@@ -1,8 +1,12 @@
 """
-Pipeline configuration — loads secrets from .env at the repo root.
+Pipeline configuration — loads secrets from the repo root.
 
-Create a .env file at the repo root (one level above this directory) with the
-keys listed in .env.local.example. The .env file is gitignored.
+Resolution order (last one wins):
+  1. .env          — base secrets file
+  2. .env.local    — local overrides (Next.js convention; present during dev)
+
+This means you can use a single .env.local for both the web app and the
+pipeline without maintaining a separate .env file.
 """
 
 import os
@@ -14,7 +18,8 @@ from dotenv import load_dotenv
 ROOT_DIR = Path(__file__).resolve().parent.parent
 PIPELINE_DIR = Path(__file__).resolve().parent
 
-load_dotenv(ROOT_DIR / ".env")
+load_dotenv(ROOT_DIR / ".env")                        # base (if present)
+load_dotenv(ROOT_DIR / ".env.local", override=True)   # local overrides win
 
 # ── Supabase ──────────────────────────────────────────────────────────────────
 SUPABASE_URL: str = os.environ["NEXT_PUBLIC_SUPABASE_URL"]
