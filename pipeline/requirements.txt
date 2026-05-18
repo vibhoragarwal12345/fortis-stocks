@@ -1,0 +1,13 @@
+supabase
+python-dotenv
+yfinance
+requests
+feedparser
+aiohttp
+asyncio
+groq
+google-generativeai
+transformers
+torch
+pandas
+sec-edgar-downloader
