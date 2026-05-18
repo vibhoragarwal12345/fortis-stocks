@@ -57,11 +57,23 @@ fortis-stocks/
 - **Imports**: use the `@/` alias (maps to `src/`).
 
 ## Database Tables
-_To be documented as tables are added._
 
-| Table | Description |
-|-------|-------------|
-| _(none yet)_ | |
+Migration: `supabase/migrations/001_initial_schema.sql`
+
+| Table | Key columns | RLS |
+|-------|-------------|-----|
+| `news_items` | ticker, headline, url (unique), published_at, sentiment_score | authenticated SELECT |
+| `market_snapshots` | ticker, snapshot_time, price, OHLCV, gap_pct, relative_volume | authenticated SELECT |
+| `sec_filings` | ticker, cik, form_type, filing_date, filing_url (unique) | authenticated SELECT |
+| `social_mentions` | ticker, source, mention_count, snapshot_date — unique (ticker, source, date) | authenticated SELECT |
+| `ranked_focus_list` | run_date, run_type, ticker, rank, composite_score, thesis, signals (jsonb) | authenticated SELECT |
+| `reports` | user_id → auth.users, report_type, report_date, content_html/markdown, delivered_email | owner only |
+| `portfolios` | user_id → auth.users, name | owner only |
+| `portfolio_holdings` | portfolio_id → portfolios, ticker, shares, cost_basis | owner only (via portfolio join) |
+
+**RLS notes:**
+- Shared tables (news, snapshots, filings, social, rankings): authenticated users can SELECT; pipeline writes via `service_role` key which bypasses RLS.
+- User-owned tables (reports, portfolios, holdings): full CRUD for owner only.
 
 ## Environment Variables
 
