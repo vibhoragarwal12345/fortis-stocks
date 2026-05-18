@@ -8,9 +8,19 @@ Usage:
 Requires: pandas, requests, lxml  (all in requirements.txt)
 """
 
+from io import StringIO
 from pathlib import Path
 
 import pandas as pd
+import requests
+
+_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0 Safari/537.36"
+    )
+}
 
 OUTPUT_PATH = Path(__file__).resolve().parent / "tickers.csv"
 
@@ -38,7 +48,9 @@ SOURCES = [
 
 
 def _fetch_tickers(source: dict) -> list[str]:
-    tables = pd.read_html(source["url"], attrs={"id": "constituents"})
+    resp = requests.get(source["url"], headers=_HEADERS, timeout=15)
+    resp.raise_for_status()
+    tables = pd.read_html(StringIO(resp.text), attrs={"id": "constituents"})
     df = tables[0]
 
     # Find the ticker column regardless of exact capitalisation
