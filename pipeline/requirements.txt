@@ -24,3 +24,9 @@ arch
 riskfolio-lib
 cvxpy
 pyfolio
+# Tier-4 audio transcription (earnings-call webcasts).
+# whisper.cpp is the primary backend (built via pipeline/quant/install_whisper.sh);
+# openai-whisper is the pure-Python fallback. imageio-ffmpeg supplies a bundled
+# ffmpeg binary when the system has none.
+openai-whisper
+imageio-ffmpeg

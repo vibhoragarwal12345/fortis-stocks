@@ -59,3 +59,8 @@ next-env.d.ts
 
 # Ad-hoc error logs
 *.err
+
+# Tier-4 audio transcription
+/pipeline/vendor/                          # cloned + built whisper.cpp (and ffmpeg shim)
+/pipeline/data/audio_cache/                # downloaded earnings-call audio (transcripts kept long-term, audio is not)
+/pipeline/data/audio_discovery_cache.json  # audio-URL discovery result cache (one lookup per company per quarter)

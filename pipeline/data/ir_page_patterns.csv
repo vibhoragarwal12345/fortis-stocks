@@ -1,0 +1,13 @@
+# ir_page_patterns.csv -- IR-page lookup for Tier-4 audio transcription.
+#
+# Hand-maintained SEED list. Only verified entries belong here. For any ticker
+# NOT listed, audio_transcriber.find_earnings_audio_url() discovers the IR page
+# at runtime (company website -> /investor* probing) and remembers the outcome
+# in data/audio_discovery_cache.json -- so this file is never auto-rewritten.
+# Add a row here when you have confirmed a working IR earnings/webcast URL.
+#
+# platform hint (guides audio-link parsing): q4 | notified | brighttalk | self | other
+ticker,company,ir_page_url,platform,notes
+AAPL,Apple Inc.,https://www.apple.com/investor/earnings-call/,self,Webcast + audio replay on the earnings-call page
+MSFT,Microsoft Corp.,https://www.microsoft.com/en-us/Investor/earnings/,self,Quarterly earnings hub with webcast replay
+NVDA,NVIDIA Corp.,https://investor.nvidia.com/financial-info/financial-reports/,q4,Q4-platform IR site; webcast replay under events

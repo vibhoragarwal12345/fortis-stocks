@@ -1,0 +1,12 @@
+# ir_rss_feeds.csv -- IR RSS-feed lookup for Tier-3 transcript discovery.
+#
+# Hand-maintained SEED list. Only verified feed URLs belong here. ir_rss_fetcher.py
+# reads these feeds (subscription, not scraping) and looks for a posted earnings
+# transcript near the relevant quarter. Tickers without an entry simply skip
+# Tier 3 and fall through to Tier 4 (audio) -- no guessing.
+#
+# Common feed-URL patterns for companies not yet listed (verify before adding):
+#   Q4-platform default:  https://<subdomain>.gcs-web.com/rss/events.xml
+#   Generic IR news:      https://investors.<company>.com/rss/news.xml
+ticker,company,rss_url,notes
+AAPL,Apple Inc.,https://www.apple.com/newsroom/rss-feed.rss,Company-wide newsroom feed; entries are filtered to investor/earnings items

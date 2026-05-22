@@ -19,16 +19,30 @@ ARCHITECTURE
     release as a separate 8-K under Item 7.01 (Reg FD). We look at all
     8-Ks in [earnings_date, earnings_date + 5 days].
 
-  PATH 3 -- IR page scrape (fragile; opt-in)
-    Some companies post transcripts on investor relations pages without
-    filing them. We try yfinance to find the IR URL, look for a transcripts
-    page, and grab the most recent. Many sites have anti-bot protection so
-    this is graceful-degrade only.
+  PATH 3 -- Company IR RSS feed  (agents/ir_rss_fetcher.py)
+    Most companies publish an investor-relations RSS feed; when they post a
+    transcript it is linked from the feed. We subscribe to verified feeds
+    (data/ir_rss_feeds.csv) and parse a linked transcript when one appears
+    for the quarter. Cheap and exact, so tried before the audio path.
 
-  PATH 4 -- Press release fallback
-    If nothing usable, we use the 8-K Item 2.02 description from sec_filings.
-    Quality is marked 'press_release_only' so downstream signal strength
-    is capped at 50.
+  PATH 5 -- Press release fallback
+    We fetch the actual EX-99.1 press-release content from SEC and grade it
+    by substantive word count: substantive_press_release (>3000 words),
+    standard_press_release (1000-3000) or minimal_press_release (<1000).
+    Evaluated before PATH 4 so its substance can gate the slow audio path.
+
+  PATH 4 -- Audio transcription  (agents/audio_transcriber.py)  [conditional]
+    Only attempted when the press release is thin (minimal / unavailable) --
+    a substantive press release already carries the financials, guidance and
+    prepared commentary, so the 5-10 min of transcription is not worth it.
+    We locate the publicly-webcast audio replay on the company IR page,
+    download it once, and transcribe it locally with whisper (open-source,
+    offline, no API cost). robots.txt is honoured; results are cached.
+
+  QUALITY GRADES (Fix 2)
+    full_call_with_qa | full_call_prepared_only | substantive_press_release |
+    standard_press_release | minimal_press_release | unavailable. These drive
+    earnings_strength_baseline in smart_money_intel.
 
 RATE LIMITING
   SEC's polite limit is 10 req/s with a User-Agent header. We track the last
@@ -47,7 +61,7 @@ Usage:
     from agents.sec_transcript_fetcher import fetch_full_transcript
     r = fetch_full_transcript("AAPL", 2026, 1)
     # -> {"transcript_text": "...", "structured_segments": [...],
-    #     "quality_grade": "full_call", "source_url": "...",
+    #     "quality_grade": "full_call_with_qa", "source_url": "...",
     #     "source_path": "sec_8k_item202", "earnings_date": "2026-04-30"}
 
     python pipeline/agents/sec_transcript_fetcher.py AAPL 2026 1
@@ -93,6 +107,13 @@ BACKOFF_MAX_SECONDS     = 300
 MIN_FULL_CALL_WORDS  = 3000
 MIN_QA_PAIRS         = 5
 MIN_SPEAKER_TURNS    = 12
+
+# Quality-grade vocabulary (Fix 2). full_call_* are real call transcripts;
+# the *_press_release tiers grade an 8-K earnings release by substantive word
+# count. earnings_strength_baseline in smart_money_intel keys off these.
+_FULL_TRANSCRIPT_GRADES = ("full_call_with_qa", "full_call_prepared_only")
+# Grades good enough to halt the fallback chain and serve from cache.
+_CACHEABLE_GRADES = _FULL_TRANSCRIPT_GRADES + ("substantive_press_release",)
 
 TRANSCRIPT_FILENAME_HINTS = (
     "transcript", "earnings", "conference", "call", "q&a",
@@ -639,25 +660,45 @@ def structure_full_transcript(text: str) -> list[Segment]:
 
 
 def validate_transcript_quality(text: str, segments: list[Segment]) -> str:
-    """Return 'full_call' | 'partial' | 'press_release_only' | 'unavailable'."""
-    if not text or _word_count(text) < 500:
+    """Grade the document on the six-tier rubric (Fix 2):
+
+      full_call_with_qa        real transcript with Q&A captured
+      full_call_prepared_only  real transcript, prepared remarks only
+      substantive_press_release  press release > 3000 words of real content
+      standard_press_release     press release 1000-3000 words
+      minimal_press_release      press release < 1000 words
+      unavailable                nothing usable
+
+    A real call transcript is distinguished from a press release by structure
+    (an Operator, many speaker turns, multiple distinct speakers); a press
+    release is graded purely by substantive word count."""
+    wc = _word_count(text)
+    if not text or wc < 150:
         return "unavailable"
-    has_operator = bool(OPERATOR_RE.search(text))
+
+    has_operator  = bool(OPERATOR_RE.search(text))
     has_qa_marker = bool(QA_HEADER_RE.search(text))
     speakers = {s.name for s in segments}
     qa_pairs = sum(1 for s in segments if s.segment_type == "qa_question")
-    n_turns = len(segments)
-    wc = _word_count(text)
+    n_turns  = len(segments)
 
-    if (wc >= MIN_FULL_CALL_WORDS and n_turns >= MIN_SPEAKER_TURNS
-            and (has_qa_marker or qa_pairs >= MIN_QA_PAIRS)
-            and len(speakers) >= 4):
-        return "full_call"
-    if wc >= 1500 and (n_turns >= 5 or has_operator):
-        return "partial"
-    if wc >= 300:
-        return "press_release_only"
-    return "unavailable"
+    # Does this read as an actual call transcript rather than a press release?
+    is_transcript = (has_operator or n_turns >= MIN_SPEAKER_TURNS
+                     or len(speakers) >= 4)
+
+    if is_transcript and wc >= 1500:
+        has_real_qa = has_qa_marker or qa_pairs >= MIN_QA_PAIRS
+        if (has_real_qa and wc >= MIN_FULL_CALL_WORDS
+                and n_turns >= MIN_SPEAKER_TURNS and len(speakers) >= 4):
+            return "full_call_with_qa"
+        return "full_call_prepared_only"
+
+    # Otherwise treat as an earnings press release, graded by substance.
+    if wc > 3000:
+        return "substantive_press_release"
+    if wc >= 1000:
+        return "standard_press_release"
+    return "minimal_press_release"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -819,7 +860,7 @@ def _try_8k_path(ticker: str, year: int, quarter: int,
             attempts.append(FetchAttempt(path_label, quality != "unavailable",
                                            quality=quality,
                                            exhibit_url=ex.url))
-            if quality in ("full_call", "partial"):
+            if quality in _FULL_TRANSCRIPT_GRADES:
                 return {
                     "transcript_text":     text,
                     "structured_segments": [s.to_dict() for s in segments],
@@ -835,9 +876,9 @@ def _try_press_release_fallback(db, ticker: str, year: int,
                                    quarter: int) -> tuple[dict | None,
                                                             FetchAttempt]:
     """Fetch the actual EX-99.1 press release content from SEC -- much richer
-    than the short description in sec_filings. This is still 'press_release_only'
-    quality per spec, but the text body is several thousand words instead of
-    one line."""
+    than the short description in sec_filings. Graded by substantive word
+    count (substantive / standard / minimal press release), so a meaty
+    release earns a higher earnings-strength baseline than a one-liner."""
     cik = _resolve_cik(ticker)
     if cik:
         filings = find_8k_transcript_filings(ticker, year, quarter)
@@ -862,16 +903,17 @@ def _try_press_release_fallback(db, ticker: str, year: int,
             parsed = fetch_and_parse_exhibit(pr_ex)
             if not parsed or not parsed.get("text"):
                 continue
+            pr_text = parsed["text"]
+            grade = validate_transcript_quality(pr_text, [])
             return {
-                "transcript_text":     parsed["text"],
+                "transcript_text":     pr_text,
                 "structured_segments": [],
-                "quality_grade":       "press_release_only",
+                "quality_grade":       grade,
                 "source_url":          pr_ex.url,
                 "source_path":         "press_release_fallback",
                 "earnings_date":       f.filed.isoformat(),
-            }, FetchAttempt("press_release_fallback", True,
-                              quality="press_release_only",
-                              exhibit_url=pr_ex.url)
+            }, FetchAttempt("press_release_fallback", grade != "unavailable",
+                              quality=grade, exhibit_url=pr_ex.url)
 
     # Final-final fallback: short description from sec_filings
     try:
@@ -892,33 +934,35 @@ def _try_press_release_fallback(db, ticker: str, year: int,
     if not desc:
         return None, FetchAttempt("press_release_fallback", False,
                                     error="empty description")
+    grade = validate_transcript_quality(desc, [])
     return {
         "transcript_text":     desc,
         "structured_segments": [],
-        "quality_grade":       "press_release_only",
+        "quality_grade":       grade,
         "source_url":          chosen.get("filing_url"),
         "source_path":         "press_release_fallback",
         "earnings_date":       (chosen.get("filing_date") or "")[:10],
-    }, FetchAttempt("press_release_fallback", True,
-                      quality="press_release_only")
+    }, FetchAttempt("press_release_fallback", grade != "unavailable",
+                      quality=grade)
 
 
 def fetch_full_transcript(ticker: str, year: int, quarter: int,
                             db=None, use_cache: bool = True) -> dict:
-    """Orchestrator. Tries 4 paths in order; returns the first success."""
+    """Orchestrator. Tries 5 paths in order; returns the first success."""
     t0 = time.monotonic()
     ticker = ticker.upper()
     db_handle = db or _db()
 
-    # Cache check
+    # Cache check -- only "good" grades short-circuit; thin grades are re-tried
+    # each run so a later-filed transcript (or audio) can still upgrade them.
     if use_cache:
         cached = _read_disk_cache(ticker, year, quarter)
-        if cached and cached.get("quality_grade") in ("full_call", "partial"):
+        if cached and cached.get("quality_grade") in _CACHEABLE_GRADES:
             log.info("%s %dQ%d: disk cache hit (%s)",
                      ticker, year, quarter, cached["quality_grade"])
             return cached
         db_cached = _read_db_cache(db_handle, ticker, year, quarter)
-        if db_cached and db_cached.get("quality_grade") in ("full_call", "partial"):
+        if db_cached and db_cached.get("quality_grade") in _CACHEABLE_GRADES:
             log.info("%s %dQ%d: DB cache hit (%s)",
                      ticker, year, quarter, db_cached["quality_grade"])
             return db_cached
@@ -935,22 +979,67 @@ def fetch_full_transcript(ticker: str, year: int, quarter: int,
         result, a = _try_8k_path(ticker, year, quarter, "sec_8k_item701")
         attempts.extend(a)
 
-    # PATH 3: IR page scrape -- skipped by default (fragile, anti-bot)
-    # Implement on demand for specific tickers later
-
-    # PATH 4: press release fallback (fetches actual EX-99.1 content)
+    # PATH 3: company IR RSS feed -- a transcript linked from the feed
     if result is None:
-        result, a = _try_press_release_fallback(db_handle, ticker, year, quarter)
+        try:
+            from agents.ir_rss_fetcher import find_ir_rss_transcript
+            rss = find_ir_rss_transcript(ticker, year, quarter)
+        except Exception as exc:
+            log.warning("%s: PATH 3 (IR RSS) error: %s", ticker, exc)
+            rss = None
+        if rss:
+            result = rss
+            attempts.append(FetchAttempt("ir_rss_transcript", True,
+                                           quality=rss["quality_grade"],
+                                           exhibit_url=rss.get("source_url")))
+        else:
+            attempts.append(FetchAttempt("ir_rss_transcript", False,
+                                           error="no transcript in IR RSS feed"))
+
+    # PATH 5: press release fallback -- the actual EX-99.1 content from SEC.
+    # Evaluated before PATH 4 so its substance gates the slow audio path.
+    pr_result = None
+    if result is None:
+        pr_result, a = _try_press_release_fallback(db_handle, ticker, year, quarter)
         attempts.append(a)
-        if result is None:
-            result = {
-                "transcript_text":     "",
-                "structured_segments": [],
-                "quality_grade":       "unavailable",
-                "source_url":          None,
-                "source_path":         None,
-                "earnings_date":       None,
-            }
+
+    # PATH 4: audio transcription of the webcast -- only worth the 5-10 min
+    # when the press release is thin (minimal / unavailable). A substantive or
+    # standard press release already carries the financials, guidance and
+    # prepared commentary. No-op fast when no whisper backend is installed.
+    if result is None:
+        pr_grade = (pr_result or {}).get("quality_grade", "unavailable")
+        if pr_grade in ("minimal_press_release", "unavailable"):
+            try:
+                from agents.audio_transcriber import fetch_audio_transcript
+                audio = fetch_audio_transcript(ticker, year, quarter, db=db_handle)
+            except Exception as exc:
+                log.warning("%s: PATH 4 (audio) error: %s", ticker, exc)
+                audio = None
+            if audio and audio.get("quality_grade") in _FULL_TRANSCRIPT_GRADES:
+                result = audio
+                attempts.append(FetchAttempt("audio_transcription", True,
+                                               quality=audio["quality_grade"],
+                                               exhibit_url=audio.get("source_url")))
+            else:
+                attempts.append(FetchAttempt(
+                    "audio_transcription", False,
+                    quality=(audio or {}).get("quality_grade"),
+                    error="no full-call audio / no webcast / no whisper backend"))
+                result = pr_result
+        else:
+            # Press release is substantive enough -- use it, skip audio.
+            result = pr_result
+
+    if result is None:
+        result = {
+            "transcript_text":     "",
+            "structured_segments": [],
+            "quality_grade":       "unavailable",
+            "source_url":          None,
+            "source_path":         None,
+            "earnings_date":       None,
+        }
 
     payload = {
         "ticker":             ticker,
@@ -960,7 +1049,7 @@ def fetch_full_transcript(ticker: str, year: int, quarter: int,
     }
 
     elapsed = time.monotonic() - t0
-    success = payload["quality_grade"] in ("full_call", "partial", "press_release_only")
+    success = payload["quality_grade"] != "unavailable"
     log.info("%s %dQ%d -> %s (%s, %.1fs)",
              ticker, year, quarter, payload["quality_grade"],
              payload.get("source_path"), elapsed)
