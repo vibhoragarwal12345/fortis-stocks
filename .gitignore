@@ -46,3 +46,16 @@ next-env.d.ts
 /pipeline/__pycache__/
 /pipeline/**/__pycache__/
 /pipeline/**/*.pyc
+
+# Local historical-analog store (multi-GB FAISS index + metadata)
+/pipeline/data/historical_patterns.faiss
+/pipeline/data/historical_patterns.parquet
+
+# Cached SEC transcript JSON (30-day TTL; permanent copy lives in earnings_transcripts table)
+/pipeline/data/transcripts/
+
+# Generated performance / track-record reports
+/pipeline/reports/
+
+# Ad-hoc error logs
+*.err
