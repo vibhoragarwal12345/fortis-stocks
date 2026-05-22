@@ -1,6 +1,7 @@
 supabase
 python-dotenv
 yfinance
+pandas-ta
 requests
 feedparser
 aiohttp
@@ -9,5 +10,17 @@ groq
 google-generativeai
 transformers
 torch
+sentence-transformers
+spacy
+faiss-cpu
+pyarrow
 pandas
+numpy
 sec-edgar-downloader
+# Quantitative Models Desk
+scipy
+statsmodels
+arch
+riskfolio-lib
+cvxpy
+pyfolio

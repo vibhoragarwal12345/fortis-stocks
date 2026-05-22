@@ -1,0 +1,349 @@
+"""
+Critic Agent  -- the devil's advocate
+Every thesis the advisor reads has been challenged. For each top-ranked ticker
+that already has a bull case, this agent attacks the thesis rigorously and
+writes a sharper bear case -- the discipline practised at Citadel, Point72 and
+Bridgewater.
+
+It deliberately uses a DIFFERENT model from the thesis writer: debate_synthesizer
+writes with Groq Llama 3.3 70B, so the critic writes with Gemini 2.0 Flash. A
+model should not get to mark its own homework.
+
+  NOTE: if GEMINI_API_KEY is not set the critic falls back to Groq Llama. That
+  still produces a critique, but it forfeits the cross-model independence that
+  is the whole point -- set GEMINI_API_KEY for the intended behaviour.
+
+For each ticker it produces, and writes to ranked_focus_list (migration 012):
+  critic_weaknesses, critic_disconfirming_data, critic_precedent_failures,
+  critic_hidden_risks, critic_objection_level, critic_rewritten_bear_case.
+The rewritten bear case also replaces the original bear_case.
+
+CONVICTION IMPACT
+  critic_objection_level is stored for the conviction grader to enforce:
+    STRONG   -> conviction grade capped at B
+    MODERATE -> max grade A, flagged for advisor review
+    NONE     -> proceed normally
+  (The cap itself is applied by conviction_grader.py.)
+
+Usage:
+    python pipeline/agents/critic_agent.py [N]      # default N = 30
+"""
+
+import logging
+import re
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from config import (  # noqa: E402
+    GEMINI_API_KEY, GROQ_API_KEY, SUPABASE_SERVICE_KEY, SUPABASE_URL,
+)
+from supabase import create_client  # noqa: E402
+
+DEFAULT_N    = 30
+RANK_SOURCE  = "midday"
+GEMINI_MODEL = "gemini-2.5-flash"   # 2.0-flash free-tier quota is exhausted; 2.5 is its successor
+GROQ_MODEL   = "llama-3.3-70b-versatile"
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s  %(levelname)-7s  %(message)s",
+    datefmt="%H:%M:%S",
+)
+log = logging.getLogger(__name__)
+
+_SYSTEM = ("You are a contrarian risk officer at a hedge fund. Your job is to "
+           "identify weaknesses in investment theses. You are skeptical, not "
+           "negative. You ask hard questions.")
+
+_HEADERS = ["THESIS_WEAKNESSES", "DISCONFIRMING_DATA", "PRECEDENT_FAILURES",
+            "HIDDEN_RISKS", "CONVICTION_ADJUSTMENT", "REWRITTEN_BEAR_CASE"]
+
+# Gemini free-tier has a 20-req/day daily cap on 2.5-flash. Once we hit a
+# quota error, stop retrying for the rest of the run -- log once, route every
+# remaining critique straight to Groq.
+_gemini_disabled = False
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Prompt
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _build_prompt(ticker: str, bull_case: str, sm: dict | None = None) -> str:
+    sm_block = ""
+    if sm:
+        sm_block = (
+            f"\nSMART MONEY SIGNALS for {ticker}:\n"
+            f"- Pattern detected: {sm.get('pattern_detected')} "
+            f"(confidence {sm.get('confidence_level')}, "
+            f"composite {sm.get('composite_smart_money_score')})\n"
+            f"- Earnings signal: {sm.get('earnings_signal_score')}\n"
+            f"- Insider signal: {sm.get('insider_signal_score')} "
+            f"({sm.get('insider_detected_cluster')})\n"
+            f"- Short signal: {sm.get('short_signal_score')} "
+            f"(trend {sm.get('short_trend_direction')})\n"
+            f"- Revisions: {sm.get('revision_signal_score')} "
+            f"({sm.get('revision_velocity')})\n"
+            "\nAddress whether these smart-money signals contradict the bull thesis "
+            "in your weaknesses section.\n"
+        )
+    return f"""Here is the bull case for {ticker}:
+{bull_case}
+{sm_block}
+Your task: Attack this thesis rigorously.
+
+THESIS_WEAKNESSES:
+Identify the 3 weakest links in the bull case. Be specific -- name which claim
+is weakest and why. If the smart-money signals contradict the bull thesis,
+name the specific divergence.
+
+DISCONFIRMING_DATA:
+What data, if it appeared in the next 30 days, would invalidate this thesis? Be
+specific about what would need to be true.
+
+PRECEDENT_FAILURES:
+Has a similar setup historically failed? If so, why?
+
+HIDDEN_RISKS:
+What risks is the bull case ignoring or downplaying? Macro, sector, idiosyncratic.
+
+CONVICTION_ADJUSTMENT:
+Based on your analysis, should conviction be raised, maintained, or lowered?
+Output one of: STRONG_OBJECTION, MODERATE_OBJECTION, NO_MATERIAL_OBJECTION.
+
+REWRITTEN_BEAR_CASE:
+Now write the bear case as it should be written if it were as well-argued as
+the bull case typically is. Be specific."""
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# LLM generation -- Gemini (preferred), Groq fallback
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _try_gemini(prompt: str) -> str | None:
+    global _gemini_disabled
+    if not GEMINI_API_KEY or _gemini_disabled:
+        return None
+    try:
+        import google.generativeai as genai
+        genai.configure(api_key=GEMINI_API_KEY)
+        model = genai.GenerativeModel(GEMINI_MODEL, system_instruction=_SYSTEM)
+        return (model.generate_content(prompt).text or "").strip() or None
+    except Exception as exc:
+        msg = str(exc)
+        # Quota errors are sticky -- stop banging the API for every remaining
+        # pick. Disable Gemini for the rest of this run and route to Groq.
+        if any(s in msg for s in ("429", "RESOURCE_EXHAUSTED")) \
+                or "quota" in msg.lower():
+            log.warning("Gemini quota exhausted -- routing remaining "
+                        "critiques to Groq for the rest of this run")
+            _gemini_disabled = True
+        else:
+            log.warning("Gemini failed: %s -- falling back to Groq", exc)
+        return None
+
+
+def _try_groq(prompt: str) -> str | None:
+    if not GROQ_API_KEY:
+        return None
+    try:
+        from groq import Groq
+        resp = Groq(api_key=GROQ_API_KEY).chat.completions.create(
+            model=GROQ_MODEL,
+            messages=[{"role": "system", "content": _SYSTEM},
+                      {"role": "user", "content": prompt}],
+            temperature=0.5, max_tokens=1600)
+        return (resp.choices[0].message.content or "").strip() or None
+    except Exception as exc:
+        log.warning("Groq fallback failed: %s", exc)
+        return None
+
+
+def _generate(prompt: str) -> tuple[str | None, str]:
+    text = _try_gemini(prompt)
+    if text:
+        return text, "gemini"
+    text = _try_groq(prompt)
+    if text:
+        return text, "groq (fallback)"
+    return None, "none"
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Parsing
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _parse(text: str) -> dict:
+    pattern = re.compile(r"^[#*\s]*(" + "|".join(_HEADERS) + r")[#*:\s]*$",
+                         re.MULTILINE | re.IGNORECASE)
+    marks = [(m.group(1).upper(), m.end()) for m in pattern.finditer(text)]
+    sections: dict[str, str] = {}
+    for i, (name, end) in enumerate(marks):
+        stop = (pattern.search(text, end).start()
+                if i + 1 < len(marks) else len(text))
+        sections[name] = text[end:stop].strip()
+
+    adj = sections.get("CONVICTION_ADJUSTMENT", "").upper()
+    if "STRONG_OBJECTION" in adj:
+        level = "STRONG"
+    elif "MODERATE_OBJECTION" in adj:
+        level = "MODERATE"
+    elif "NO_MATERIAL_OBJECTION" in adj:
+        level = "NONE"
+    else:                                   # unparseable -> conservative default
+        level = "MODERATE"
+
+    return {
+        "critic_weaknesses":          sections.get("THESIS_WEAKNESSES") or None,
+        "critic_disconfirming_data":  sections.get("DISCONFIRMING_DATA") or None,
+        "critic_precedent_failures":  sections.get("PRECEDENT_FAILURES") or None,
+        "critic_hidden_risks":        sections.get("HIDDEN_RISKS") or None,
+        "critic_objection_level":     level,
+        "critic_rewritten_bear_case": sections.get("REWRITTEN_BEAR_CASE") or None,
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Entry point
+# ══════════════════════════════════════════════════════════════════════════════
+
+def run(limit: int = DEFAULT_N) -> None:
+    db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    primary = GEMINI_MODEL if GEMINI_API_KEY else "Groq Llama (FALLBACK)"
+    log.info("Critic Agent -- top %d, model: %s", limit, primary)
+    if not GEMINI_API_KEY:
+        log.warning("GEMINI_API_KEY not set -- critic uses the SAME model family "
+                    "as the thesis writer. Cross-model independence is lost. "
+                    "Set GEMINI_API_KEY for the intended behaviour.")
+
+    recent = (db.table("ranked_focus_list").select("run_date")
+              .order("run_date", desc=True).limit(1).execute().data)
+    if not recent:
+        log.warning("ranked_focus_list empty -- run ranking_engine first.")
+        return
+    run_date = recent[0]["run_date"]
+
+    rows = (db.table("ranked_focus_list")
+            .select("ticker,rank,bull_case,bear_case")
+            .eq("run_date", run_date).eq("run_type", RANK_SOURCE)
+            .order("rank").limit(limit).execute().data or [])
+    rows = [r for r in rows if r.get("bull_case")]
+    if not rows:
+        log.warning("No theses with a bull_case found -- run debate_synthesizer "
+                    "first (and ensure migration 011 is applied).")
+        return
+    log.info("Critiquing %d theses from %s/%s", len(rows), run_date, RANK_SOURCE)
+
+    # Pre-load Smart Money signals (Step 6.7) so the critic can address them
+    # and we can apply pattern-driven objection overrides post-LLM.
+    tickers = [r["ticker"] for r in rows]
+    smart_money: dict[str, dict] = {}
+    try:
+        sm_rows = (db.table("smart_money_intel")
+                   .select("ticker,pattern_detected,confidence_level,"
+                           "composite_smart_money_score,earnings_signal_score,"
+                           "insider_signal_score,insider_detected_cluster,"
+                           "short_signal_score,short_trend_direction,"
+                           "revision_signal_score,revision_velocity,snapshot_date")
+                   .in_("ticker", tickers)
+                   .order("snapshot_date", desc=True).execute().data or [])
+        for r in sm_rows:
+            smart_money.setdefault(r["ticker"], r)
+    except Exception as exc:
+        log.debug("smart_money_intel preload failed: %s", exc)
+
+    results: list[dict] = []
+    for r in rows:
+        try:                                       # never let one ticker kill the run
+            sm = smart_money.get(r["ticker"])
+            text, method = _generate(_build_prompt(r["ticker"], r["bull_case"], sm))
+            if not text:
+                log.warning("%s: no critique generated", r["ticker"])
+                continue
+            parsed = _parse(text)
+            parsed["ticker"] = r["ticker"]
+            parsed["_method"] = method
+            parsed["_original_bear"] = r.get("bear_case")
+            # Pattern-driven objection override (Step 6.7). Only fires when
+            # confidence is HIGH/MEDIUM (LOW = informational only per spec).
+            if sm and sm.get("confidence_level") in ("HIGH", "MEDIUM"):
+                pat = sm.get("pattern_detected")
+                if pat in ("INSIDER_SMOKE_SIGNAL", "VALUE_TRAP_WARNING"):
+                    if parsed["critic_objection_level"] != "STRONG":
+                        log.info("%s: critic objection raised STRONG by %s pattern",
+                                 r["ticker"], pat)
+                        parsed["critic_objection_level"] = "STRONG"
+                elif pat == "CAPITULATION_BOTTOM":
+                    # Spec: MODERATE objection if a bear case is being made.
+                    # In this pipeline the critic always argues bear, so we
+                    # MODERATE the objection unless it was already STRONG.
+                    if parsed["critic_objection_level"] == "NONE":
+                        parsed["critic_objection_level"] = "MODERATE"
+            results.append(parsed)
+            log.info("%s: %s objection (via %s)",
+                     r["ticker"], parsed["critic_objection_level"], method)
+        except Exception as exc:
+            log.warning("%s: critique iteration error -- %s",
+                        r["ticker"], type(exc).__name__)
+            continue
+
+    # Persist -- the rewritten bear case also replaces the original bear_case.
+    now = datetime.now(timezone.utc).isoformat()
+    updated = 0
+    for r in results:
+        payload = {
+            "critic_weaknesses":          r["critic_weaknesses"],
+            "critic_disconfirming_data":  r["critic_disconfirming_data"],
+            "critic_precedent_failures":  r["critic_precedent_failures"],
+            "critic_hidden_risks":        r["critic_hidden_risks"],
+            "critic_objection_level":     r["critic_objection_level"],
+            "critic_rewritten_bear_case": r["critic_rewritten_bear_case"],
+        }
+        if r["critic_rewritten_bear_case"]:
+            payload["bear_case"] = r["critic_rewritten_bear_case"]
+        try:
+            db.table("ranked_focus_list").update(payload) \
+              .eq("run_date", run_date).eq("ticker", r["ticker"]).execute()
+            updated += 1
+        except Exception as exc:
+            log.debug("update %s failed: %s", r["ticker"], exc)
+    log.info("ranked_focus_list: critique written for %d/%d tickers",
+             updated, len(results))
+    if updated == 0 and results:
+        log.warning("Nothing persisted -- apply supabase/migrations/"
+                    "012_critic_columns.sql, then re-run.")
+
+    _report(results)
+
+
+def _report(results: list[dict]) -> None:
+    bar = "=" * 80
+    print(f"\n{bar}\nCRITIC AGENT -- {len(results)} theses challenged\n{bar}")
+
+    print("\n[ OBJECTION LEVEL BY TICKER ]")
+    for r in results:
+        print(f"  {r['ticker']:<8}{r['critic_objection_level']:<12}(via {r['_method']})")
+
+    rank = {"STRONG": 3, "MODERATE": 2, "NONE": 1}
+    strongest = max(results, key=lambda r: rank.get(r["critic_objection_level"], 0))
+    print(f"\n[ REWRITTEN BEAR CASE -- STRONGEST OBJECTION: {strongest['ticker']} "
+          f"({strongest['critic_objection_level']}) ]\n")
+    print(strongest["critic_rewritten_bear_case"] or "(none)")
+
+    print(f"\n{bar}\n[ ORIGINAL vs CRITIC-REWRITTEN BEAR CASE -- {results[0]['ticker']} ]")
+    print(f"\n--- ORIGINAL (debate_synthesizer) ---\n"
+          f"{results[0]['_original_bear'] or '(none on file)'}")
+    print(f"\n--- CRITIC-REWRITTEN ---\n"
+          f"{results[0]['critic_rewritten_bear_case'] or '(none)'}")
+    print(f"{bar}\n")
+
+
+if __name__ == "__main__":
+    n = DEFAULT_N
+    if len(sys.argv) > 1:
+        try:
+            n = int(sys.argv[1])
+        except ValueError:
+            log.warning("Invalid N '%s' -- using %d", sys.argv[1], DEFAULT_N)
+    run(n)
