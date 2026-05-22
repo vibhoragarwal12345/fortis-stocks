@@ -217,13 +217,14 @@ def fetch_transcript(db, ticker: str, today: date) -> dict:
     """Return {'text', 'source', 'quality', 'last_report_date', 'year',
     'quarter'} -- best-effort.
 
-    Step 6.7 upgrade: routes through sec_transcript_fetcher (SEC EDGAR
-    exhibits). API Ninjas is no longer used (free tier paywalled). The new
-    quality vocabulary maps to the legacy one used downstream:
-      sec_full_call          -> 'full' (no longer used; SEC rarely has these)
-      sec_partial            -> 'partial'
-      sec_press_release_only -> 'press_release_only'
-      sec_unavailable        -> 'none'
+    Routes through sec_transcript_fetcher's fallback chain: SEC 8-K exhibits
+    -> IR RSS feed -> press release -> (conditional) audio transcription.
+    'quality' is the six-tier coverage grade, passed straight through:
+      full_call_with_qa | full_call_prepared_only | substantive_press_release
+      | standard_press_release | minimal_press_release | unavailable
+    analyze_earnings_call() keys earnings_strength_baseline off it. The
+    'source' field carries the originating path (sec_8k_item202 / ... /
+    press_release_fallback).
     """
     from agents import sec_transcript_fetcher as stf  # avoid import-time cycle
 
@@ -234,29 +235,28 @@ def fetch_transcript(db, ticker: str, today: date) -> dict:
     py, pq = (year - 1, 4) if quarter == 1 else (year, quarter - 1)
     candidates.append((py, pq))
 
+    # "Good" grades stop the search; anything non-unavailable is kept as a
+    # fallback if no quarter yields a good one.
+    GOOD = ("full_call_with_qa", "full_call_prepared_only",
+            "substantive_press_release")
     best = None
     for y, q in candidates:
         r = stf.fetch_full_transcript(ticker, y, q, db=db)
-        if r["quality_grade"] in ("full_call", "partial"):
+        if r["quality_grade"] in GOOD:
             best = (r, y, q)
             break
-        if r["quality_grade"] == "press_release_only" and best is None:
+        if r["quality_grade"] != "unavailable" and best is None:
             best = (r, y, q)
 
     if best is None:
-        return {"text": None, "source": None, "quality": "none",
+        return {"text": None, "source": None, "quality": "unavailable",
                 "last_report_date": None, "year": year, "quarter": quarter}
 
     r, y, q = best
-    # Map new quality vocabulary -> legacy
-    quality_map = {"full_call": "full",
-                    "partial":   "partial",
-                    "press_release_only": "press_release_only",
-                    "unavailable": "none"}
     return {
         "text":             r["transcript_text"],
         "source":           r.get("source_path") or "sec",
-        "quality":          quality_map.get(r["quality_grade"], "none"),
+        "quality":          r["quality_grade"],   # six-tier grade, passed through
         "last_report_date": r.get("earnings_date"),
         "year":             y,
         "quarter":          q,
@@ -312,7 +312,7 @@ def _classify_deflections(qa_text: str) -> tuple[int, int, int]:
 def analyze_earnings_call(transcript_pkg: dict, ticker: str, today: date) -> dict:
     """Returns the earnings sub-signal."""
     text = transcript_pkg.get("text") or ""
-    quality = transcript_pkg.get("quality") or "none"
+    quality = transcript_pkg.get("quality") or "unavailable"
     if not text:
         return {"score": 0.0, "strength": 0.0,
                 "last_report_date": None, "verdict": "NO_DATA",
@@ -368,12 +368,20 @@ def analyze_earnings_call(transcript_pkg: dict, ticker: str, today: date) -> dic
     score -= min(20, deflected * 5)
     score = max(-100, min(100, round(score, 2)))
 
-    # Strength baseline per Step 6.7 upgrade spec.
-    # 'full' (SEC full_call) = 100, 'partial' = 70, 'press_release_only' = 50,
-    # 'none' = 0. Press release content is now richer (actual EX-99.1 body,
-    # ~2000 words) so 50 reflects the real information density.
-    base_strength = {"full": 100, "partial": 70,
-                     "press_release_only": 50, "none": 0}.get(quality, 0)
+    # Earnings-strength baseline per the six-tier coverage rubric (Fix 2).
+    # A press release is no longer treated as a uniformly degraded outcome: a
+    # substantive 8-K Item 2.02 release carries the financials, guidance and
+    # prepared commentary, so it earns a solid baseline. What a press release
+    # lacks -- live Q&A pushback, real-time tone shifts -- is disclosed in the
+    # intel note rather than silently penalised.
+    base_strength = {
+        "full_call_with_qa":         100,
+        "full_call_prepared_only":    85,
+        "substantive_press_release":  75,
+        "standard_press_release":     60,
+        "minimal_press_release":      40,
+        "unavailable":                 0,
+    }.get(quality, 0)
     # Decay if last earnings > 60 days ago (signal stale). We don't always
     # know the date; assume current quarter is fresh.
     strength = base_strength
@@ -428,6 +436,24 @@ def _looks_10b5_1(footnote_text: str) -> bool:
         return True
     # Boilerplate that frequently accompanies scheduled trades.
     if "trading plan" in s and ("adopt" in s or "established" in s):
+        return True
+    return False
+
+
+def _is_directional_signal(code: str | None, ad: str | None,
+                           is_10b5_1: bool) -> bool:
+    """True only for Form 4 transactions that reflect a real, discretionary
+    view -- the integrity filter from the 10b5-1 spot test:
+      P  open-market purchase
+      S  open-market sale, but only when NOT a scheduled 10b5-1 trade
+      V  voluntary transaction not pursuant to Rule 10b5-1
+    Every other code (A grants, F tax withholding, G gifts, M/X derivative
+    exercises, etc.) is mechanical or non-directional and returns False."""
+    if code == "P":
+        return True
+    if code == "S":
+        return not is_10b5_1
+    if code == "V":
         return True
     return False
 
@@ -554,8 +580,9 @@ def _parse_form4_xml(cik: str, accession: str) -> list[dict]:
 
     out = []
     # nonDerivativeTransaction blocks
-    for block in re.findall(r"<nonDerivativeTransaction>(.*?)</nonDerivativeTransaction>",
-                              xml, re.IGNORECASE | re.DOTALL):
+    for idx, block in enumerate(re.findall(
+            r"<nonDerivativeTransaction>(.*?)</nonDerivativeTransaction>",
+            xml, re.IGNORECASE | re.DOTALL)):
         code = (re.search(r"<transactionCode>(.)</transactionCode>", block) or [None, None])[1] \
                 if False else None
         m = re.search(r"<transactionCode>(.)</transactionCode>", block, re.IGNORECASE)
@@ -578,17 +605,22 @@ def _parse_form4_xml(cik: str, accession: str) -> list[dict]:
                             re.IGNORECASE | re.DOTALL)
             if fm:
                 footnote_text += " " + re.sub(r"<.*?>", "", fm.group(1))
+        fn = footnote_text.strip()
+        is10 = _looks_10b5_1(fn)
         out.append({
             "insider":   name or "Unknown",
             "role":      role,
             "tx_code":   code,
             "ad":        ad,                # A=acquired, D=disposed
+            "is_acquisition": (ad == "A") if ad else None,
+            "txn_index": idx,               # ordinal within the filing
             "date":      tdate,
             "shares":    shares,
             "price":     price,
             "value":     (shares * price) if (shares is not None and price is not None) else None,
-            "footnote":  footnote_text.strip(),
-            "is_10b5_1": _looks_10b5_1(footnote_text),
+            "footnote":  fn,
+            "is_10b5_1": is10,
+            "is_directional_signal": _is_directional_signal(code, ad, is10),
         })
     return out
 
@@ -619,17 +651,17 @@ def _classify_insider_cluster(txns: list[dict]) -> str:
     cutoff = (datetime.utcnow().date() - timedelta(days=30)).isoformat()
     recent = [t for t in txns if (t.get("date") or "") >= cutoff]
     discretionary = [t for t in recent if not t.get("is_10b5_1")]
-    # tx_code mapping per SEC Form 4 instructions:
-    #   P = open-market purchase (real signal)
-    #   S = open-market sale (real signal)
-    #   G = bona fide gift (NOT a directional signal)
-    #   F = payment of tax withholding via stock (NOT directional)
-    #   M = exercise of derivative (NOT a sale)
-    # We narrow buys/sells to the open-market codes only, per the 10b5-1
-    # spot test finding -- gifts and GSU vestings shouldn't drive INSIDER
-    # signals.
-    buys  = [t for t in discretionary if t.get("tx_code") == "P"]
-    sells = [t for t in discretionary if t.get("tx_code") == "S"]
+    # Only directional codes drive insider clusters (see _is_directional_signal
+    # and the 10b5-1 spot test): P open-market buy, S open-market sale, and V
+    # voluntary non-10b5-1 transaction (direction from acquired/disposed).
+    # Grants (A), tax withholding (F), gifts (G) and derivative exercises (M/X)
+    # are excluded -- they are mechanical, not sentiment.
+    buys  = [t for t in discretionary
+             if t.get("tx_code") == "P"
+             or (t.get("tx_code") == "V" and t.get("ad") == "A")]
+    sells = [t for t in discretionary
+             if t.get("tx_code") == "S"
+             or (t.get("tx_code") == "V" and t.get("ad") == "D")]
     buy_insiders  = {t["insider"] for t in buys}
     sell_insiders = {t["insider"] for t in sells}
     buy_dollars  = sum((t.get("value") or 0) for t in buys)
@@ -660,10 +692,18 @@ _ROLE_WEIGHT_SELL = {"CFO": 3.0, "CEO": 2.0, "COO": 1.8, "Director": 0.8,
 def _weighted_insider_score(txns: list[dict]) -> tuple[float, int, int, float]:
     """Returns (score, n_discretionary, n_10b5_1, net_dollar)."""
     score = 0.0
-    # Narrow to open-market codes only (P/S). Gifts (G), tax withholding (F),
-    # and option exercises / GSU vestings (M) aren't directional insider
-    # signals -- see the 10b5-1 spot test for why.
-    relevant = [t for t in txns if t.get("tx_code") in ("P", "S")]
+    # Narrow to codes that reflect a real, discretionary view: open-market buy
+    # (P), open-market sale (S), voluntary non-10b5-1 transaction (V). Gifts
+    # (G), tax withholding (F), grants (A) and derivative exercises (M/X) are
+    # not directional signals -- see the 10b5-1 spot test. We require shares
+    # but NOT price > 0: multi-lot sales routinely report a 0 price in the XML
+    # and disclose the weighted-average price in a footnote (verified against
+    # real Lockheed Martin Form 4 filings) -- excluding them would silently
+    # drop genuine insider sales. A price-0 row contributes at the floor
+    # dollar-magnitude rather than vanishing.
+    relevant = [t for t in txns
+                if t.get("tx_code") in ("P", "S", "V")
+                and (t.get("shares") or 0) > 0]
     n_10 = sum(1 for t in relevant if t.get("is_10b5_1"))
     n_dis = len(relevant) - n_10
     net_dollar = 0.0
@@ -673,8 +713,10 @@ def _weighted_insider_score(txns: list[dict]) -> tuple[float, int, int, float]:
         else:
             w_scale = 1.0
         role = t.get("role") or "Other"
-        is_buy = t.get("tx_code") == "P"
-        is_sell = t.get("tx_code") == "S"
+        code = t.get("tx_code")
+        ad = t.get("ad")
+        is_buy = code == "P" or (code == "V" and ad == "A")
+        is_sell = code == "S" or (code == "V" and ad == "D")
         if not (is_buy or is_sell):
             continue
         role_w = (_ROLE_WEIGHT_BUY if is_buy else _ROLE_WEIGHT_SELL).get(role, 0.5)
@@ -703,9 +745,10 @@ def _post_earnings_summary(txns: list[dict], earnings_date: str | None) -> str:
             td = datetime.fromisoformat((t.get("date") or "")[:10]).date()
         except Exception:
             continue
-        if (0 <= (td - ed).days <= 30 and not t.get("is_10b5_1")
-                and t.get("tx_code") in ("P", "S")):
-            side = "bought" if t.get("tx_code") == "P" else "sold"
+        if 0 <= (td - ed).days <= 30 and t.get("is_directional_signal"):
+            code = t.get("tx_code")
+            is_buy = code == "P" or (code == "V" and t.get("ad") == "A")
+            side = "bought" if is_buy else "sold"
             v = t.get("value") or 0
             post.append(f"{t['role']} {t['insider']} {side} ${v:,.0f} on {td}")
     if not post:
@@ -734,11 +777,18 @@ def analyze_insider_activity(ticker: str, earnings_date: str | None) -> dict:
         strength = min(100, strength + 15)
     else:
         strength = max(0, strength - 15)
-    _SIDE = {"P": "buy", "S": "sell", "G": "gift", "F": "tax_withholding",
-             "M": "option_exercise"}
+    _SIDE = {"P": "buy", "S": "sell", "A": "grant", "G": "gift",
+             "F": "tax_withholding", "M": "option_exercise"}
+
+    def _txn_side(t: dict) -> str:
+        if t.get("tx_code") == "V":
+            return "voluntary_buy" if t.get("ad") == "A" else "voluntary_sell"
+        return _SIDE.get(t.get("tx_code"), "other")
+
     recent = [{
         "insider": t["insider"], "role": t["role"], "date": t.get("date"),
-        "side": _SIDE.get(t.get("tx_code"), "other"),
+        "side": _txn_side(t),
+        "directional": bool(t.get("is_directional_signal")),
         "value": t.get("value"), "is_10b5_1": t.get("is_10b5_1"),
     } for t in txns[:15]]
     return {
@@ -1182,6 +1232,23 @@ def _build_intel_user_prompt(data, congress):
             continue
         refs.append(f"  - {k} = {v}")
     refs_block = "\n".join(refs)
+
+    # Honest-disclosure requirement (Fix 2): when the earnings analysis rests
+    # on a press release rather than a full call transcript, the note must say
+    # so plainly -- this is disclosure, not a degradation flag.
+    tq = data.get("earnings_transcript_quality") or ""
+    pr_disclosure = ""
+    if tq in ("substantive_press_release", "standard_press_release",
+              "minimal_press_release"):
+        pr_disclosure = (
+            "TRANSCRIPT COVERAGE NOTE: the earnings analysis is based on the "
+            "earnings press release filed via 8-K Item 2.02 -- a full call "
+            "transcript was not publicly available, so Q&A pushback and live "
+            "tone-shift analysis are NOT included. You MUST end the EARNINGS "
+            "section with this exact sentence: \"Analysis based on earnings "
+            "press release filed via 8-K Item 2.02. Full transcript not "
+            "publicly available -- Q&A pushback analysis not included.\"")
+
     lines = [
         f"Smart Money Intelligence Analysis for {data['ticker']}:",
         "",
@@ -1219,6 +1286,7 @@ def _build_intel_user_prompt(data, congress):
         f"CONGRESSIONAL TRADES (60d): {data['congressional_trades_count']} "
             f"(key: congressional_trades_count).",
         "",
+        pr_disclosure,
         "OUTPUT EXACTLY THESE SECTIONS, each as a clearly labelled heading:",
         "",
         "HEADLINE: One sentence describing the pattern detected and its implication.",
