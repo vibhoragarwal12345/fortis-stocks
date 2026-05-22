@@ -97,3 +97,10 @@ See `.env.local.example` for all required variables.
 | `GEMINI_API_KEY` | Google Gemini LLM inference |
 | `FINNHUB_API_KEY` | Finnhub market data |
 | `RESEND_API_KEY` | Resend email delivery |
+| `API_NINJAS_KEY` | API Ninjas (earnings transcripts — note: free tier no longer includes the transcripts endpoint; kept here in case the plan is upgraded) |
+| `DATABASE_URL` | Direct Postgres URL (session pooler) for `pipeline/apply_migration.py` |
+
+## Known limitations
+
+- **Earnings transcripts (Step 6.7 upgrade)** — replaced the paywalled API Ninjas path with `pipeline/agents/sec_transcript_fetcher.py` which pulls directly from SEC EDGAR 8-K exhibits. No recurring API costs. Four-path orchestrator: (1) 8-K transcript exhibit, (2) Item 7.01 standalone, (3) IR scrape (disabled — fragile), (4) press-release fallback that now fetches the actual EX-99.1 content from SEC (not just the 1-line `sec_filings.description`). Rate-limited to ~8 req/s with exponential 429 backoff; results cached on disk (30-day TTL) and in the `earnings_transcripts` table (permanent). Honest coverage finding from S&P 500 backfill: in 2026, most mega-caps file rich press releases (~2000-9000 words) but no actual transcripts — they keep transcripts on their IR sites. Banks and pharma (WFC, JPM, JNJ-style Item 2.02 filers) sometimes produce `partial` quality. True `full_call` transcripts via SEC are rare; the architecture is in place to capture them when filed. Quality grades drive earnings signal strength: `full_call`→100, `partial`→70, `press_release_only`→50, `unavailable`→0.
+- **10b5-1 detection** — regex-based on Form 4 footnote text. See `pipeline/test_10b5_1.py` for the spot test.
