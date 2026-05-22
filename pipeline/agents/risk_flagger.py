@@ -420,11 +420,20 @@ def _classify_insider(flags: dict) -> tuple[str, str, dict] | None:
     if "insider_cluster" in flags:
         f = flags["insider_cluster"]
         ctx = f.get("context") or {}
+        directional = ctx.get("source") == "form4_transactions"
+        if not directional:
+            # form4_transactions not backfilled -- direction unknown, so a
+            # cluster of grants/vestings can't be told from real selling.
+            return ("INFORMATIONAL",
+                    "insider filing cluster (direction unknown)",
+                    {"flag_value": _num(f.get("flag_value")), "context": ctx})
         sells = ctx.get("sell_count") or 0
         buys  = ctx.get("buy_count") or 0
-        # Cluster of sells in a held position is a MEDIUM warning.
+        # A cluster of real insider selling in a held position is a MEDIUM warning.
         sev = "MEDIUM" if sells > buys else "INFORMATIONAL"
-        label = "insider selling cluster" if sells > buys else "insider buying cluster"
+        label = ("insider selling cluster" if sells > buys
+                 else "insider buying cluster" if buys > sells
+                 else "insider activity cluster (mixed)")
         return (sev, label, {"flag_value": _num(f.get("flag_value")),
                              "context": ctx})
     if "institutional_pivot" in flags:

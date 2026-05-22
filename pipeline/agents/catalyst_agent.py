@@ -308,12 +308,26 @@ def detect_catalyst(ticker: str, src: dict) -> dict:
                          "top_block": blocks[0] if blocks else None}}
 
     # P7 -- INSIDER / INSTITUTIONAL
+    # Only a DIRECTIONAL insider cluster (real P/S/V open-market trades) is a
+    # catalyst -- a wave of grants or GSU vestings is not. The non-directional
+    # fallback flag (form4_transactions not backfilled) is skipped here.
     ins = {ft: f for ft, f in flags.items() if ft in INSIDER_FLAGS}
     if ins:
-        ft = "insider_cluster" if "insider_cluster" in ins else "institutional_pivot"
-        return {"category": "insider_institutional", "confidence": 0.68,
-                "data": {"flag_type": ft, "flag_value": ins[ft].get("flag_value"),
-                         "context": ins[ft].get("context")}}
+        ic = ins.get("insider_cluster")
+        ic_directional = bool(ic) and (
+            (ic.get("context") or {}).get("source") == "form4_transactions")
+        if ic is not None and ic_directional:
+            return {"category": "insider_institutional", "confidence": 0.68,
+                    "data": {"flag_type": "insider_cluster",
+                             "flag_value": ic.get("flag_value"),
+                             "context": ic.get("context")}}
+        if "institutional_pivot" in ins:
+            ip = ins["institutional_pivot"]
+            return {"category": "insider_institutional", "confidence": 0.68,
+                    "data": {"flag_type": "institutional_pivot",
+                             "flag_value": ip.get("flag_value"),
+                             "context": ip.get("context")}}
+        # insider_cluster present but non-directional -> not a catalyst.
 
     # P8 -- SOCIAL / MOMENTUM
     d = src["debates"].get(ticker)
@@ -402,9 +416,11 @@ def _template_description(ticker: str, cat: dict) -> str:
     if c == "insider_institutional":
         ctx = d.get("context") or {}
         if d.get("flag_type") == "insider_cluster":
-            return (f"{ticker} saw clustered insider filing activity "
-                    f"({ctx.get('form4_count', d.get('flag_value'))} Form 4 "
-                    f"filings in the last 5 days).")
+            n = ctx.get("directional_txn_count", d.get("flag_value"))
+            direction = ctx.get("direction", "directional")
+            return (f"{ticker} saw a cluster of directional insider activity "
+                    f"({n} open-market / discretionary Form 4 transactions in "
+                    f"the last 5 days, net {direction}).")
         return (f"{ticker} had a 13F institutional-holdings filing today -- a "
                 f"possible shift in institutional positioning.")
 

@@ -636,6 +636,21 @@ def generate_performance_report(db=None) -> Path:
     lines.append(f"# Fortis -- Performance Report  ({today})\n")
     lines.append(f"_Tracked picks: {len(outcomes)}_\n")
 
+    # Form 4 data-integrity disclosure: picks generated before the
+    # transaction-code fix may carry insider signals corrupted by grants /
+    # vestings / gifts being miscounted as directional trades.
+    post_fix = sum(1 for o in outcomes
+                   if o.get("signal_quality_after_form4_fix"))
+    pre_fix = len(outcomes) - post_fix
+    if pre_fix:
+        lines.append(
+            f"> **Form 4 data-integrity note:** {pre_fix} of {len(outcomes)} "
+            f"tracked picks predate the Form 4 transaction-code fix and may "
+            f"carry insider signals corrupted by grants/vestings/gifts being "
+            f"miscounted as directional trades. {post_fix} pick(s) used the "
+            f"corrected insider filter. Treat pre-fix insider attribution "
+            f"with caution.\n")
+
     if not outcomes:
         lines.append("\n> No picks tracked yet. Run `outcome_tracker.py backfill`.\n")
         out_path = REPORTS_DIR / f"performance_{today}.md"

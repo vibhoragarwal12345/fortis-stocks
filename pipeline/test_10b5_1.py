@@ -1,15 +1,24 @@
 """
-10b5-1 spot test (Step 6.7 quality gate).
+Form 4 transaction-code + 10b5-1 spot test (data-integrity quality gate).
 
-Fetches Form 4 filings for AMZN, GOOGL, META over the last 2 years, parses
-every transaction, and reports our 10b5-1 detection rate broken down by
-insider name. Bezos (AMZN), Pichai (GOOGL), and Zuckerberg (META) all have
-publicly documented 10b5-1 plans, so the great majority of their
-discretionary-looking sales should be flagged as scheduled.
+Fetches Form 4 filings for AMZN, GOOGL, META, parses every transaction, and
+reports two things:
+
+  1. The transaction-code breakdown and how many transactions are DIRECTIONAL
+     signals (code P, code S not 10b5-1, code V) versus mechanical events
+     that must NOT count as insider sentiment -- grants (A), tax withholding
+     (F), gifts (G), derivative exercises (M). Bezos's charitable gifts and
+     Pichai's GSU vestings should appear in the code histogram but be
+     EXCLUDED from the directional count.
+
+  2. The 10b5-1 detection rate. Bezos, Pichai and Zuckerberg all have
+     publicly documented 10b5-1 plans, so most of their code-S sales should
+     be flagged as scheduled (and therefore non-directional).
 
 Usage:
     python pipeline/test_10b5_1.py
-    python pipeline/test_10b5_1.py --dump AMZN     # dump every parsed txn + footnote snippet
+    python pipeline/test_10b5_1.py --days 90       # shorter lookback window
+    python pipeline/test_10b5_1.py --dump AMZN     # dump every parsed txn
 """
 
 from __future__ import annotations
@@ -32,13 +41,13 @@ TARGETS = {
 LOOKBACK_DAYS = 730
 
 
-def _all_insider_txns(ticker: str) -> list[dict]:
+def _all_insider_txns(ticker: str, lookback_days: int = LOOKBACK_DAYS) -> list[dict]:
     cik = _resolve_cik(ticker)
     if not cik:
         print(f"  {ticker}: CIK lookup failed")
         return []
-    filings = _fetch_form4_filings(cik, LOOKBACK_DAYS)
-    print(f"  {ticker}: {len(filings)} Form 4 filings in last {LOOKBACK_DAYS}d")
+    filings = _fetch_form4_filings(cik, lookback_days)
+    print(f"  {ticker}: {len(filings)} Form 4 filings in last {lookback_days}d")
     txns = []
     import time
     for f in filings:
@@ -50,21 +59,34 @@ def _all_insider_txns(ticker: str) -> list[dict]:
     return txns
 
 
-def _report(ticker: str, txns: list[dict], target_names: list[str], dump: bool = False):
+def _report(ticker: str, txns: list[dict], target_names: list[str],
+            dump: bool = False):
     print(f"\n=== {ticker}  --  {len(txns)} transactions parsed ===")
     if not txns:
         print("  (no transactions)")
         return
+
+    # Transaction-code histogram. Gifts (G), grants (A) and derivative
+    # exercises (M) should be present but NOT counted as directional signals.
+    codes = Counter(t.get("tx_code") or "?" for t in txns)
+    directional = sum(1 for t in txns if t.get("is_directional_signal"))
+    print("  transaction codes: "
+          + ", ".join(f"{c}={n}" for c, n in sorted(codes.items())))
+    print(f"  directional signals (P / S non-10b5-1 / V): {directional} of "
+          f"{len(txns)}  ({len(txns) - directional} excluded as mechanical)")
+
     insiders = Counter(t["insider"] for t in txns)
     print(f"  unique insiders: {len(insiders)}")
     for name, n in insiders.most_common(8):
         n_10 = sum(1 for t in txns if t["insider"] == name and t["is_10b5_1"])
-        sells = sum(1 for t in txns
-                    if t["insider"] == name and (t.get("tx_code") == "S" or t.get("ad") == "D"))
-        marker = "  <<<" if any(s.lower() in name.lower() for s in target_names) else ""
-        print(f"    {name:<38}  n={n:<3} sells={sells:<3} 10b5-1={n_10:<3}{marker}")
+        n_dir = sum(1 for t in txns
+                    if t["insider"] == name and t.get("is_directional_signal"))
+        marker = "  <<<" if any(s.lower() in name.lower()
+                                for s in target_names) else ""
+        print(f"    {name:<38}  n={n:<3} directional={n_dir:<3} "
+              f"10b5-1={n_10:<3}{marker}")
 
-    # Spot-check our target insiders specifically.
+    # Spot-check the target insiders specifically.
     print("\n  -- TARGET INSIDERS --")
     for name in target_names:
         matching = [t for t in txns if name.lower() in t["insider"].lower()]
@@ -73,34 +95,49 @@ def _report(ticker: str, txns: list[dict], target_names: list[str], dump: bool =
             continue
         n = len(matching)
         n_10 = sum(1 for t in matching if t["is_10b5_1"])
-        n_sells = sum(1 for t in matching
-                      if t.get("tx_code") == "S" or t.get("ad") == "D")
-        pct = (n_10 / n * 100) if n else 0
-        verdict = "OK" if pct >= 80 else "FAIL" if pct < 50 else "WEAK"
-        print(f"    {name}: n={n} sells={n_sells} 10b5-1={n_10} ({pct:.0f}%) -- {verdict}")
-        # Dump 3 sample sells with footnote snippets
-        sample = [t for t in matching
-                  if (t.get("tx_code") == "S" or t.get("ad") == "D")][:3]
-        for t in sample:
-            fn = (t.get("footnote") or "")[:240].replace("\n", " ")
-            print(f"      [{t.get('date')}] flag={t['is_10b5_1']}  shares={t.get('shares')}  "
-                  f"value=${(t.get('value') or 0):,.0f}")
-            print(f"        footnote: {fn or '(empty)'}")
+        n_dir = sum(1 for t in matching if t.get("is_directional_signal"))
+        code_bd = dict(sorted(Counter(t.get("tx_code") or "?"
+                                      for t in matching).items()))
+        n_sells_s = sum(1 for t in matching if t.get("tx_code") == "S")
+        pct_10 = (n_10 / n_sells_s * 100) if n_sells_s else 0.0
+        verdict = "OK" if pct_10 >= 80 else "FAIL" if pct_10 < 50 else "WEAK"
+        print(f"    {name}: n={n}  codes={code_bd}")
+        print(f"      directional={n_dir}  code-S sales={n_sells_s}  "
+              f"10b5-1={n_10} ({pct_10:.0f}% of S) -- 10b5-1 detection {verdict}")
+        excluded = [t for t in matching if not t.get("is_directional_signal")]
+        if excluded:
+            ex_codes = dict(sorted(Counter(t.get("tx_code") or "?"
+                                           for t in excluded).items()))
+            print(f"      EXCLUDED from insider signal ({len(excluded)} txns): "
+                  f"{ex_codes} -- gifts/grants/vestings/10b5-1, correctly filtered")
+
     if dump:
         print("\n  -- FULL DUMP --")
         for t in txns:
-            print(f"    {t.get('date')}  {t['insider']:<30}  code={t.get('tx_code')} "
-                  f"ad={t.get('ad')}  shares={t.get('shares')}  10b5-1={t['is_10b5_1']}")
+            print(f"    {t.get('date')}  {t['insider']:<30}  "
+                  f"code={t.get('tx_code')} ad={t.get('ad')}  "
+                  f"shares={t.get('shares')}  10b5-1={t['is_10b5_1']}  "
+                  f"directional={t.get('is_directional_signal')}")
             if t.get("footnote"):
                 print(f"      footnote: {t['footnote'][:200]}")
 
 
 def main():
-    dump_for = sys.argv[2] if (len(sys.argv) > 2 and sys.argv[1] == "--dump") else None
-    print(f"10b5-1 SPOT TEST -- lookback={LOOKBACK_DAYS}d")
+    args = sys.argv[1:]
+    lookback = LOOKBACK_DAYS
+    if "--days" in args:
+        i = args.index("--days")
+        if i + 1 < len(args):
+            lookback = int(args[i + 1])
+    dump_for = None
+    if "--dump" in args:
+        i = args.index("--dump")
+        if i + 1 < len(args):
+            dump_for = args[i + 1]
+    print(f"FORM 4 TRANSACTION-CODE + 10b5-1 SPOT TEST -- lookback={lookback}d")
     for ticker, names in TARGETS.items():
         try:
-            txns = _all_insider_txns(ticker)
+            txns = _all_insider_txns(ticker, lookback)
             _report(ticker, txns, names, dump=(dump_for == ticker))
         except Exception as exc:
             print(f"  {ticker}: ERROR {exc}")

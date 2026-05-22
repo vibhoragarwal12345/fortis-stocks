@@ -256,6 +256,9 @@ def record_picks_from_run(db, run_date, run_type: str) -> int:
             "validated_strength": vs_map.get(t),
             "entry_price": entry,
             "still_active": True,
+            # Picks recorded now use the corrected Form 4 transaction-code
+            # insider filter -- safe for backtest integrity comparisons.
+            "signal_quality_after_form4_fix": True,
             "last_updated": datetime.now(timezone.utc).isoformat(),
             "smart_money_pattern": sm.get("pattern_detected"),
             "composite_smart_money_score": _num(sm.get("composite_smart_money_score")),

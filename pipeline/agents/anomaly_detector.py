@@ -19,8 +19,8 @@ Anomaly families and their data source:
   OPTIONS  (options_signals)
     unusual_calls / unusual_puts / iv_spike / iv_crush
 
-  SEC / INSIDER  (sec_filings)
-    insider_cluster      3+ Form 4 filings in the last 5 days
+  SEC / INSIDER  (sec_filings, form4_transactions)
+    insider_cluster      3+ directional Form 4 transactions in the last 5 days
     material_event       an 8-K filed today
     activist_alert       a 13D filed today (activist stake crossed)
     institutional_pivot  a 13F filed today
@@ -36,8 +36,10 @@ NOTES
   * range_expansion / breakout_52w / breakdown_52w / ma_crossover read the
     technical jsonb columns added by migration 005. If those columns are
     absent (005 not applied / market_data not re-run) they are skipped.
-  * insider_cluster cannot read trade direction (sec_filings has no such
-    field); it flags on filing count and reports direction as "unknown".
+  * insider_cluster reads form4_transactions (migration 037) and counts only
+    directional signals (P / S non-10b5-1 / V), reporting buy/sell side. If
+    that table is empty (backfill_form4.py not run) it falls back to a
+    filing-count flag with direction "unknown".
 
 Usage:
     python pipeline/agents/anomaly_detector.py [premarket|midday|close]
@@ -238,24 +240,56 @@ _FORM_13D = {"13D", "SC 13D", "SC 13D/A", "13D/A"}
 _FORM_13F = {"13F-HR", "13F-HR/A"}
 
 
-def _sec_flags(filings: list[dict], now: datetime):
+def _sec_flags(filings: list[dict], form4_txns: list[dict] | None,
+               now: datetime):
     today_cut   = now - timedelta(hours=TODAY_WINDOW_HOURS)
     insider_cut = now - timedelta(days=INSIDER_WINDOW_DAYS)
 
     dated = [(f, _parse_dt(f.get("filing_date"))) for f in filings]
     dated = [(f, d) for f, d in dated if d is not None]
 
-    form4_recent = [(f, d) for f, d in dated
-                    if (f.get("form_type") in _FORM4) and d >= insider_cut]
-    if len(form4_recent) >= INSIDER_MIN_FILINGS:
-        n = len(form4_recent)
-        yield {"flag_type": "insider_cluster", "flag_value": n,
-               "severity": _cap(n * 22),
-               "context": {"form4_count": n,
-                           "window_days": INSIDER_WINDOW_DAYS,
-                           "direction": "unknown (sec_filings has no trade side)",
-                           "dates": sorted(d.date().isoformat()
-                                           for _, d in form4_recent)}}
+    # ── insider_cluster ──────────────────────────────────────────────────────
+    # Preferred path: form4_transactions (migration 037) -- count ONLY
+    # directional signals (P / S non-10b5-1 / V) so grants, GSU vestings and
+    # gifts no longer trigger a cluster. Fall back to a filing count when that
+    # table has no rows for this ticker (backfill_form4.py not yet run).
+    insider_cut_date = insider_cut.date().isoformat()
+    directional = [t for t in (form4_txns or [])
+                   if t.get("is_directional_signal")
+                   and (t.get("transaction_date") or "") >= insider_cut_date]
+    if directional:
+        buy_insiders  = {t.get("insider") for t in directional
+                         if t.get("is_acquisition") is True}
+        sell_insiders = {t.get("insider") for t in directional
+                         if t.get("is_acquisition") is False}
+        buy_insiders.discard(None)
+        sell_insiders.discard(None)
+        n_dir = len(directional)
+        if n_dir >= INSIDER_MIN_FILINGS:
+            direction = ("selling" if len(sell_insiders) > len(buy_insiders)
+                         else "buying" if len(buy_insiders) > len(sell_insiders)
+                         else "mixed")
+            yield {"flag_type": "insider_cluster", "flag_value": n_dir,
+                   "severity": _cap(n_dir * 22),
+                   "context": {"directional_txn_count": n_dir,
+                               "buy_count": len(buy_insiders),
+                               "sell_count": len(sell_insiders),
+                               "window_days": INSIDER_WINDOW_DAYS,
+                               "direction": direction,
+                               "source": "form4_transactions"}}
+    else:
+        form4_recent = [(f, d) for f, d in dated
+                        if (f.get("form_type") in _FORM4) and d >= insider_cut]
+        if len(form4_recent) >= INSIDER_MIN_FILINGS:
+            n = len(form4_recent)
+            yield {"flag_type": "insider_cluster", "flag_value": n,
+                   "severity": _cap(n * 22),
+                   "context": {"form4_count": n,
+                               "window_days": INSIDER_WINDOW_DAYS,
+                               "direction": "unknown (run backfill_form4.py)",
+                               "source": "sec_filings_count",
+                               "dates": sorted(d.date().isoformat()
+                                               for _, d in form4_recent)}}
 
     eightk = [(f, d) for f, d in dated
               if f.get("form_type") in _FORM_8K and d >= today_cut]
@@ -388,6 +422,23 @@ def run(run_type: str = "midday") -> None:
             filings_by_ticker[f["ticker"]].append(f)
     log.info("sec_filings: %d tickers", len(filings_by_ticker))
 
+    # Transaction-level Form 4 feed for directional insider_cluster detection.
+    form4_by_ticker: dict[str, list[dict]] = defaultdict(list)
+    f4_cut = (now - timedelta(days=INSIDER_WINDOW_DAYS + 3)).date().isoformat()
+    try:
+        for t in _fetch_all(lambda: db.table("form4_transactions")
+                            .select("ticker,insider,transaction_code,"
+                                    "is_acquisition,is_directional_signal,"
+                                    "transaction_date")
+                            .gte("transaction_date", f4_cut)):
+            if t.get("ticker"):
+                form4_by_ticker[t["ticker"]].append(t)
+    except Exception as exc:
+        log.warning("form4_transactions: skipped (%s) -- insider_cluster falls "
+                    "back to filing count", exc)
+    log.info("form4_transactions: %d tickers (directional feed)",
+             len(form4_by_ticker))
+
     debates_by_ticker: dict[str, list[dict]] = defaultdict(list)
     try:
         for d in _fetch_all(lambda: db.table("ticker_debates").select(
@@ -400,8 +451,8 @@ def run(run_type: str = "midday") -> None:
     log.info("ticker_debates: %d tickers", len(debates_by_ticker))
 
     # ── Evaluate ──────────────────────────────────────────────────────────────
-    tickers = (set(market) | set(options)
-               | set(filings_by_ticker) | set(debates_by_ticker))
+    tickers = (set(market) | set(options) | set(filings_by_ticker)
+               | set(form4_by_ticker) | set(debates_by_ticker))
     log.info("Evaluating %d distinct tickers...", len(tickers))
 
     flags: list[dict] = []
@@ -412,8 +463,9 @@ def run(run_type: str = "midday") -> None:
             produced += list(_price_volume_flags(market[t]))
         if t in options:
             produced += list(_options_flags(options[t]))
-        if t in filings_by_ticker:
-            produced += list(_sec_flags(filings_by_ticker[t], now))
+        if t in filings_by_ticker or t in form4_by_ticker:
+            produced += list(_sec_flags(filings_by_ticker.get(t, []),
+                                        form4_by_ticker.get(t), now))
         if t in debates_by_ticker:
             produced += list(_social_flags(debates_by_ticker[t]))
         for fl in produced:
