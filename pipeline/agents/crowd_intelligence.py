@@ -64,7 +64,7 @@ ATTENTION_THRESHOLD = 30       # attention_score above which a debate is generat
 NEWS_WINDOW_HOURS   = 48
 TIMEOUT             = aiohttp.ClientTimeout(total=20)
 GROQ_MODEL          = "llama-3.3-70b-versatile"
-GEMINI_MODEL        = "gemini-2.0-flash"
+GEMINI_MODEL        = "gemini-2.5-flash"
 VALID_RUN_TYPES     = ("premarket", "midday", "close")
 USER_AGENT          = (
     "FortisStockScreener/1.0 (crowd-intelligence research; research@fortis.com)"
