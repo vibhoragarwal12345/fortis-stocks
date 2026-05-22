@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { buttonVariants } from "@/components/ui/button"
@@ -40,8 +41,31 @@ export default async function DashboardPage() {
         <div className="mx-auto max-w-7xl">
           <h1 className="text-3xl font-bold">Welcome back</h1>
           <p className="mt-1 text-muted-foreground">{user.email}</p>
-          <div className="mt-8 rounded-xl border bg-card px-6 py-10 text-center text-muted-foreground">
-            Dashboard content coming soon.
+          <div className="mt-8 grid gap-4 sm:grid-cols-2">
+            <Link
+              href="/dashboard/track-record"
+              className="group rounded-xl border bg-card px-6 py-8 text-left transition hover:border-foreground/20"
+            >
+              <div className="text-sm font-semibold tracking-tight">
+                Track record
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Forward performance of every A / B / C pick, benchmarked
+                against SPY.
+              </p>
+            </Link>
+            <Link
+              href="/dashboard/positions"
+              className="group rounded-xl border bg-card px-6 py-8 text-left transition hover:border-foreground/20"
+            >
+              <div className="text-sm font-semibold tracking-tight">
+                Positions
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Position-management signals for every tracked portfolio —
+                color-coded review status, top priorities, and concentration alerts.
+              </p>
+            </Link>
           </div>
         </div>
       </main>
