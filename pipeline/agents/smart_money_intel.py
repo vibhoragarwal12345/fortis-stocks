@@ -578,6 +578,13 @@ def _parse_form4_xml(cik: str, accession: str) -> list[dict]:
                           "Other Officer" if is_off == "1" else "Other")
     role = _normalize_role(role_seed)
 
+    # Filing-level Rule 10b5-1 affirmation (SEC 2023 Form 4 amendment): when
+    # <aff10b5One>1</aff10b5One> is set, every transaction in this filing was
+    # made under a 10b5-1 plan. This catches issuers (e.g. Alphabet/GOOGL) who
+    # disclose via the SEC checkbox rather than per-transaction footnote prose.
+    aff = (_first(r"<aff10b5One>\s*([\w\.]+)\s*</aff10b5One>") or "").strip().lower()
+    filing_is_10b5_1 = aff in ("1", "true")
+
     out = []
     # nonDerivativeTransaction blocks
     for idx, block in enumerate(re.findall(
@@ -606,7 +613,7 @@ def _parse_form4_xml(cik: str, accession: str) -> list[dict]:
             if fm:
                 footnote_text += " " + re.sub(r"<.*?>", "", fm.group(1))
         fn = footnote_text.strip()
-        is10 = _looks_10b5_1(fn)
+        is10 = _looks_10b5_1(fn) or filing_is_10b5_1
         out.append({
             "insider":   name or "Unknown",
             "role":      role,

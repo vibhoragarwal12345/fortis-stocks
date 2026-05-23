@@ -99,11 +99,26 @@ def _report(ticker: str, txns: list[dict], target_names: list[str],
         code_bd = dict(sorted(Counter(t.get("tx_code") or "?"
                                       for t in matching).items()))
         n_sells_s = sum(1 for t in matching if t.get("tx_code") == "S")
-        pct_10 = (n_10 / n_sells_s * 100) if n_sells_s else 0.0
-        verdict = "OK" if pct_10 >= 80 else "FAIL" if pct_10 < 50 else "WEAK"
+        # 10b5-1 share is computed on code-S sales only (filing-level flags
+        # also tag non-S transactions, which would otherwise inflate the rate
+        # past 100%).
+        n_10_s = sum(1 for t in matching
+                     if t.get("tx_code") == "S" and t["is_10b5_1"])
         print(f"    {name}: n={n}  codes={code_bd}")
-        print(f"      directional={n_dir}  code-S sales={n_sells_s}  "
-              f"10b5-1={n_10} ({pct_10:.0f}% of S) -- 10b5-1 detection {verdict}")
+        if n_sells_s == 0:
+            print(f"      directional={n_dir}  code-S sales=0  -- "
+                  f"10b5-1 detection n/a (no open-market sales)")
+        else:
+            pct_10 = n_10_s / n_sells_s * 100
+            # Informational only -- a low rate may mean the insider genuinely
+            # isn't on a 10b5-1 plan (e.g. trust dispositions), which is the
+            # correct detection outcome, not a code bug.
+            verdict = ("OK" if pct_10 >= 80
+                       else "low (may be non-10b5-1 by design)" if pct_10 < 50
+                       else "weak")
+            print(f"      directional={n_dir}  code-S sales={n_sells_s}  "
+                  f"10b5-1 sales={n_10_s}/{n_sells_s} ({pct_10:.0f}%) -- "
+                  f"10b5-1 detection {verdict}")
         excluded = [t for t in matching if not t.get("is_directional_signal")]
         if excluded:
             ex_codes = dict(sorted(Counter(t.get("tx_code") or "?"
