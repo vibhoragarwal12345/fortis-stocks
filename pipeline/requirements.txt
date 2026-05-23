@@ -30,3 +30,5 @@ pyfolio
 # ffmpeg binary when the system has none.
 openai-whisper
 imageio-ffmpeg
+# Step 7.1 Report Composer -- HTML templating for the three daily briefs.
+jinja2

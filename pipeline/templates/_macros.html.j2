@@ -1,0 +1,431 @@
+{# ──────────────────────────────────────────────────────────────────────────
+   Fortis Report Composer  -- shared Jinja macros
+   These render the structured `report` dict into HTML. Each section's
+   `kind` field dispatches to the right macro from base.html.j2.
+   Styling is defined once in base.html.j2's <style> block and applied here
+   via class names. Only colour-dependent inline styles (conviction badges,
+   alert severities) are written inline -- everything else is class-based.
+   ────────────────────────────────────────────────────────────────────── #}
+
+{# ── Conviction grade badge ─────────────────────────────────────────────── #}
+{% macro grade_badge(grade) %}
+  {%- set g = (grade or '?')|upper -%}
+  {%- if g == 'A' -%}
+    <span class="badge badge-a">A — High Conviction</span>
+  {%- elif g == 'B' -%}
+    <span class="badge badge-b">B — Supporting</span>
+  {%- elif g == 'C' -%}
+    <span class="badge badge-c">C — Watch</span>
+  {%- else -%}
+    <span class="badge badge-neutral">{{ g }}</span>
+  {%- endif -%}
+{% endmacro %}
+
+{# ── Severity pill ──────────────────────────────────────────────────────── #}
+{% macro severity_pill(sev) %}
+  {%- set s = (sev or 'INFO')|upper -%}
+  {%- if s in ('CRITICAL', 'HIGH') -%}
+    <span class="pill pill-critical">{{ s }}</span>
+  {%- elif s == 'MEDIUM' -%}
+    <span class="pill pill-medium">{{ s }}</span>
+  {%- else -%}
+    <span class="pill pill-info">{{ s }}</span>
+  {%- endif -%}
+{% endmacro %}
+
+{# ── Verification badge ─────────────────────────────────────────────────── #}
+{% macro verification_badge(score, grade) %}
+  {%- if score is not none -%}
+    {%- set pct = (score * 100)|round|int if score <= 1 else score|round|int -%}
+    <span class="vbadge" title="Verification {{ grade or '' }}">
+      Verified {{ pct }}%{% if grade %} · {{ grade }}{% endif %}
+    </span>
+  {%- endif -%}
+{% endmacro %}
+
+{# ── Empty section notice ───────────────────────────────────────────────── #}
+{% macro empty_section(sec) %}
+  <div class="empty-note">
+    <em>No data available for this section</em><br>
+    <span class="muted">{{ sec.empty_note }}</span>
+  </div>
+{% endmacro %}
+
+{# ── Narrative block (Executive Summary / Morning Recap / Market Wrap) ─── #}
+{% macro narrative_block(sec) %}
+  <div class="narrative">{{ sec.narrative | replace('\n\n', '</p><p>') | replace('\n', '<br>') | safe }}</div>
+  {% if sec.source_refs %}
+    <p class="src-line">Sources: {{ sec.source_refs|map('string')|join(' · ') }}</p>
+  {% endif %}
+{% endmacro %}
+
+{# ── Macro snapshot ─────────────────────────────────────────────────────── #}
+{% macro macro_block(sec) %}
+  {% if sec.regime %}
+    <p><span class="kicker">Regime</span> <strong>{{ sec.regime }}</strong></p>
+  {% endif %}
+  {% if sec.narrative %}
+    <p>{{ sec.narrative }}</p>
+  {% endif %}
+  {% if sec.indicators %}
+    <table class="dt" role="presentation">
+      <thead><tr><th>Indicator</th><th class="num">Value</th><th class="num">Δ</th></tr></thead>
+      <tbody>
+        {% for it in sec.indicators %}
+          <tr>
+            <td>{{ it.label }}</td>
+            <td class="num">{{ it.value if it.value is not none else '—' }}</td>
+            <td class="num">{{ it.change if it.change is not none else '—' }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+  {% if sec.stale_note %}
+    <p class="stale-note">⚠ {{ sec.stale_note }}</p>
+  {% endif %}
+{% endmacro %}
+
+{# ── Portfolio review ───────────────────────────────────────────────────── #}
+{% macro portfolio_review_block(sec) %}
+  {% if sec.critical_alert_count or sec.high_alert_count %}
+    <p class="alert-banner">
+      <strong>{{ sec.critical_alert_count }} CRITICAL</strong> ·
+      <strong>{{ sec.high_alert_count }} HIGH</strong> alerts across
+      {{ sec.portfolios|length }} portfolio{{ 's' if sec.portfolios|length != 1 else '' }}.
+    </p>
+  {% endif %}
+  {% for p in sec.portfolios %}
+    <div class="port-card">
+      <h3 class="port-name">{{ p.name }} <span class="muted">— {{ p.holdings_count }} holdings</span></h3>
+      {% if p.alerts %}
+        <table class="dt dt-tight" role="presentation">
+          <thead><tr><th></th><th>Ticker</th><th>Alert</th><th>Message</th></tr></thead>
+          <tbody>
+            {% for a in p.alerts %}
+              <tr>
+                <td>{{ severity_pill(a.severity) }}</td>
+                <td class="ticker">{{ a.ticker or '—' }}</td>
+                <td>{{ a.alert_type or '—' }}</td>
+                <td>{{ a.message or '—' }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p class="muted small">No alerts in the window.</p>
+      {% endif %}
+      {% if p.rebalance and p.rebalance.top_3_priorities %}
+        <p class="rebal"><span class="kicker">Rebalance priorities</span>
+          {{ p.rebalance.top_3_priorities }}</p>
+      {% endif %}
+    </div>
+  {% endfor %}
+{% endmacro %}
+
+{# ── A-grade pick card (full institutional treatment) ───────────────────── #}
+{% macro pick_card(p) %}
+  <div class="pick">
+    <div class="pick-head">
+      <div class="pick-ticker">
+        <span class="ticker-lg">{{ p.ticker }}</span>
+        {{ grade_badge(p.conviction_grade) }}
+      </div>
+      <div class="pick-meta">
+        <span class="muted small">rank #{{ p.rank or '—' }}</span>
+        {% if p.conviction_score is not none %}
+          · score {{ p.conviction_score | fmt_num(1) }}
+        {% endif %}
+        {{ verification_badge(p.verification.smart_money_score, p.verification.smart_money_grade) }}
+      </div>
+    </div>
+
+    {% if p.catalyst and p.catalyst.description %}
+      <p><span class="kicker">Catalyst</span>{% if p.catalyst.category %} <em>({{ p.catalyst.category }})</em>{% endif %}<br>
+        {{ p.catalyst.description }}</p>
+    {% endif %}
+
+    {% if p.bull_case or p.bear_case %}
+      <table class="dt dt-thesis" role="presentation">
+        <tr>
+          <td class="thesis-cell thesis-bull">
+            <span class="kicker">Bull case</span><br>
+            {{ p.bull_case or '—' }}
+          </td>
+          <td class="thesis-cell thesis-bear">
+            <span class="kicker">Bear case</span><br>
+            {{ p.bear_case or '—' }}
+            {% if p.critic and p.critic.objection_level %}
+              <div class="muted small">critic objection: {{ p.critic.objection_level }}</div>
+            {% endif %}
+          </td>
+        </tr>
+      </table>
+    {% endif %}
+
+    {% if p.quant_models %}
+      <p class="section-kicker">Quant Models Verdict</p>
+      <table class="dt dt-tight" role="presentation">
+        <thead><tr><th>Model</th><th>Value</th><th>Detail</th><th>Note</th></tr></thead>
+        <tbody>
+          {% for m in p.quant_models %}
+            <tr>
+              <td class="model-name">{{ m.model }}</td>
+              <td class="num"><strong>{{ m.value }}</strong></td>
+              <td class="muted small">{{ m.detail or '—' }}</td>
+              <td class="muted small">{{ m.note or '—' }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+
+    {% if p.smart_money %}
+      <p class="section-kicker">Smart Money Verdict</p>
+      <p>
+        <span class="kicker">Pattern</span>
+        <strong>{{ p.smart_money.pattern or '—' }}</strong> ·
+        confidence {{ p.smart_money.confidence_level or '—' }} ·
+        composite {{ p.smart_money.composite_score | fmt_num(1) }}
+        {{ verification_badge(p.smart_money.verification_score, p.smart_money.quality_grade) }}
+      </p>
+      <table class="dt dt-tight dt-grid4" role="presentation">
+        <tbody>
+          {% for s in p.smart_money.signals %}
+            <tr>
+              <td class="model-name">{{ s.name }}</td>
+              <td class="num">{{ s.score | fmt_num(1) }}</td>
+              <td class="muted small">strength {{ s.strength | fmt_num(1) }}</td>
+              <td class="muted small">{{ s.extra or '—' }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% if p.smart_money.intel_note %}
+        <p class="intel-note">{{ p.smart_money.intel_note }}</p>
+      {% endif %}
+    {% endif %}
+
+    {% if p.peer_industry %}
+      <p class="section-kicker">Peer &amp; Industry Verdict</p>
+      <p>
+        <span class="kicker">Industry stance</span>
+        <strong>{{ p.peer_industry.industry_stance or '—' }}</strong> ·
+        rank {{ p.peer_industry.within_industry_rank or '—' }}/{{ p.peer_industry.peer_count or '—' }}
+        · peer score {{ p.peer_industry.overall_peer_score | fmt_num(1) }}
+        {{ verification_badge(p.peer_industry.verification_score, p.peer_industry.quality_grade) }}
+      </p>
+      {% if p.peer_industry.differentiation %}
+        <p>{{ p.peer_industry.differentiation }}</p>
+      {% endif %}
+    {% endif %}
+
+    {% if p.what_to_watch or p.price_target_upside or p.price_target_downside %}
+      <p class="watch">
+        {% if p.price_target_upside %}
+          <span class="kicker">Upside target</span> {{ p.price_target_upside | fmt_money }} ·
+        {% endif %}
+        {% if p.price_target_downside %}
+          <span class="kicker">Downside</span> {{ p.price_target_downside | fmt_money }} ·
+        {% endif %}
+        {% if p.what_to_watch %}
+          <span class="kicker">What to watch</span> {{ p.what_to_watch }}
+        {% endif %}
+      </p>
+    {% endif %}
+  </div>
+{% endmacro %}
+
+{# ── Focus list section ─────────────────────────────────────────────────── #}
+{% macro focus_list_block(sec) %}
+  {% for p in sec.picks %}
+    {{ pick_card(p) }}
+  {% endfor %}
+{% endmacro %}
+
+{# ── Supporting picks (B-grade, abbreviated) ────────────────────────────── #}
+{% macro brief_picks_block(sec) %}
+  {% for p in sec.picks %}
+    <div class="brief-pick">
+      <div class="brief-head">
+        <span class="ticker-md">{{ p.ticker }}</span>
+        {{ grade_badge(p.conviction_grade) }}
+        {% if p.conviction_score is not none %}
+          <span class="muted small">score {{ p.conviction_score | fmt_num(1) }}</span>
+        {% endif %}
+      </div>
+      {% if p.catalyst %}
+        <p><span class="kicker">Catalyst</span> {{ p.catalyst }}</p>
+      {% endif %}
+      {% if p.thesis %}
+        <p class="muted">{{ p.thesis }}</p>
+      {% endif %}
+      {% if p.grade_reasoning %}
+        <p class="grade-reasoning"><em>{{ p.grade_reasoning }}</em></p>
+      {% endif %}
+    </div>
+  {% endfor %}
+{% endmacro %}
+
+{# ── Honorable mentions (C-grade, one-line) ─────────────────────────────── #}
+{% macro oneline_picks_block(sec) %}
+  <ul class="oneline">
+    {% for p in sec.picks %}
+      <li><span class="ticker">{{ p.ticker }}</span> — {{ p.catalyst or p.thesis or 'see full analysis' }}</li>
+    {% endfor %}
+  </ul>
+{% endmacro %}
+
+{# ── Risk radar ─────────────────────────────────────────────────────────── #}
+{% macro risk_radar_block(sec) %}
+  <table class="dt" role="presentation">
+    <thead><tr><th>Ticker</th><th>Pattern</th><th class="num">Composite</th><th>Confidence</th></tr></thead>
+    <tbody>
+      {# bracket lookup -- sec.items would resolve to the dict method #}
+      {% for it in sec['items'] %}
+        <tr>
+          <td class="ticker">{{ it.ticker }}</td>
+          <td><strong>{{ it.pattern }}</strong></td>
+          <td class="num">{{ it.composite_score | fmt_num(1) }}</td>
+          <td>{{ it.confidence }}</td>
+        </tr>
+        {% if it.note %}
+          <tr><td colspan="4" class="muted small">{{ it.note }}</td></tr>
+        {% endif %}
+      {% endfor %}
+    </tbody>
+  </table>
+{% endmacro %}
+
+{# ── Position table ─────────────────────────────────────────────────────── #}
+{% macro position_table_block(sec) %}
+  <table class="dt" role="presentation">
+    <thead><tr><th>Ticker</th><th class="num">Price</th><th class="num">Cost</th><th class="num">P&amp;L</th><th>Signal</th></tr></thead>
+    <tbody>
+      {% for p in sec.positions %}
+        <tr>
+          <td class="ticker">{{ p.ticker }}</td>
+          <td class="num">{{ p.current_price | fmt_money }}</td>
+          <td class="num">{{ p.cost_basis | fmt_money }}</td>
+          <td class="num{% if (p.unrealized_pct or 0) < 0 %} neg{% elif (p.unrealized_pct or 0) > 0 %} pos{% endif %}">
+            {{ p.unrealized_pct | fmt_pct(1) }}
+          </td>
+          <td>{{ p.signal_type or '—' }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endmacro %}
+
+{# ── Earnings takeaways ─────────────────────────────────────────────────── #}
+{% macro earnings_takeaways_block(sec) %}
+  {% for it in sec['items'] %}
+    <div class="brief-pick">
+      <div class="brief-head">
+        <span class="ticker-md">{{ it.ticker }}</span>
+        <span class="muted small">{{ it.earnings_verdict }} · quality {{ it.earnings_transcript_quality or '—' }}</span>
+      </div>
+      {% if it.intel_note %}
+        <p class="intel-note">{{ it.intel_note }}</p>
+      {% endif %}
+    </div>
+  {% endfor %}
+{% endmacro %}
+
+{# ── Calendar entry renderer (lists, dicts, strings all work) ──────────── #}
+{% macro cal_entries(cal, limit=10) %}
+  {% if cal is string %}
+    <p>{{ cal }}</p>
+  {% elif cal is mapping %}
+    <ul class="oneline">
+      {% for k, v in cal.items() %}
+        <li><span class="kicker">{{ k }}</span> {{ v }}</li>
+      {% endfor %}
+    </ul>
+  {% elif cal is iterable %}
+    <ul class="oneline">
+      {% for item in cal[:limit] %}
+        <li>
+          {% if item is mapping %}
+            {% set d = item.date or item.event_date or item.report_date or item.release_date %}
+            {% if d %}<span class="muted small">{{ d }}</span>{% endif %}
+            {% if item.ticker %} <span class="ticker">{{ item.ticker }}</span>{% endif %}
+            {% set txt = item.event or item.title or item.name or item.description or item.symbol or item.company %}
+            {% if txt %} · {{ txt }}{% endif %}
+            {% if item.importance or item.consensus %}
+              <span class="muted small">
+                {% if item.importance %} · importance {{ item.importance }}{% endif %}
+                {% if item.consensus %} · cons {{ item.consensus }}{% endif %}
+              </span>
+            {% endif %}
+          {% else %}
+            {{ item }}
+          {% endif %}
+        </li>
+      {% endfor %}
+      {% if cal|length > limit %}
+        <li class="muted small">…and {{ cal|length - limit }} more</li>
+      {% endif %}
+    </ul>
+  {% endif %}
+{% endmacro %}
+
+{# ── Calendar block (tomorrow's setup, tonight's earnings) ──────────────── #}
+{% macro calendar_block(sec) %}
+  {% if sec.fed_calendar %}
+    <p class="section-kicker">Fed Events</p>
+    {{ cal_entries(sec.fed_calendar, 6) }}
+  {% endif %}
+  {% if sec.economic_calendar %}
+    <p class="section-kicker">Economic Releases</p>
+    {{ cal_entries(sec.economic_calendar, 10) }}
+  {% endif %}
+  {% if sec.earnings_calendar %}
+    <p class="section-kicker">Earnings</p>
+    {{ cal_entries(sec.earnings_calendar, 12) }}
+  {% endif %}
+  {% if not (sec.fed_calendar or sec.economic_calendar or sec.earnings_calendar) %}
+    <p class="muted">No upcoming events recorded in macro_context.</p>
+  {% endif %}
+{% endmacro %}
+
+{# ── Disclaimers ────────────────────────────────────────────────────────── #}
+{% macro disclaimers_block(sec) %}
+  <ul class="disclaim">
+    {% for ln in sec.lines %}<li>{{ ln }}</li>{% endfor %}
+  </ul>
+{% endmacro %}
+
+{# ── Section dispatcher ─────────────────────────────────────────────────── #}
+{% macro render_section(sec) %}
+  <section class="sec sec-{{ sec.slug }}">
+    <h2>{{ sec.title }}</h2>
+    {% if sec.kind == 'empty' %}
+      {{ empty_section(sec) }}
+    {% elif sec.kind == 'narrative' %}
+      {{ narrative_block(sec) }}
+    {% elif sec.kind == 'macro' %}
+      {{ macro_block(sec) }}
+    {% elif sec.kind == 'portfolio_review' %}
+      {{ portfolio_review_block(sec) }}
+    {% elif sec.kind == 'focus_list' %}
+      {{ focus_list_block(sec) }}
+    {% elif sec.kind == 'brief_picks' %}
+      {{ brief_picks_block(sec) }}
+    {% elif sec.kind == 'oneline_picks' %}
+      {{ oneline_picks_block(sec) }}
+    {% elif sec.kind == 'risk_radar' %}
+      {{ risk_radar_block(sec) }}
+    {% elif sec.kind == 'position_table' %}
+      {{ position_table_block(sec) }}
+    {% elif sec.kind == 'earnings_takeaways' %}
+      {{ earnings_takeaways_block(sec) }}
+    {% elif sec.kind == 'calendar' or sec.kind == 'earnings_calendar' %}
+      {{ calendar_block(sec) }}
+    {% elif sec.kind == 'disclaimers' %}
+      {{ disclaimers_block(sec) }}
+    {% else %}
+      <p class="muted">(unrendered kind: {{ sec.kind }})</p>
+    {% endif %}
+  </section>
+{% endmacro %}
