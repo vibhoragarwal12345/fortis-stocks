@@ -120,6 +120,17 @@ export default async function EmergingPage() {
         </Link>
       </div>
 
+      <div className="rounded-md border bg-card px-4 py-3 text-xs text-muted-foreground">
+        <strong className="text-foreground">Tiers.</strong>{" "}
+        <span className="font-medium">Tier 1</span> — multibagger DNA across all
+        six traits and a clean balance sheet.{" "}
+        <span className="font-medium">Tier 2</span> — promising but at least one
+        gap (margin trajectory, runway, or discovery profile).{" "}
+        <span className="font-medium">Tier 3</span> — speculative; the engine
+        rates these honestly as long shots even on its own list. Every name
+        carries the asymmetric framing above.
+      </div>
+
       {rows.length === 0 && (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">

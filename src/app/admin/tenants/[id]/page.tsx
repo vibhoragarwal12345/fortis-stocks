@@ -70,15 +70,17 @@ export default async function TenantDetailPage({
   const memberRows = (members ?? []) as Member[]
   const inviteRows = (invites ?? []) as Invite[]
 
-  // Resolve member emails via auth.users (service role can read auth schema)
-  let emailByUserId = new Map<string, string>()
+  // Resolve member emails via auth.users (service role can read auth schema).
+  // One getUserById per member in parallel beats listUsers({perPage:1000})
+  // which was scanning every auth user on every render.
+  const emailByUserId = new Map<string, string>()
   if (memberRows.length) {
-    const { data: users } = await service.auth.admin.listUsers({
-      page: 1,
-      perPage: 1000,
-    })
-    for (const u of users?.users ?? []) {
-      if (u.id && u.email) emailByUserId.set(u.id, u.email)
+    const lookups = await Promise.all(
+      memberRows.map((m) => service.auth.admin.getUserById(m.user_id)),
+    )
+    for (const r of lookups) {
+      const u = r.data?.user
+      if (u?.id && u.email) emailByUserId.set(u.id, u.email)
     }
   }
 

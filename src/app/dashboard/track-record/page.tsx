@@ -227,27 +227,8 @@ export default async function TrackRecordPage() {
   const buildingDisclaimer = matured < MIN_SAMPLE_FOR_CLAIMS;
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="border-b bg-card px-6 py-3">
-        <div className="mx-auto flex max-w-7xl items-center justify-between">
-          <div className="flex items-center gap-4">
-            <span className="text-base font-semibold tracking-tight">
-              Fortis Stock Intelligence
-            </span>
-            <Link
-              href="/dashboard"
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              Dashboard
-            </Link>
-            <span className="text-sm font-medium">Track Record</span>
-          </div>
-          <span className="text-sm text-muted-foreground">{user.email}</span>
-        </div>
-      </header>
-
-      <main className="flex-1 px-6 py-10">
-        <div className="mx-auto max-w-7xl space-y-8">
+    <div className="px-6 py-10">
+      <div className="mx-auto max-w-7xl space-y-8">
           <div>
             <h1 className="text-3xl font-bold">Track Record</h1>
             <p className="mt-1 text-muted-foreground">
@@ -521,7 +502,6 @@ export default async function TrackRecordPage() {
             </Link>
           </div>
         </div>
-      </main>
     </div>
   );
 }

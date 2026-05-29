@@ -108,16 +108,20 @@ export default async function PositionsPage() {
 
   if (portfolioList.length === 0) {
     return (
-      <div className="flex min-h-screen flex-col">
-        <Header email={user.email ?? ""} />
-        <main className="flex-1 px-6 py-10">
-          <div className="mx-auto max-w-7xl">
-            <h1 className="text-3xl font-bold">Positions</h1>
-            <p className="mt-1 text-muted-foreground">
-              You have no tracked portfolios yet.
+      <div className="mx-auto max-w-7xl px-6 py-10">
+        <h1 className="text-3xl font-bold">Positions</h1>
+        <Card className="mt-6">
+          <CardContent className="py-12 text-center text-sm text-muted-foreground">
+            <p className="font-medium text-foreground">No portfolios linked to this account yet.</p>
+            <p className="mt-1">
+              Add a portfolio via{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                pipeline/data/load_sample_portfolio.py
+              </code>
+              {" "}or upload one from <Link href="/dashboard/settings/branding" className="underline-offset-4 hover:underline">Settings</Link>.
             </p>
-          </div>
-        </main>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -181,11 +185,8 @@ export default async function PositionsPage() {
     .filter((s) => s.requires_immediate_attention).length;
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <Header email={user.email ?? ""} />
-
-      <main className="flex-1 px-6 py-10">
-        <div className="mx-auto max-w-7xl space-y-8">
+    <div className="px-6 py-10">
+      <div className="mx-auto max-w-7xl space-y-8">
           <div className="flex items-baseline justify-between">
             <div>
               <h1 className="text-3xl font-bold">Positions</h1>
@@ -425,35 +426,6 @@ export default async function PositionsPage() {
             </Link>
           </div>
         </div>
-      </main>
     </div>
-  );
-}
-
-function Header({ email }: { email: string }) {
-  return (
-    <header className="border-b bg-card px-6 py-3">
-      <div className="mx-auto flex max-w-7xl items-center justify-between">
-        <div className="flex items-center gap-4">
-          <span className="text-base font-semibold tracking-tight">
-            Fortis Stock Intelligence
-          </span>
-          <Link
-            href="/dashboard"
-            className="text-sm text-muted-foreground hover:text-foreground"
-          >
-            Dashboard
-          </Link>
-          <Link
-            href="/dashboard/track-record"
-            className="text-sm text-muted-foreground hover:text-foreground"
-          >
-            Track Record
-          </Link>
-          <span className="text-sm font-medium">Positions</span>
-        </div>
-        <span className="text-sm text-muted-foreground">{email}</span>
-      </div>
-    </header>
   );
 }
