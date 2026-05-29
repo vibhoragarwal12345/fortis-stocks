@@ -2,22 +2,18 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 
 import { createClient } from "@/lib/supabase/server"
-import { buttonVariants } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
 import { getActiveTenantMember } from "@/lib/tenant"
 import { themeFromTenant, tenantCssVars } from "@/lib/theme"
 import { checkAccess } from "@/lib/permissions"
 import { signout } from "./actions"
 
-// Top-level nav for every /dashboard route. Active-link highlighting
-// (usePathname) is deferred until we add a client-side wrapper -- a slim
-// server-rendered nav keeps the first-byte fast and serves email-deep links.
+// Top-level nav for every /dashboard route. Active-link highlighting is
+// deferred to a follow-up; a slim server-rendered nav keeps first-byte fast.
 const navItems = [
   { href: "/dashboard",              label: "Today" },
   { href: "/dashboard/focus-list",   label: "Focus list" },
   { href: "/dashboard/positions",    label: "Positions" },
   { href: "/dashboard/track-record", label: "Track record" },
-  { href: "/dashboard/focus-list",   label: "Research" },
   { href: "/dashboard/emerging",     label: "Emerging" },
 ]
 
@@ -37,14 +33,14 @@ export default async function DashboardLayout({
 
   if (!access.ok) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background px-4">
-        <div className="max-w-md rounded-lg border bg-card p-8 text-center shadow-sm">
-          <h1 className="text-xl font-semibold tracking-tight">Access unavailable</h1>
-          <p className="mt-3 text-sm text-muted-foreground">{access.message}</p>
-          <form action={signout} className="mt-6">
+      <div className="flex min-h-screen items-center justify-center bg-background px-6">
+        <div className="max-w-md space-y-6 text-center">
+          <h1 className="text-h2">Access unavailable</h1>
+          <p className="text-small text-muted-foreground">{access.message}</p>
+          <form action={signout}>
             <button
               type="submit"
-              className={buttonVariants({ variant: "outline", size: "sm" })}
+              className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-background px-4 text-[14px] font-medium text-foreground transition-premium hover:bg-secondary"
             >
               Sign out
             </button>
@@ -59,75 +55,74 @@ export default async function DashboardLayout({
       className="flex min-h-screen flex-col bg-background"
       style={tenantCssVars(theme)}
     >
-      <header className="border-b bg-card">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-3">
+      <header className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur-md backdrop-saturate-150">
+        <div className="mx-auto flex h-14 max-w-[1280px] items-center justify-between gap-6 px-6 md:px-10">
+          {/* ── Wordmark ─────────────────────────────────────────────── */}
           <Link
             href="/dashboard"
-            className="flex items-center gap-2 font-semibold tracking-tight text-foreground hover:text-foreground/80"
+            className="flex shrink-0 items-center gap-2 transition-premium hover:opacity-80"
           >
             {theme.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={theme.logoUrl}
                 alt={theme.name}
-                className="h-6 w-auto"
+                className="h-5 w-auto"
               />
             ) : (
               <span
                 aria-hidden
-                className="inline-block h-3 w-3 rounded-sm"
+                className="inline-block h-2.5 w-2.5 rounded-sm"
                 style={{ backgroundColor: theme.primaryColor }}
               />
             )}
-            <span>{theme.name}</span>
-            <span className="text-muted-foreground"> · Intelligence</span>
+            <span className="text-[14px] font-semibold tracking-tight text-foreground">
+              {theme.name}
+            </span>
           </Link>
+
+          {/* ── Primary nav (desktop) ───────────────────────────────── */}
           <nav className="hidden md:flex items-center gap-1">
             {navItems.map((item, idx) => (
               <Link
                 key={`${item.label}-${idx}`}
                 href={item.href}
-                className={cn(
-                  buttonVariants({ variant: "ghost", size: "sm" }),
-                  "text-muted-foreground hover:text-foreground",
-                )}
+                className="rounded-md px-3 py-1.5 text-[13.5px] text-muted-foreground transition-premium hover:text-foreground"
               >
                 {item.label}
               </Link>
             ))}
           </nav>
-          <div className="flex items-center gap-3">
-            <span className="hidden sm:inline text-xs text-muted-foreground truncate max-w-[180px]">
-              {user.email}
-            </span>
+
+          {/* ── Account ─────────────────────────────────────────────── */}
+          <div className="flex shrink-0 items-center gap-1">
             <Link
               href="/dashboard/settings/branding"
-              className={cn(
-                buttonVariants({ variant: "ghost", size: "sm" }),
-                "text-muted-foreground hover:text-foreground",
-              )}
+              className="hidden rounded-md px-3 py-1.5 text-[13.5px] text-muted-foreground transition-premium hover:text-foreground sm:inline-block"
             >
               Settings
             </Link>
             <form action={signout}>
               <button
                 type="submit"
-                className={buttonVariants({ variant: "outline", size: "sm" })}
+                className="rounded-md px-3 py-1.5 text-[13.5px] text-muted-foreground transition-premium hover:text-foreground"
               >
                 Sign out
               </button>
             </form>
           </div>
         </div>
+
+        {/* ── Mobile horizontal nav ───────────────────────────────── */}
         <nav
           aria-label="Mobile primary"
-          className="md:hidden flex overflow-x-auto border-t px-4 py-2 gap-1 text-[13px] [&::-webkit-scrollbar]:hidden"
+          className="md:hidden flex overflow-x-auto border-t border-border px-4 py-2 gap-1 text-[13px] [&::-webkit-scrollbar]:hidden"
         >
           {navItems.map((item, idx) => (
             <Link
               key={`m-${item.label}-${idx}`}
               href={item.href}
-              className="whitespace-nowrap px-3 py-1 text-muted-foreground hover:text-foreground"
+              className="whitespace-nowrap rounded-md px-3 py-1.5 text-muted-foreground transition-premium hover:text-foreground"
             >
               {item.label}
             </Link>
@@ -137,17 +132,17 @@ export default async function DashboardLayout({
 
       <main className="flex-1">{children}</main>
 
-      <footer className="border-t bg-card">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-6 py-4 text-xs text-muted-foreground">
-          <div>
-            Powered by <span className="font-semibold tracking-tight">{theme.name}</span>
-            {" — institutional research for wealth advisors."}
-          </div>
+      <footer className="border-t border-border">
+        <div className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-3 px-6 py-6 md:px-10">
+          <p className="text-caption">
+            &copy; {new Date().getFullYear()} {theme.name} · For licensed
+            advisor review — not investment advice.
+          </p>
           <Link
             href="/dashboard/emerging"
-            className="underline-offset-4 hover:text-foreground hover:underline"
+            className="text-caption underline-offset-4 hover:text-foreground hover:underline"
           >
-            See the Emerging Watchlist for long-horizon candidates →
+            Emerging watchlist →
           </Link>
         </div>
       </footer>

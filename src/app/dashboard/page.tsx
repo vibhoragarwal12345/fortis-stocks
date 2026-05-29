@@ -1,25 +1,15 @@
 import Link from "next/link"
-import {
-  AlertTriangle,
-  ArrowRight,
-  Briefcase,
-  Moon,
-  Sun,
-  Sunrise,
-} from "lucide-react"
+import { ArrowRight, Moon, Sun, Sunrise } from "lucide-react"
 
 import { createClient } from "@/lib/supabase/server"
 import { trackEvent } from "@/lib/track"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { buttonVariants } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
+import { Reveal } from "@/components/ui/reveal"
 
 export const metadata = { title: "Today — Fortis" }
 
@@ -239,188 +229,214 @@ export default async function DashboardHomePage() {
     }
   })
 
+  const dateLine = now.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  })
+
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 md:px-6 md:py-10 space-y-12">
+    <div className="mx-auto max-w-[1280px] space-y-20 px-6 py-14 md:space-y-24 md:px-10 md:py-16">
       {/* ── Greeting ───────────────────────────────────────────── */}
-      <header>
-        <h1 className="font-heading text-2xl md:text-3xl font-semibold tracking-tight">
+      <Reveal as="header" className="space-y-3">
+        <p className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+          {dateLine}
+        </p>
+        <h1 className="text-h1">
           {greeting(now)}, {displayName(user)}.
         </h1>
-        <p className="mt-1 text-muted-foreground">
-          Today is{" "}
-          {now.toLocaleDateString("en-US", {
-            weekday: "long",
-            month: "long",
-            day: "numeric",
-            year: "numeric",
-          })}
-          .
-        </p>
-      </header>
+      </Reveal>
 
       {/* ── Three report cards ─────────────────────────────────── */}
-      <section aria-labelledby="briefs-heading">
-        <h2
-          id="briefs-heading"
-          className="mb-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground"
-        >
-          Today&apos;s briefs
-        </h2>
-        <div className="grid gap-4 md:grid-cols-3">
-          {RUN_TYPES.map(t => {
+      <section aria-labelledby="briefs-heading" className="space-y-6">
+        <Reveal>
+          <h2
+            id="briefs-heading"
+            className="text-caption uppercase tracking-[0.18em] text-muted-foreground"
+          >
+            Today&apos;s briefs
+          </h2>
+        </Reveal>
+        <div className="grid gap-5 md:grid-cols-3">
+          {RUN_TYPES.map((t, idx) => {
             const r = reports.find(x => x.report_type === t)
             const Icon = RUN_TYPE_ICON[t]
             const a = r?.a_grade_count ?? 0
             const b = r?.b_grade_count ?? 0
             const c = r?.c_grade_count ?? 0
             const vsPct = verifyPct(r?.avg_verification_score)
-            return (
-              <Card key={t} size="sm">
+            const inner = (
+              <Card
+                size="sm"
+                className="h-full transition-premium duration-300 group-hover:-translate-y-0.5 group-hover:shadow-[var(--shadow-md)]"
+              >
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Icon className="size-4 text-muted-foreground" />
-                      <CardTitle className="text-base">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Icon className="size-4" />
+                      <CardTitle className="text-[15px]">
                         {RUN_TYPE_LABEL[t]}
                       </CardTitle>
                     </div>
-                    {r ? (
-                      <Badge variant="success">Generated</Badge>
-                    ) : (
-                      <Badge variant="neutral">Awaiting</Badge>
-                    )}
+                    <span
+                      className={
+                        r
+                          ? "text-caption uppercase tracking-[0.14em] text-foreground"
+                          : "text-caption uppercase tracking-[0.14em] text-muted-foreground"
+                      }
+                    >
+                      {r ? "Generated" : "Awaiting"}
+                    </span>
                   </div>
-                  <CardDescription className="text-xs">
-                    {RUN_TYPE_TIME[t]}
-                  </CardDescription>
+                  <p className="text-caption">{RUN_TYPE_TIME[t]}</p>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-4">
                   {r ? (
-                    <p className="text-sm text-muted-foreground">
-                      <span className="font-medium text-foreground">
+                    <p className="text-small text-muted-foreground">
+                      <span className="font-medium text-foreground tabular-nums">
                         {a} A
                       </span>{" "}
-                      · <span>{b} B</span> · <span>{c} C</span>
-                      {vsPct !== null && <> · verified {vsPct}%</>}
+                      · <span className="tabular-nums">{b} B</span> ·{" "}
+                      <span className="tabular-nums">{c} C</span>
+                      {vsPct !== null && (
+                        <> · verified {vsPct}%</>
+                      )}
                     </p>
                   ) : (
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-small text-muted-foreground">
                       Daily briefs run weekdays. Next one at {RUN_TYPE_TIME[t]}.
                     </p>
                   )}
-                  <div className="mt-3">
+                  <div className="flex items-center text-small">
                     {r ? (
-                      <Link
-                        href={`/dashboard/reports/${today}/${t}`}
-                        className={cn(
-                          buttonVariants({ variant: "outline", size: "sm" }),
-                          "w-full"
-                        )}
-                      >
+                      <span className="inline-flex items-center gap-1 font-medium text-foreground">
                         Open report
                         <ArrowRight className="size-3.5" />
-                      </Link>
+                      </span>
                     ) : (
-                      <button
-                        type="button"
-                        disabled
-                        aria-disabled
-                        className={cn(
-                          buttonVariants({ variant: "outline", size: "sm" }),
-                          "w-full opacity-50 cursor-not-allowed"
-                        )}
-                      >
+                      <span className="text-muted-foreground">
                         Not yet generated
-                      </button>
+                      </span>
                     )}
                   </div>
                 </CardContent>
               </Card>
+            )
+            return (
+              <Reveal key={t} delay={idx * 80}>
+                {r ? (
+                  <Link
+                    href={`/dashboard/reports/${today}/${t}`}
+                    className="group block h-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-xl"
+                  >
+                    {inner}
+                  </Link>
+                ) : (
+                  <div className="group h-full opacity-90">{inner}</div>
+                )}
+              </Reveal>
             )
           })}
         </div>
       </section>
 
       {/* ── Top 3 A picks ──────────────────────────────────────── */}
-      <section aria-labelledby="picks-heading">
-        <div className="mb-4 flex items-baseline justify-between gap-4">
-          <h2
-            id="picks-heading"
-            className="text-xs font-semibold uppercase tracking-widest text-muted-foreground"
-          >
-            Today&apos;s top picks
-          </h2>
-          <Link
-            href="/dashboard/focus-list"
-            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-          >
-            See full focus list
-            <ArrowRight className="size-3" />
-          </Link>
-        </div>
-        {showingFallbackPicks && (
-          <div className="mb-3 rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-            Today&apos;s pipeline hasn&apos;t run yet — showing the latest A-grade picks from {latestRunDate}.
+      <section aria-labelledby="picks-heading" className="space-y-6">
+        <Reveal>
+          <div className="flex items-baseline justify-between gap-4">
+            <h2
+              id="picks-heading"
+              className="text-caption uppercase tracking-[0.18em] text-muted-foreground"
+            >
+              Today&apos;s top picks
+            </h2>
+            <Link
+              href="/dashboard/focus-list"
+              className="inline-flex items-center gap-1 text-caption transition-premium hover:text-foreground"
+            >
+              See full focus list
+              <ArrowRight className="size-3" />
+            </Link>
           </div>
+        </Reveal>
+        {showingFallbackPicks && (
+          <Reveal>
+            <div className="rounded-md border border-border bg-secondary/40 px-3.5 py-2.5 text-caption text-muted-foreground">
+              Today&apos;s pipeline hasn&apos;t run yet — showing the latest
+              A-grade picks from {latestRunDate}.
+            </div>
+          </Reveal>
         )}
         {picks.length === 0 ? (
-          <Card size="sm">
-            <CardContent className="py-6 text-sm text-muted-foreground">
-              No A-grade picks on file yet. Picks are generated by the midday
-              run at 12:30pm ET on weekdays.
-            </CardContent>
-          </Card>
+          <Reveal>
+            <Card size="sm">
+              <CardContent className="py-8 text-small text-muted-foreground">
+                No A-grade picks on file yet. Picks are generated by the
+                midday run at 12:30pm ET on weekdays.
+              </CardContent>
+            </Card>
+          </Reveal>
         ) : (
-          <div className="grid gap-4 md:grid-cols-3">
-            {picks.map(p => {
+          <div className="grid gap-5 md:grid-cols-3">
+            {picks.map((p, idx) => {
               const s = snapByTicker[p.ticker]
               const price = num(s?.price)
               const gap = num(s?.gap_pct)
               const cs = num(p.composite_score)
               return (
-                <Card key={p.ticker} size="sm">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <Link
-                        href={`/dashboard/research/${p.ticker}`}
-                        className="font-mono text-lg font-semibold tracking-wider hover:underline"
-                      >
-                        {p.ticker}
-                      </Link>
-                      <Badge variant="success">A</Badge>
-                    </div>
-                    <CardDescription className="text-xs">
-                      {price !== null ? `$${price.toFixed(2)}` : "price n/a"}
-                      {gap !== null && (
-                        <>
-                          {" · "}
-                          <span
-                            className={
-                              gap >= 0
-                                ? "text-emerald-700 dark:text-emerald-300"
-                                : "text-red-700 dark:text-red-300"
-                            }
-                          >
-                            {gap >= 0 ? "+" : ""}
-                            {gap.toFixed(2)}%
+                <Reveal key={p.ticker} delay={idx * 80}>
+                  <Link
+                    href={`/dashboard/research/${p.ticker}`}
+                    className="group block h-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-xl"
+                  >
+                    <Card
+                      size="sm"
+                      className="h-full transition-premium duration-300 group-hover:-translate-y-0.5 group-hover:shadow-[var(--shadow-md)]"
+                    >
+                      <CardHeader>
+                        <div className="flex items-baseline justify-between">
+                          <span className="font-mono text-[20px] font-semibold tracking-tight">
+                            {p.ticker}
                           </span>
-                        </>
-                      )}
-                      {cs !== null && <> · score {cs.toFixed(1)}</>}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="text-sm">
-                    {p.catalyst_category && (
-                      <p className="mb-1 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-                        {p.catalyst_category}
-                      </p>
-                    )}
-                    <p className="line-clamp-3 text-muted-foreground">
-                      {p.catalyst_description ??
-                        "Catalyst detail not yet attached."}
-                    </p>
-                  </CardContent>
-                </Card>
+                          <span className="text-caption uppercase tracking-[0.14em] text-foreground">
+                            A
+                          </span>
+                        </div>
+                        <p className="text-caption tabular-nums">
+                          {price !== null ? `$${price.toFixed(2)}` : "price n/a"}
+                          {gap !== null && (
+                            <>
+                              {" · "}
+                              <span
+                                className={
+                                  gap >= 0
+                                    ? "text-foreground"
+                                    : "text-muted-foreground"
+                                }
+                              >
+                                {gap >= 0 ? "+" : ""}
+                                {gap.toFixed(2)}%
+                              </span>
+                            </>
+                          )}
+                          {cs !== null && <> · score {cs.toFixed(1)}</>}
+                        </p>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        {p.catalyst_category && (
+                          <p className="text-caption uppercase tracking-[0.14em]">
+                            {p.catalyst_category}
+                          </p>
+                        )}
+                        <p className="line-clamp-3 text-small text-muted-foreground">
+                          {p.catalyst_description ??
+                            "Catalyst detail not yet attached."}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                </Reveal>
               )
             })}
           </div>
@@ -428,118 +444,127 @@ export default async function DashboardHomePage() {
       </section>
 
       {/* ── Portfolios at a glance ─────────────────────────────── */}
-      <section aria-labelledby="portfolios-heading">
-        <div className="mb-4 flex items-baseline justify-between gap-4">
-          <h2
-            id="portfolios-heading"
-            className="text-xs font-semibold uppercase tracking-widest text-muted-foreground"
-          >
-            Portfolio at a glance
-          </h2>
-          <Link
-            href="/dashboard/positions"
-            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-          >
-            Open positions
-            <ArrowRight className="size-3" />
-          </Link>
-        </div>
+      <section aria-labelledby="portfolios-heading" className="space-y-6">
+        <Reveal>
+          <div className="flex items-baseline justify-between gap-4">
+            <h2
+              id="portfolios-heading"
+              className="text-caption uppercase tracking-[0.18em] text-muted-foreground"
+            >
+              Portfolio at a glance
+            </h2>
+            <Link
+              href="/dashboard/positions"
+              className="inline-flex items-center gap-1 text-caption transition-premium hover:text-foreground"
+            >
+              Open positions
+              <ArrowRight className="size-3" />
+            </Link>
+          </div>
+        </Reveal>
         {portfolioSummaries.length === 0 ? (
-          <Card size="sm">
-            <CardContent className="py-6 text-sm text-muted-foreground">
-              No portfolios linked to this account yet.
-            </CardContent>
-          </Card>
+          <Reveal>
+            <Card size="sm">
+              <CardContent className="py-8 text-small text-muted-foreground">
+                No portfolios linked to this account yet.
+              </CardContent>
+            </Card>
+          </Reveal>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2">
-            {portfolioSummaries.map(p => (
-              <Link
-                key={p.id}
-                href="/dashboard/positions"
-                className="block group"
-              >
-                <Card
-                  size="sm"
-                  className="transition group-hover:ring-foreground/20"
+          <div className="grid gap-5 sm:grid-cols-2">
+            {portfolioSummaries.map((p, idx) => (
+              <Reveal key={p.id} delay={idx * 80}>
+                <Link
+                  href="/dashboard/positions"
+                  className="group block h-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-xl"
                 >
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Briefcase className="size-4 text-muted-foreground" />
-                        <CardTitle className="text-base">{p.name}</CardTitle>
+                  <Card
+                    size="sm"
+                    className="h-full transition-premium duration-300 group-hover:-translate-y-0.5 group-hover:shadow-[var(--shadow-md)]"
+                  >
+                    <CardHeader>
+                      <div className="flex items-baseline justify-between">
+                        <CardTitle className="text-[15px]">{p.name}</CardTitle>
+                        {p.critical > 0 && (
+                          <span className="text-caption uppercase tracking-[0.14em] text-destructive">
+                            {p.critical} critical
+                          </span>
+                        )}
                       </div>
-                      {p.critical > 0 && (
-                        <Badge variant="destructive">
-                          <AlertTriangle className="size-3 mr-1" />
-                          {p.critical}
-                        </Badge>
-                      )}
-                    </div>
-                    <CardDescription className="text-xs">
-                      {p.holdings} {p.holdings === 1 ? "holding" : "holdings"}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-sm text-muted-foreground">
-                      {p.alerts === 0 ? (
-                        "No active alerts."
-                      ) : (
-                        <>
-                          {p.alerts} alert{p.alerts === 1 ? "" : "s"} in the
-                          last week
-                          {p.critical > 0 && (
-                            <span className="text-red-700 dark:text-red-300">
-                              {" — "}
-                              {p.critical} critical/high
-                            </span>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
+                      <p className="text-caption tabular-nums">
+                        {p.holdings}{" "}
+                        {p.holdings === 1 ? "holding" : "holdings"}
+                      </p>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-small text-muted-foreground">
+                        {p.alerts === 0 ? (
+                          "No active alerts."
+                        ) : (
+                          <>
+                            {p.alerts} alert{p.alerts === 1 ? "" : "s"} in the
+                            last week
+                            {p.critical > 0 && (
+                              <span className="text-destructive">
+                                {" — "}
+                                {p.critical} critical/high
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </Link>
+              </Reveal>
             ))}
           </div>
         )}
       </section>
 
       {/* ── Recent activity ─────────────────────────────────────── */}
-      <section aria-labelledby="activity-heading">
-        <h2
-          id="activity-heading"
-          className="mb-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground"
-        >
-          Recent activity
-        </h2>
-        <Card size="sm">
-          <CardContent className="py-4">
-            {recentEvents.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No activity yet. Open a brief or research a ticker and it&apos;ll
-                appear here.
-              </p>
-            ) : (
-              <ul className="divide-y text-sm">
-                {recentEvents.map((e, i) => (
-                  <li key={i} className="flex items-baseline justify-between gap-4 py-2">
-                    <span className="text-foreground">
-                      {prettyEvent(e.event_type)}
-                      {typeof e.event_data?.ticker === "string" && (
-                        <span className="ml-1 font-mono text-xs text-muted-foreground">
-                          {e.event_data.ticker.toUpperCase()}
-                        </span>
-                      )}
-                    </span>
-                    <span className="text-xs text-muted-foreground tabular-nums">
-                      {timeAgo(new Date(e.occurred_at))}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
+      <section aria-labelledby="activity-heading" className="space-y-6">
+        <Reveal>
+          <h2
+            id="activity-heading"
+            className="text-caption uppercase tracking-[0.18em] text-muted-foreground"
+          >
+            Recent activity
+          </h2>
+        </Reveal>
+        <Reveal>
+          <Card size="sm">
+            <CardContent className="py-4">
+              {recentEvents.length === 0 ? (
+                <p className="text-small text-muted-foreground">
+                  No activity yet. Open a brief or research a ticker and it
+                  appears here.
+                </p>
+              ) : (
+                <ul className="divide-y divide-border text-small">
+                  {recentEvents.map((e, i) => (
+                    <li
+                      key={i}
+                      className="flex items-baseline justify-between gap-4 py-3"
+                    >
+                      <span className="text-foreground">
+                        {prettyEvent(e.event_type)}
+                        {typeof e.event_data?.ticker === "string" && (
+                          <span className="ml-1.5 font-mono text-caption">
+                            {e.event_data.ticker.toUpperCase()}
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-caption tabular-nums">
+                        {timeAgo(new Date(e.occurred_at))}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        </Reveal>
       </section>
     </div>
   )
