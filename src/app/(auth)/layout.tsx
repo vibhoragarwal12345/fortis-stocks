@@ -1,12 +1,34 @@
 import Link from "next/link"
 
-export default function AuthLayout({ children }: { children: React.ReactNode }) {
+// Auth layout. Centered, minimal, generous whitespace. The wordmark sits
+// above the form as a quiet brand anchor, and a thin footer line below
+// keeps the surface intentional rather than empty.
+
+export default function AuthLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-12">
-      <Link href="/" className="mb-8 text-xl font-bold tracking-tight text-foreground">
-        Fortis
+    <div className="relative flex min-h-screen flex-col items-center bg-background px-6 py-16 md:py-24">
+      <Link
+        href="/"
+        className="flex items-center gap-2 transition-premium hover:opacity-80"
+      >
+        <span
+          aria-hidden
+          className="inline-block h-2.5 w-2.5 rounded-sm bg-foreground"
+        />
+        <span className="text-caption uppercase tracking-[0.18em] text-foreground">
+          Fortis
+        </span>
       </Link>
-      <div className="w-full max-w-sm">{children}</div>
+
+      <div className="mt-14 w-full max-w-[400px] md:mt-20">{children}</div>
+
+      <p className="mt-auto pt-16 text-caption">
+        For licensed advisor review — not investment advice.
+      </p>
     </div>
   )
 }

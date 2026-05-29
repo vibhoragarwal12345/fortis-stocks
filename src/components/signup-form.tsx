@@ -58,9 +58,9 @@ export function SignupForm({
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
         {serverError && (
-          <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3.5 py-3 text-small text-destructive">
             {serverError}
           </div>
         )}
@@ -121,6 +121,7 @@ export function SignupForm({
         <Button
           type="submit"
           className="w-full"
+          size="lg"
           disabled={form.formState.isSubmitting}
         >
           {form.formState.isSubmitting ? "Creating account…" : "Create account"}

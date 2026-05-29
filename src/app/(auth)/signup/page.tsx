@@ -1,12 +1,5 @@
 import Link from "next/link"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+
 import { SignupForm } from "@/components/signup-form"
 import { createClient } from "@/lib/supabase/server"
 
@@ -31,33 +24,31 @@ export default async function SignupPage({
 
   if (!token) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Invite required</CardTitle>
-          <CardDescription>
-            Access is currently invite-only. If you were invited, use the link
-            from your invite email.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="text-sm text-muted-foreground">
-          Need access? Contact{" "}
-          <a
-            href="mailto:vibhora030@gmail.com"
-            className="font-medium text-foreground underline-offset-4 hover:underline"
-          >
-            vibhora030@gmail.com
-          </a>
-          .
-        </CardContent>
-        <CardFooter className="justify-center text-sm text-muted-foreground">
+      <div className="space-y-8">
+        <div className="space-y-3">
+          <h1 className="text-h2">Invite required</h1>
+          <p className="text-small text-muted-foreground">
+            Access is currently invite-only. Use the link from your invite
+            email, or contact{" "}
+            <a
+              href="mailto:vibhora030@gmail.com"
+              className="font-medium text-foreground underline-offset-4 hover:underline"
+            >
+              vibhora030@gmail.com
+            </a>
+            .
+          </p>
+        </div>
+        <p className="text-small text-muted-foreground">
+          Already have an account?{" "}
           <Link
             href="/login"
             className="font-medium text-foreground underline-offset-4 hover:underline"
           >
-            Sign in instead
+            Sign in
           </Link>
-        </CardFooter>
-      </Card>
+        </p>
+      </div>
     )
   }
 
@@ -71,47 +62,49 @@ export default async function SignupPage({
 
   if (invalid) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Invite link not valid</CardTitle>
-          <CardDescription>
-            This invite link is invalid or has expired. Ask your inviter to
-            send a fresh link.
-          </CardDescription>
-        </CardHeader>
-        <CardFooter className="justify-center text-sm text-muted-foreground">
+      <div className="space-y-8">
+        <div className="space-y-3">
+          <h1 className="text-h2">Invite link expired</h1>
+          <p className="text-small text-muted-foreground">
+            This invite link is no longer valid. Ask your inviter to send a
+            fresh one.
+          </p>
+        </div>
+        <p className="text-small text-muted-foreground">
           <Link
             href="/login"
             className="font-medium text-foreground underline-offset-4 hover:underline"
           >
             Sign in
           </Link>
-        </CardFooter>
-      </Card>
+        </p>
+      </div>
     )
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Create account</CardTitle>
-        <CardDescription>
-          Joining <span className="font-medium text-foreground">{invite!.tenant_name}</span> as{" "}
+    <div className="space-y-8">
+      <div className="space-y-3">
+        <h1 className="text-h2">Create account</h1>
+        <p className="text-small text-muted-foreground">
+          Joining{" "}
+          <span className="font-medium text-foreground">{invite!.tenant_name}</span>{" "}
+          as{" "}
           <span className="font-medium text-foreground">{invite!.email}</span>.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <SignupForm token={token} inviteEmail={invite!.email} />
-      </CardContent>
-      <CardFooter className="justify-center text-sm text-muted-foreground">
-        Already have an account?&nbsp;
+        </p>
+      </div>
+
+      <SignupForm token={token} inviteEmail={invite!.email} />
+
+      <p className="text-small text-muted-foreground">
+        Already have an account?{" "}
         <Link
           href="/login"
           className="font-medium text-foreground underline-offset-4 hover:underline"
         >
           Sign in
         </Link>
-      </CardFooter>
-    </Card>
+      </p>
+    </div>
   )
 }

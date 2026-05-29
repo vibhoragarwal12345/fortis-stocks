@@ -1,13 +1,7 @@
+import Link from "next/link"
 import { redirect } from "next/navigation"
 
 import { createClient } from "@/lib/supabase/server"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
 import { UpdatePasswordForm } from "@/components/update-password-form"
 
 export const metadata = { title: "Set new password — Fortis" }
@@ -24,18 +18,38 @@ export default async function UpdatePasswordPage() {
   if (!user) redirect("/forgot-password")
 
   return (
-    <div className="mx-auto max-w-md px-4 py-16">
-      <Card>
-        <CardHeader>
-          <CardTitle>Set new password</CardTitle>
-          <CardDescription>
-            Choose a new password for {user.email}.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+    <div className="relative flex min-h-screen flex-col items-center bg-background px-6 py-16 md:py-24">
+      <Link
+        href="/"
+        className="flex items-center gap-2 transition-premium hover:opacity-80"
+      >
+        <span
+          aria-hidden
+          className="inline-block h-2.5 w-2.5 rounded-sm bg-foreground"
+        />
+        <span className="text-caption uppercase tracking-[0.18em] text-foreground">
+          Fortis
+        </span>
+      </Link>
+
+      <div className="mt-14 w-full max-w-[400px] md:mt-20">
+        <div className="space-y-8">
+          <div className="space-y-3">
+            <h1 className="text-h2">Set new password</h1>
+            <p className="text-small text-muted-foreground">
+              Choose a new password for{" "}
+              <span className="font-medium text-foreground">{user.email}</span>
+              .
+            </p>
+          </div>
+
           <UpdatePasswordForm />
-        </CardContent>
-      </Card>
+        </div>
+      </div>
+
+      <p className="mt-auto pt-16 text-caption">
+        For licensed advisor review — not investment advice.
+      </p>
     </div>
   )
 }

@@ -44,18 +44,18 @@ export function ForgotPasswordForm() {
 
   if (submitted) {
     return (
-      <div className="rounded-md bg-muted px-4 py-3 text-sm text-muted-foreground">
-        If an account exists for that address, a password reset link is on its
-        way. Check your inbox (and spam folder).
+      <div className="rounded-md border border-border bg-secondary/50 px-3.5 py-3 text-small text-muted-foreground">
+        If an account exists for that address, a reset link is on its way.
+        Check your inbox (and spam folder).
       </div>
     )
   }
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
         {serverError && (
-          <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3.5 py-3 text-small text-destructive">
             {serverError}
           </div>
         )}
@@ -80,6 +80,7 @@ export function ForgotPasswordForm() {
         <Button
           type="submit"
           className="w-full"
+          size="lg"
           disabled={form.formState.isSubmitting}
         >
           {form.formState.isSubmitting ? "Sending…" : "Send reset link"}
