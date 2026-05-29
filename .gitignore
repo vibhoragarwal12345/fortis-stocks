@@ -57,6 +57,12 @@ next-env.d.ts
 # Generated performance / track-record reports
 /pipeline/reports/
 
+# Step 7.5 -- daily feedback diagnostics + retraining proposals. Uploaded
+# as workflow artifacts in feedback_aggregator.yml; not source.
+/pipeline/proposals/*.json
+/pipeline/proposals/*.md
+!/pipeline/proposals/.gitkeep
+
 # Ad-hoc error logs
 *.err
 

@@ -1,0 +1,65 @@
+name: Feedback Aggregator
+
+# 02:00 UTC = 21:00 ET (EST) / 22:00 ET (EDT). Runs one hour after the
+# outcome tracker so the day's pick_outcomes are fresh when signal-value
+# and correlation diagnostics read them.
+on:
+  schedule:
+    - cron: "0 2 * * 2-6"   # Tue-Sat UTC == Mon-Fri evening ET
+  workflow_dispatch:
+
+concurrency:
+  group: feedback-aggregator
+  cancel-in-progress: false
+
+env:
+  NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  TIINGO_API_KEY: ${{ secrets.TIINGO_API_KEY }}
+
+jobs:
+  aggregate:
+    name: "Daily aggregation"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-pipeline
+
+      - name: Roll up yesterday's dashboard events
+        run: python -m pipeline.agents.feedback_aggregator daily
+
+      - name: Compute signal value diagnostics
+        run: python -m pipeline.agents.feedback_aggregator signal-value 90
+
+      - name: Compute signal <-> outcome correlations
+        run: python -m pipeline.agents.feedback_aggregator correlate 30
+
+      - name: Check whether weights can be retrained yet
+        # Always succeeds: if the gate isn't met it just prints the metrics.
+        # Once the gate trips, the next propose-step will write a markdown
+        # proposal but still never mutates ranking_engine.py.
+        run: python -m pipeline.agents.weight_retrainer check
+
+      - name: Upload diagnostics + any proposal
+        uses: actions/upload-artifact@v4
+        with:
+          name: feedback-artifacts-${{ github.run_id }}
+          path: pipeline/proposals/
+          if-no-files-found: ignore
+          retention-days: 90
+
+  notify_failure:
+    needs: [aggregate]
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post to Slack
+        env:
+          WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        if: env.WEBHOOK != ''
+        run: |
+          curl -X POST -H "Content-Type: application/json" \
+            --data "{\"text\":\":warning: *${{ github.workflow }}* failed (run #${{ github.run_number }}) -- <${RUN_URL}|view logs>\"}" \
+            "$WEBHOOK"

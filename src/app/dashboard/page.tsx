@@ -9,6 +9,7 @@ import {
 } from "lucide-react"
 
 import { createClient } from "@/lib/supabase/server"
+import { trackEvent } from "@/lib/track"
 import {
   Card,
   CardContent,
@@ -102,6 +103,10 @@ export default async function DashboardHomePage() {
   } = await supabase.auth.getUser()
   // Layout already redirects unauthenticated users; this is a defensive guard.
   if (!user) return null
+
+  // Step 7.5 -- log page view. Fire-and-forget; await so the 5s dedup
+  // bucket sees a stable occurred_at, but failures never break render.
+  await trackEvent("dashboard_today_opened")
 
   const now = new Date()
   const today = now.toISOString().slice(0, 10)

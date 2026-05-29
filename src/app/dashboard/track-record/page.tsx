@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 
 import { createClient } from "@/lib/supabase/server";
+import { trackEvent } from "@/lib/track";
 import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
@@ -172,6 +173,8 @@ export default async function TrackRecordPage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  await trackEvent("track_record_opened");
 
   const [{ data: outcomesRaw }, { data: rollupsRaw }] = await Promise.all([
     supabase
