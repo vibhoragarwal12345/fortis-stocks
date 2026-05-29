@@ -1,0 +1,62 @@
+name: Weekly Rollup
+
+# Monday 04:00 UTC == Sunday 23:00 ET (EST) / Monday 00:00 ET (EDT). Runs the
+# weekly track-record cadence (system_performance_rollup, weekly grade-bucket
+# stats). Phase-5 retraining hook will be added in Step 7.5.
+on:
+  schedule:
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: weekly-rollup
+  cancel-in-progress: false
+
+env:
+  NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+  FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+  TIINGO_API_KEY: ${{ secrets.TIINGO_API_KEY }}
+  GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+
+jobs:
+  rollup:
+    name: "Weekly performance rollup"
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-pipeline
+
+      - name: outcome_tracker weekly cadence
+        run: python pipeline/run_track_record.py weekly
+
+      - name: Monthly cadence (only on the 1st)
+        # The monthly cadence runs backtest_engine.generate_performance_report.
+        # We piggyback on the weekly cron so we don't need a second workflow
+        # just for "first Monday of the month".
+        if: ${{ github.event.schedule == '0 4 * * 1' }}
+        run: |
+          DAY=$(date -u +%d)
+          if [ "$DAY" -le 7 ]; then
+            echo "First-of-month window -- running monthly cadence"
+            python pipeline/run_track_record.py monthly
+          else
+            echo "Not first-of-month window ($DAY) -- skipping monthly"
+          fi
+
+  notify_failure:
+    needs: [rollup]
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post to Slack
+        env:
+          WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        if: env.WEBHOOK != ''
+        run: |
+          curl -X POST -H "Content-Type: application/json" \
+            --data "{\"text\":\":warning: *${{ github.workflow }}* failed (run #${{ github.run_number }}) -- <${RUN_URL}|view logs>\"}" \
+            "$WEBHOOK"

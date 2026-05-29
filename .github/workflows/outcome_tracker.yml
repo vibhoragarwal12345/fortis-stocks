@@ -1,0 +1,48 @@
+name: Daily Outcome Tracker
+
+# 01:00 UTC == 20:00 ET (EST) / 21:00 ET (EDT). Runs after close so the
+# day's prices have settled. Wraps pipeline/run_track_record.py daily, which
+# itself calls outcome_tracker.update_outcomes to fill forward returns for
+# every still-active position recorded by the day's pipeline runs.
+on:
+  schedule:
+    - cron: "0 1 * * 2-6"   # Tue-Sat UTC == Mon-Fri evening ET
+  workflow_dispatch:
+
+concurrency:
+  group: outcome-tracker-daily
+  cancel-in-progress: false
+
+env:
+  NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+  FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+  TIINGO_API_KEY: ${{ secrets.TIINGO_API_KEY }}
+
+jobs:
+  update:
+    name: "Update forward returns"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-pipeline
+
+      - name: outcome_tracker daily cadence
+        run: python pipeline/run_track_record.py daily
+
+  notify_failure:
+    needs: [update]
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post to Slack
+        env:
+          WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        if: env.WEBHOOK != ''
+        run: |
+          curl -X POST -H "Content-Type: application/json" \
+            --data "{\"text\":\":warning: *${{ github.workflow }}* failed (run #${{ github.run_number }}) -- <${RUN_URL}|view logs>\"}" \
+            "$WEBHOOK"

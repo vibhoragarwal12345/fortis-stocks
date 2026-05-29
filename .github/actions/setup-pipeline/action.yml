@@ -1,0 +1,21 @@
+name: "Set up pipeline environment"
+description: >
+  Shared prologue for every Fortis pipeline workflow: checkout, Python 3.11
+  with pip cache, and `pip install -r pipeline/requirements.txt`. Each
+  workflow job calls this once, then runs its agents in subsequent steps.
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+        cache: "pip"
+        cache-dependency-path: pipeline/requirements.txt
+
+    - name: Install pipeline dependencies
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r pipeline/requirements.txt

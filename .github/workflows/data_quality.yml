@@ -1,0 +1,45 @@
+name: Data Quality Check
+
+# 12:00 UTC == 07:00 ET (EST) / 08:00 ET (EDT). Runs after the pre-market
+# pipeline so we can verify it actually populated the day's tables before the
+# trading day opens.
+on:
+  schedule:
+    - cron: "0 12 * * 1-5"
+  workflow_dispatch:
+
+concurrency:
+  group: data-quality
+  cancel-in-progress: false
+
+env:
+  NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+
+jobs:
+  health:
+    name: "Health checks"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-pipeline
+
+      - name: Run pipeline health checks
+        run: python -m pipeline.health_check
+
+  notify_failure:
+    needs: [health]
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post to Slack
+        env:
+          WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        if: env.WEBHOOK != ''
+        run: |
+          curl -X POST -H "Content-Type: application/json" \
+            --data "{\"text\":\":warning: *${{ github.workflow }}* failed (run #${{ github.run_number }}) -- pipeline produced bad/missing data overnight. <${RUN_URL}|view logs>\"}" \
+            "$WEBHOOK"

@@ -19,6 +19,12 @@ type ReportLite = {
   tenant_id: string | null
 }
 
+// Both verbs accepted: Vercel Cron uses GET, GitHub Actions / the Step 7.4
+// workflows curl with POST. They share the same handler.
+export async function POST(req: NextRequest) {
+  return GET(req)
+}
+
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET
   if (!secret) {
