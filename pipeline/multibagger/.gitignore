@@ -1,0 +1,5 @@
+# Local Finnhub response cache -- regenerated each run, 14-day TTL.
+data/_finnhub_cache/
+
+# Locally-rendered reports (also persisted to public.reports in Supabase).
+data/_reports/

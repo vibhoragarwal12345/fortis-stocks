@@ -18,6 +18,7 @@ const navItems = [
   { href: "/dashboard/positions",    label: "Positions" },
   { href: "/dashboard/track-record", label: "Track record" },
   { href: "/dashboard/focus-list",   label: "Research" },
+  { href: "/dashboard/emerging",     label: "Emerging" },
 ]
 
 export default async function DashboardLayout({
@@ -137,9 +138,17 @@ export default async function DashboardLayout({
       <main className="flex-1">{children}</main>
 
       <footer className="border-t bg-card">
-        <div className="mx-auto max-w-7xl px-6 py-4 text-xs text-muted-foreground">
-          Powered by <span className="font-semibold tracking-tight">{theme.name}</span>
-          {" — institutional research for wealth advisors."}
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-6 py-4 text-xs text-muted-foreground">
+          <div>
+            Powered by <span className="font-semibold tracking-tight">{theme.name}</span>
+            {" — institutional research for wealth advisors."}
+          </div>
+          <Link
+            href="/dashboard/emerging"
+            className="underline-offset-4 hover:text-foreground hover:underline"
+          >
+            See the Emerging Watchlist for long-horizon candidates →
+          </Link>
         </div>
       </footer>
     </div>

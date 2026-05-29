@@ -1,0 +1,38 @@
+name: Multibagger · Weekly
+
+# Sundays 14:00 UTC -- well before any Monday open. Light job: refresh
+# watchlist prices, flag thesis-breaking moves, update the tracker.
+on:
+  schedule:
+    - cron: "0 14 * * 0"
+  workflow_dispatch:
+
+concurrency:
+  group: multibagger-weekly
+  cancel-in-progress: false
+
+env:
+  NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+
+jobs:
+  weekly:
+    name: "Weekly watchlist refresh + tracker"
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-pipeline
+
+      - name: Refresh prices + drawdowns
+        run: python -m pipeline.multibagger.watchlist_manager --update
+
+      - name: Graduate names that crossed $10B
+        run: python -m pipeline.multibagger.watchlist_manager --graduate
+
+      - name: Refresh outcomes tracker
+        run: python -m pipeline.multibagger.tracker --refresh
+
+      - name: Print engine track-record stats
+        run: python -m pipeline.multibagger.tracker --stats
