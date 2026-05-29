@@ -4,127 +4,289 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* =========================================================================
+ *  Design System
+ *  -----------------------------------------------------------------------
+ *  - Restraint over decoration. Typography does the heavy lifting.
+ *  - One accent: near-black (#1D1D1F light / #FFFFFF dark).
+ *  - Off-white surfaces (#FBFBFD), pure white cards, soft black text.
+ *  - Borders prefered over shadows for definition.
+ *  - All motion uses cubic-bezier(0.16, 1, 0.3, 1); honoured by prefers-
+ *    reduced-motion.
+ *  ========================================================================= */
+
 @theme inline {
+  /* Fonts -- Inter loaded via next/font (CSS var set on <html> in layout.tsx),
+     with a system stack fallback that renders SF Pro on Apple devices. */
+  --font-sans:
+    var(--font-inter), -apple-system, BlinkMacSystemFont, "SF Pro Text",
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono:
+    var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco,
+    Consolas, "Liberation Mono", "Courier New", monospace;
+  --font-heading: var(--font-sans);
+
+  /* Type scale -- referenced by `text-display`, `text-h1`, ... utility
+     classes defined in the @layer utilities block below. We keep these as
+     theme vars so `var(--text-h1-size)` is available anywhere. */
+  --text-display-size: 60px;
+  --text-display-leading: 1.05;
+  --text-display-tracking: -0.02em;
+  --text-h1-size: 44px;
+  --text-h1-leading: 1.1;
+  --text-h1-tracking: -0.02em;
+  --text-h2-size: 32px;
+  --text-h2-leading: 1.2;
+  --text-h2-tracking: -0.01em;
+  --text-h3-size: 22px;
+  --text-h3-leading: 1.3;
+  --text-h3-tracking: -0.01em;
+  --text-body-lg-size: 19px;
+  --text-body-lg-leading: 1.6;
+  --text-body-size: 16px;
+  --text-body-leading: 1.6;
+  --text-small-size: 14px;
+  --text-small-leading: 1.5;
+  --text-caption-size: 13px;
+  --text-caption-leading: 1.4;
+
+  /* Color tokens consumed by Tailwind utilities (bg-background, text-foreground,
+     border-border, etc.). Light/dark values live in :root and .dark below. */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-geist-sans);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* Radii. Cards 12-16, buttons 8-10, small 6. */
+  --radius: 0.75rem;       /* 12px -- base for cards */
+  --radius-sm: 0.375rem;   /* 6px  -- small elements */
+  --radius-md: 0.5rem;     /* 8px  -- buttons */
+  --radius-lg: 0.75rem;    /* 12px -- cards */
+  --radius-xl: 1rem;       /* 16px -- elevated cards */
+  --radius-2xl: 1.5rem;    /* 24px -- hero panels */
+
+  /* Motion. Apple's smooth deceleration curve, kept consistent everywhere. */
+  --ease-out-quart: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 200ms;
+  --duration-base: 300ms;
+  --duration-slow: 400ms;
+
+  /* Soft, diffuse shadows. Prefer borders. */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 24px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.08);
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+ *  Colors -- LIGHT mode
+ *  Exact hex values per the design spec. Off-white background, soft black
+ *  text, near-black accent. Single accent rule: it appears only on
+ *  primary CTAs, links, active states.
+ *  ───────────────────────────────────────────────────────────────────────── */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --background: #FBFBFD;
+  --foreground: #1D1D1F;
+  --card: #FFFFFF;
+  --card-foreground: #1D1D1F;
+  --popover: #FFFFFF;
+  --popover-foreground: #1D1D1F;
+  --primary: #1D1D1F;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F5F5F7;
+  --secondary-foreground: #1D1D1F;
+  --muted: #F5F5F7;
+  --muted-foreground: #6E6E73;
+  --accent: #F5F5F7;
+  --accent-foreground: #1D1D1F;
+  --destructive: #C7372F;
+  --border: #E8E8ED;
+  --input: #E8E8ED;
+  --ring: #1D1D1F;
+  --chart-1: #1D1D1F;
+  --chart-2: #6E6E73;
+  --chart-3: #86868B;
+  --chart-4: #C7C7CC;
+  --chart-5: #E8E8ED;
+  --sidebar: #FFFFFF;
+  --sidebar-foreground: #1D1D1F;
+  --sidebar-primary: #1D1D1F;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #F5F5F7;
+  --sidebar-accent-foreground: #1D1D1F;
+  --sidebar-border: #E8E8ED;
+  --sidebar-ring: #1D1D1F;
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+ *  Colors -- DARK mode
+ *  Near-black background, elevated surfaces slightly lighter. The accent
+ *  inverts to white. Borders go to a subtle white-with-alpha.
+ *  ───────────────────────────────────────────────────────────────────────── */
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: #000000;
+  --foreground: #F5F5F7;
+  --card: #1D1D1F;
+  --card-foreground: #F5F5F7;
+  --popover: #1D1D1F;
+  --popover-foreground: #F5F5F7;
+  --primary: #F5F5F7;
+  --primary-foreground: #1D1D1F;
+  --secondary: #2C2C2E;
+  --secondary-foreground: #F5F5F7;
+  --muted: #1D1D1F;
+  --muted-foreground: #86868B;
+  --accent: #2C2C2E;
+  --accent-foreground: #F5F5F7;
+  --destructive: #FF453A;
+  --border: rgba(255, 255, 255, 0.10);
+  --input: rgba(255, 255, 255, 0.10);
+  --ring: #F5F5F7;
+  --chart-1: #F5F5F7;
+  --chart-2: #86868B;
+  --chart-3: #6E6E73;
+  --chart-4: #3A3A3C;
+  --chart-5: #2C2C2E;
+  --sidebar: #1D1D1F;
+  --sidebar-foreground: #F5F5F7;
+  --sidebar-primary: #F5F5F7;
+  --sidebar-primary-foreground: #1D1D1F;
+  --sidebar-accent: #2C2C2E;
+  --sidebar-accent-foreground: #F5F5F7;
+  --sidebar-border: rgba(255, 255, 255, 0.10);
+  --sidebar-ring: #F5F5F7;
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+ *  Base
+ *  ───────────────────────────────────────────────────────────────────────── */
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
-  body {
-    @apply bg-background text-foreground;
-  }
   html {
     @apply font-sans;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "kern", "ss01";
+    scroll-behavior: smooth;
+  }
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+  }
+  /* Default focus -- soft ring using the accent ring. */
+  *:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  /* Honour the user's reduced-motion preference everywhere. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ *  Type-scale utilities. Use these to opt INTO the strict scale --
+ *  Tailwind's default text-* utilities still work for body copy.
+ *
+ *      <h1 className="text-display">…</h1>
+ *      <h2 className="text-h1">…</h2>
+ *      <p  className="text-body-lg">…</p>
+ *  ───────────────────────────────────────────────────────────────────────── */
+@layer utilities {
+  .text-display {
+    font-size: var(--text-display-size);
+    line-height: var(--text-display-leading);
+    letter-spacing: var(--text-display-tracking);
+    font-weight: 600;
+  }
+  .text-h1 {
+    font-size: var(--text-h1-size);
+    line-height: var(--text-h1-leading);
+    letter-spacing: var(--text-h1-tracking);
+    font-weight: 600;
+  }
+  .text-h2 {
+    font-size: var(--text-h2-size);
+    line-height: var(--text-h2-leading);
+    letter-spacing: var(--text-h2-tracking);
+    font-weight: 600;
+  }
+  .text-h3 {
+    font-size: var(--text-h3-size);
+    line-height: var(--text-h3-leading);
+    letter-spacing: var(--text-h3-tracking);
+    font-weight: 600;
+  }
+  .text-body-lg {
+    font-size: var(--text-body-lg-size);
+    line-height: var(--text-body-lg-leading);
+    font-weight: 400;
+  }
+  .text-body {
+    font-size: var(--text-body-size);
+    line-height: var(--text-body-leading);
+    font-weight: 400;
+  }
+  .text-small {
+    font-size: var(--text-small-size);
+    line-height: var(--text-small-leading);
+    font-weight: 400;
+  }
+  .text-caption {
+    font-size: var(--text-caption-size);
+    line-height: var(--text-caption-leading);
+    font-weight: 400;
+    color: var(--muted-foreground);
+  }
+
+  /* Apple-tier transition helper. Apply to any interactive element. */
+  .transition-premium {
+    transition-timing-function: var(--ease-out-quart);
+    transition-duration: var(--duration-fast);
+    transition-property: background-color, color, border-color, transform,
+      opacity, box-shadow;
+  }
+
+  /* Responsive headline shrinks. Display is gigantic on mobile -- step it
+     down so it doesn't bleed off-screen. */
+  @media (max-width: 768px) {
+    .text-display {
+      font-size: 44px;
+    }
+    .text-h1 {
+      font-size: 32px;
+    }
+    .text-h2 {
+      font-size: 26px;
+    }
   }
 }
