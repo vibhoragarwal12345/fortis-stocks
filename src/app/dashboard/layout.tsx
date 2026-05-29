@@ -4,6 +4,9 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { getActiveTenantMember } from "@/lib/tenant"
+import { themeFromTenant, tenantCssVars } from "@/lib/theme"
+import { checkAccess } from "@/lib/permissions"
 import { signout } from "./actions"
 
 // Top-level nav for every /dashboard route. Active-link highlighting
@@ -14,8 +17,6 @@ const navItems = [
   { href: "/dashboard/focus-list",   label: "Focus list" },
   { href: "/dashboard/positions",    label: "Positions" },
   { href: "/dashboard/track-record", label: "Track record" },
-  // Research is a ticker-deep-link page. Until the /dashboard/research
-  // index lands, point the nav at the focus list (where tickers live).
   { href: "/dashboard/focus-list",   label: "Research" },
 ]
 
@@ -28,16 +29,57 @@ export default async function DashboardLayout({
   } = await supabase.auth.getUser()
   if (!user) redirect("/login")
 
+  const membership = await getActiveTenantMember()
+  const tenant = membership?.tenant ?? null
+  const theme = themeFromTenant(tenant)
+  const access = checkAccess(tenant)
+
+  if (!access.ok) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-4">
+        <div className="max-w-md rounded-lg border bg-card p-8 text-center shadow-sm">
+          <h1 className="text-xl font-semibold tracking-tight">Access unavailable</h1>
+          <p className="mt-3 text-sm text-muted-foreground">{access.message}</p>
+          <form action={signout} className="mt-6">
+            <button
+              type="submit"
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              Sign out
+            </button>
+          </form>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div
+      className="flex min-h-screen flex-col bg-background"
+      style={tenantCssVars(theme)}
+    >
       <header className="border-b bg-card">
-        {/* primary row */}
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-3">
           <Link
             href="/dashboard"
-            className="font-semibold tracking-tight text-foreground hover:text-foreground/80"
+            className="flex items-center gap-2 font-semibold tracking-tight text-foreground hover:text-foreground/80"
           >
-            Fortis<span className="text-muted-foreground"> · Intelligence</span>
+            {theme.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={theme.logoUrl}
+                alt={theme.name}
+                className="h-6 w-auto"
+              />
+            ) : (
+              <span
+                aria-hidden
+                className="inline-block h-3 w-3 rounded-sm"
+                style={{ backgroundColor: theme.primaryColor }}
+              />
+            )}
+            <span>{theme.name}</span>
+            <span className="text-muted-foreground"> · Intelligence</span>
           </Link>
           <nav className="hidden md:flex items-center gap-1">
             {navItems.map((item, idx) => (
@@ -46,7 +88,7 @@ export default async function DashboardLayout({
                 href={item.href}
                 className={cn(
                   buttonVariants({ variant: "ghost", size: "sm" }),
-                  "text-muted-foreground hover:text-foreground"
+                  "text-muted-foreground hover:text-foreground",
                 )}
               >
                 {item.label}
@@ -57,6 +99,15 @@ export default async function DashboardLayout({
             <span className="hidden sm:inline text-xs text-muted-foreground truncate max-w-[180px]">
               {user.email}
             </span>
+            <Link
+              href="/dashboard/settings/branding"
+              className={cn(
+                buttonVariants({ variant: "ghost", size: "sm" }),
+                "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              Settings
+            </Link>
             <form action={signout}>
               <button
                 type="submit"
@@ -67,7 +118,6 @@ export default async function DashboardLayout({
             </form>
           </div>
         </div>
-        {/* mobile nav row */}
         <nav
           aria-label="Mobile primary"
           className="md:hidden flex overflow-x-auto border-t px-4 py-2 gap-1 text-[13px] [&::-webkit-scrollbar]:hidden"
@@ -88,7 +138,7 @@ export default async function DashboardLayout({
 
       <footer className="border-t bg-card">
         <div className="mx-auto max-w-7xl px-6 py-4 text-xs text-muted-foreground">
-          Powered by <span className="font-semibold tracking-tight">Fortis</span>
+          Powered by <span className="font-semibold tracking-tight">{theme.name}</span>
           {" — institutional research for wealth advisors."}
         </div>
       </footer>

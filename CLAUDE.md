@@ -75,6 +75,36 @@ Migration: `supabase/migrations/001_initial_schema.sql`
 - Shared tables (news, snapshots, filings, social, rankings): authenticated users can SELECT; pipeline writes via `service_role` key which bypasses RLS.
 - User-owned tables (reports, portfolios, holdings): full CRUD for owner only.
 
+## Multi-tenancy (Step 7.6 — MVP)
+
+Migration `041_multi_tenancy.sql` introduces tenant-scoped data isolation. The pilot tenant is **The Fortis Agency** (uuid `00000000-0000-4000-8000-000000000001`).
+
+**Governance tables**
+- `tenants` — name, slug, `primary_color`, `logo_url`, `email_from_name`, `access_status` (`active`/`suspended`/`archived`), `access_granted_until` (NULL = indefinite), `feature_flags` (jsonb), `notes`.
+- `tenant_members` — `(tenant_id, user_id, role)` with `role` in (`admin`,`member`).
+- `tenant_invites` — URL `token`, target `email`, `role`, `expires_at` (default 30 days). Anonymous lookup via the `lookup_invite(text)` SECURITY DEFINER function.
+- `platform_admins` — `(user_id)`. Reach `/admin`. Bootstrapped to `vibhora030@gmail.com`.
+
+**Tenant-scoped data tables (RLS on)** — every one carries a `tenant_id` with a DEFAULT pointing at the Fortis tenant so older insert paths (report composer, cron route) keep working:
+- portfolios, portfolio_holdings, holdings_alerts, position_signals, portfolio_alert_summary, portfolio_rebalance_suggestions, reports
+- email_preferences, email_delivery_log, dashboard_events, user_action_summary (these also keep an owner check: `user_id = auth.uid() AND is_tenant_member(tenant_id)`)
+
+**Access control — NO BILLING.** Tier gating is replaced by `tenant.access_status` + `tenant.feature_flags`. There is no Stripe, no pricing, no subscription tier, no checkout, no trial-expiration logic. Billing is deliberately deferred until the product is validated. `src/lib/permissions.ts` (`checkAccess`, `canAccessFeature`) is the single source of truth.
+
+**Signup is invite-only.** `/signup` requires `?token=…`; the token is validated via `lookup_invite()`, the email field is locked to the invite address, and on success the new user is linked to the tenant via `tenant_members` and the invite is marked accepted. Bare `/signup` and invalid tokens render an "access is invite-only" card.
+
+**Root `/` is a login gateway, not a marketing/pricing page.** Serious dark-green + ivory. Product name, "Sign in" button, and a single "Access is currently invite-only" line. No pricing or feature grid.
+
+**White-label theming.** `src/lib/theme.ts` resolves `{name, logoUrl, primaryColor, emailFromName}` from the active tenant; the dashboard layout applies it as CSS vars + header logo. Tenants self-customize at `/dashboard/settings/branding` (admin role only) — display name, primary color, From name, logo URL or file upload to the `tenant-branding` Supabase Storage bucket (auto-created on first upload).
+
+**Admin panel.** `/admin` (platform-admin only): tenant list, create tenant + admin invite, per-tenant page to edit `feature_flags`, `access_status`, `access_granted_until`, `notes`, and manage members + invites. To assign yourself: `INSERT INTO platform_admins (user_id) VALUES ('<uuid>')` (the migration does this for `vibhora030@gmail.com` automatically when that user exists).
+
+**Onboarding a new tenant** (no code changes required):
+1. Sign in to `/admin`.
+2. Create tenant → enter name + admin email. An invite is generated.
+3. Open the new tenant's page; copy the `/signup?token=…` link from the invites table and send it to the admin (or any additional invitees).
+4. The invitee signs up at that URL with a chosen password; they land in their branded dashboard with full access.
+
 ## Environment Variables
 
 See `.env.local.example` for all required variables.

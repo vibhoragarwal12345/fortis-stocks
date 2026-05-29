@@ -15,45 +15,31 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form"
-import { signup } from "@/app/(auth)/actions"
+import { updatePassword } from "@/app/(auth)/actions"
 
 const schema = z
   .object({
-    email: z.string().email("Enter a valid email address"),
     password: z.string().min(8, "Password must be at least 8 characters"),
     confirmPassword: z.string(),
   })
-  .refine((data) => data.password === data.confirmPassword, {
+  .refine((d) => d.password === d.confirmPassword, {
     message: "Passwords don't match",
     path: ["confirmPassword"],
   })
 
 type FormValues = z.infer<typeof schema>
 
-export function SignupForm({
-  token,
-  inviteEmail,
-}: {
-  token: string
-  inviteEmail: string
-}) {
+export function UpdatePasswordForm() {
   const [serverError, setServerError] = useState<string | null>(null)
-
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { email: inviteEmail, password: "", confirmPassword: "" },
+    defaultValues: { password: "", confirmPassword: "" },
   })
 
   async function onSubmit(values: FormValues) {
     setServerError(null)
-    const result = await signup({
-      email: values.email,
-      password: values.password,
-      token,
-    })
-    if (result?.error) {
-      setServerError(result.error)
-    }
+    const result = await updatePassword({ password: values.password })
+    if (result?.error) setServerError(result.error)
   }
 
   return (
@@ -66,28 +52,10 @@ export function SignupForm({
         )}
         <FormField
           control={form.control}
-          name="email"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Email</FormLabel>
-              <FormControl>
-                <Input
-                  type="email"
-                  autoComplete="email"
-                  readOnly
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
           name="password"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Password</FormLabel>
+              <FormLabel>New password</FormLabel>
               <FormControl>
                 <Input
                   type="password"
@@ -105,7 +73,7 @@ export function SignupForm({
           name="confirmPassword"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Confirm password</FormLabel>
+              <FormLabel>Confirm new password</FormLabel>
               <FormControl>
                 <Input
                   type="password"
@@ -123,7 +91,7 @@ export function SignupForm({
           className="w-full"
           disabled={form.formState.isSubmitting}
         >
-          {form.formState.isSubmitting ? "Creating account…" : "Create account"}
+          {form.formState.isSubmitting ? "Updating…" : "Set new password"}
         </Button>
       </form>
     </Form>

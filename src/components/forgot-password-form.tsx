@@ -5,8 +5,6 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 
-import Link from "next/link"
-
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -17,29 +15,40 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form"
-import { login } from "@/app/(auth)/actions"
+import { requestPasswordReset } from "@/app/(auth)/actions"
 
 const schema = z.object({
   email: z.string().email("Enter a valid email address"),
-  password: z.string().min(1, "Password is required"),
 })
 
 type FormValues = z.infer<typeof schema>
 
-export function LoginForm() {
+export function ForgotPasswordForm() {
   const [serverError, setServerError] = useState<string | null>(null)
+  const [submitted, setSubmitted] = useState(false)
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { email: "", password: "" },
+    defaultValues: { email: "" },
   })
 
   async function onSubmit(values: FormValues) {
     setServerError(null)
-    const result = await login(values)
+    const result = await requestPasswordReset({ email: values.email })
     if (result?.error) {
       setServerError(result.error)
+      return
     }
+    setSubmitted(true)
+  }
+
+  if (submitted) {
+    return (
+      <div className="rounded-md bg-muted px-4 py-3 text-sm text-muted-foreground">
+        If an account exists for that address, a password reset link is on its
+        way. Check your inbox (and spam folder).
+      </div>
+    )
   }
 
   return (
@@ -68,38 +77,12 @@ export function LoginForm() {
             </FormItem>
           )}
         />
-        <FormField
-          control={form.control}
-          name="password"
-          render={({ field }) => (
-            <FormItem>
-              <div className="flex items-baseline justify-between">
-                <FormLabel>Password</FormLabel>
-                <Link
-                  href="/forgot-password"
-                  className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-                >
-                  Forgot password?
-                </Link>
-              </div>
-              <FormControl>
-                <Input
-                  type="password"
-                  placeholder="••••••••"
-                  autoComplete="current-password"
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
         <Button
           type="submit"
           className="w-full"
           disabled={form.formState.isSubmitting}
         >
-          {form.formState.isSubmitting ? "Signing in…" : "Sign in"}
+          {form.formState.isSubmitting ? "Sending…" : "Send reset link"}
         </Button>
       </form>
     </Form>
