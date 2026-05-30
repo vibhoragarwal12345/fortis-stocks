@@ -45,11 +45,8 @@ MODULES = [
     ("quant.garch",                ["GARCHModel"]),
     ("quant.fama_french",          ["FamaFrench5Factor", "FACTORS"]),
     ("quant.dcf",                  ["DCFValuation"]),
-    ("quant.black_litterman",      ["BlackLittermanOptimizer"]),
-    ("quant.run_desk",             ["run"]),
     ("quant.run_garch",            ["run"]),
     ("quant.run_factor_dcf",       ["run"]),
-    ("quant.run_black_litterman",  ["run"]),
 ]
 
 

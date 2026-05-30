@@ -12,11 +12,10 @@ import "server-only"
 import { createClient } from "@/lib/supabase/server"
 
 export type EventType =
-  // Page opens (current dashboard)
+  // Page opens
   | "dashboard_today_opened"
-  | "positions_opened"
   | "track_record_opened"
-  // Report viewer (Pages 2-6 of Step 7.2, in flight)
+  // Report viewer
   | "report_opened"
   | "pick_clicked"
   | "thesis_expanded"
@@ -25,12 +24,10 @@ export type EventType =
   | "peer_expanded"
   // Ad-hoc research
   | "ticker_searched"
-  // Position management
-  | "position_acknowledged"
   // Explicit feedback
   | "pick_marked_useful"
   | "pick_marked_unhelpful"
-  // Watchlist (lands with Step 7.6 or later)
+  // Watchlist
   | "sub_added"
   | "unsub_added"
 

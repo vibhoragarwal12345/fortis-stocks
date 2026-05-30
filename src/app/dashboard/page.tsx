@@ -97,7 +97,6 @@ type PickRow = {
   composite_score?: number | null
   rank?: number | null
 }
-type PortfolioRow = { id: string; name?: string | null }
 type SnapRow = {
   ticker: string
   price?: number | null
@@ -120,15 +119,12 @@ export default async function DashboardHomePage() {
 
   const now = new Date()
   const today = now.toISOString().slice(0, 10)
-  const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000)
-    .toISOString()
-    .slice(0, 10)
 
   // Wave 1 — independent fetches.
   // If today's pipeline hasn't run yet (weekends, holidays, pre-6am ET),
   // we also pull the latest run_date that DOES have data so we can show
   // the most recent picks instead of an empty dashboard.
-  const [reportsRes, picksRes, portfoliosRes, latestRunRes, latestEventsRes] = await Promise.all([
+  const [reportsRes, picksRes, latestRunRes, latestEventsRes] = await Promise.all([
     supabase
       .from("reports")
       .select(
@@ -144,7 +140,6 @@ export default async function DashboardHomePage() {
       .eq("conviction_grade", "A")
       .order("rank")
       .limit(3),
-    supabase.from("portfolios").select("id,name").eq("user_id", user.id),
     supabase
       .from("ranked_focus_list")
       .select("run_date")
@@ -160,7 +155,6 @@ export default async function DashboardHomePage() {
   ])
   const reports = (reportsRes.data ?? []) as ReportRow[]
   let picks = (picksRes.data ?? []) as PickRow[]
-  const portfolios = (portfoliosRes.data ?? []) as PortfolioRow[]
   const latestRunDate = (latestRunRes.data?.run_date as string | undefined) ?? null
   const showingFallbackPicks = picks.length === 0 && latestRunDate && latestRunDate !== today
   if (showingFallbackPicks) {
@@ -181,28 +175,9 @@ export default async function DashboardHomePage() {
     occurred_at: string
   }>
 
-  // Wave 2 — derived fetches.
-  const pids = portfolios.map(p => p.id)
+  // Wave 2 — price snapshots for the picks shown.
   const tickers = picks.map(p => p.ticker).filter(Boolean) as string[]
-
-  let holdings: { portfolio_id: string }[] = []
-  let alerts: { portfolio_id: string; severity?: string | null }[] = []
   let snaps: SnapRow[] = []
-  if (pids.length) {
-    const [h, a] = await Promise.all([
-      supabase
-        .from("portfolio_holdings")
-        .select("portfolio_id")
-        .in("portfolio_id", pids),
-      supabase
-        .from("holdings_alerts")
-        .select("portfolio_id,severity")
-        .in("portfolio_id", pids)
-        .gte("alert_date", sevenDaysAgo),
-    ])
-    holdings = (h.data ?? []) as typeof holdings
-    alerts = (a.data ?? []) as typeof alerts
-  }
   if (tickers.length) {
     const r = await supabase
       .from("market_snapshots")
@@ -215,19 +190,6 @@ export default async function DashboardHomePage() {
   // Build latest snap per ticker (rows arrive in time-desc order).
   const snapByTicker: Record<string, SnapRow> = {}
   for (const s of snaps) if (!snapByTicker[s.ticker]) snapByTicker[s.ticker] = s
-
-  const portfolioSummaries = portfolios.map(p => {
-    const myAlerts = alerts.filter(a => a.portfolio_id === p.id)
-    return {
-      id: p.id,
-      name: p.name ?? "Portfolio",
-      holdings: holdings.filter(h => h.portfolio_id === p.id).length,
-      alerts: myAlerts.length,
-      critical: myAlerts.filter(a =>
-        /critical|high/i.test(a.severity ?? "")
-      ).length,
-    }
-  })
 
   const dateLine = now.toLocaleDateString("en-US", {
     weekday: "long",
@@ -439,85 +401,6 @@ export default async function DashboardHomePage() {
                 </Reveal>
               )
             })}
-          </div>
-        )}
-      </section>
-
-      {/* ── Portfolios at a glance ─────────────────────────────── */}
-      <section aria-labelledby="portfolios-heading" className="space-y-6">
-        <Reveal>
-          <div className="flex items-baseline justify-between gap-4">
-            <h2
-              id="portfolios-heading"
-              className="text-caption uppercase tracking-[0.18em] text-muted-foreground"
-            >
-              Portfolio at a glance
-            </h2>
-            <Link
-              href="/dashboard/positions"
-              className="inline-flex items-center gap-1 text-caption transition-premium hover:text-foreground"
-            >
-              Open positions
-              <ArrowRight className="size-3" />
-            </Link>
-          </div>
-        </Reveal>
-        {portfolioSummaries.length === 0 ? (
-          <Reveal>
-            <Card size="sm">
-              <CardContent className="py-8 text-small text-muted-foreground">
-                No portfolios linked to this account yet.
-              </CardContent>
-            </Card>
-          </Reveal>
-        ) : (
-          <div className="grid gap-5 sm:grid-cols-2">
-            {portfolioSummaries.map((p, idx) => (
-              <Reveal key={p.id} delay={idx * 80}>
-                <Link
-                  href="/dashboard/positions"
-                  className="group block h-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-xl"
-                >
-                  <Card
-                    size="sm"
-                    className="h-full transition-premium duration-300 group-hover:-translate-y-0.5 group-hover:shadow-[var(--shadow-md)]"
-                  >
-                    <CardHeader>
-                      <div className="flex items-baseline justify-between">
-                        <CardTitle className="text-[15px]">{p.name}</CardTitle>
-                        {p.critical > 0 && (
-                          <span className="text-caption uppercase tracking-[0.14em] text-destructive">
-                            {p.critical} critical
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-caption tabular-nums">
-                        {p.holdings}{" "}
-                        {p.holdings === 1 ? "holding" : "holdings"}
-                      </p>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-small text-muted-foreground">
-                        {p.alerts === 0 ? (
-                          "No active alerts."
-                        ) : (
-                          <>
-                            {p.alerts} alert{p.alerts === 1 ? "" : "s"} in the
-                            last week
-                            {p.critical > 0 && (
-                              <span className="text-destructive">
-                                {" — "}
-                                {p.critical} critical/high
-                              </span>
-                            )}
-                          </>
-                        )}
-                      </p>
-                    </CardContent>
-                  </Card>
-                </Link>
-              </Reveal>
-            ))}
           </div>
         )}
       </section>

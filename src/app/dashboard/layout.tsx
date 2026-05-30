@@ -13,7 +13,6 @@ import { signout } from "./actions"
 const navItems = [
   { href: "/dashboard",              label: "Today" },
   { href: "/dashboard/focus-list",   label: "Focus list" },
-  { href: "/dashboard/positions",    label: "Positions" },
   { href: "/dashboard/track-record", label: "Track record" },
   { href: "/dashboard/emerging",     label: "Emerging" },
 ]

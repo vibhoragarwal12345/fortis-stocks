@@ -16,7 +16,6 @@ Order (mirrors the data dependencies):
   8  debate_synthesizer    regenerate top-30 theses
   9  critic_agent          critique with the Gemini-quota fix
   10 conviction_grader     assign grades incorporating critic verdicts
-  11 run_black_litterman   re-optimize with the cap-aware tilt check
 
 Usage:
     python pipeline/run_resync.py
@@ -42,7 +41,6 @@ STEPS = [
     ("debate_synthesizer (top 30)",   "pipeline/agents/debate_synthesizer.py", ["30"]),
     ("critic_agent (top 30)",         "pipeline/agents/critic_agent.py", ["30"]),
     ("conviction_grader",             "pipeline/agents/conviction_grader.py", ["midday"]),
-    ("run_black_litterman",           "pipeline/quant/run_black_litterman.py", ["midday"]),
 ]
 
 

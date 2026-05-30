@@ -3,9 +3,9 @@ Form 4 transaction backfill  (Form 4 transaction-code data-integrity fix).
 
 Re-parses Form 4 filings for the ticker universe and populates the
 form4_transactions table (migration 037), where every row carries its SEC
-transaction code and an is_directional_signal flag. anomaly_detector,
-risk_flagger and catalyst_agent read that flag so that grants, vestings and
-gifts no longer masquerade as insider sentiment.
+transaction code and an is_directional_signal flag. anomaly_detector and
+catalyst_agent read that flag so that grants, vestings and gifts no longer
+masquerade as insider sentiment.
 
 Idempotent: rows upsert on (accession, txn_index), so re-running is safe and
 only fills gaps.

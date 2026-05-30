@@ -52,7 +52,6 @@ All environment variables are read from the repo root `.env`. The module exports
 | `GROQ_API_KEY` | `GROQ_API_KEY` | LLM inference |
 | `GEMINI_API_KEY` | `GEMINI_API_KEY` | LLM inference |
 | `FINNHUB_API_KEY` | `FINNHUB_API_KEY` | Market data |
-| `RESEND_API_KEY` | `RESEND_API_KEY` | Email delivery |
 | `TICKER_UNIVERSE_PATH` | — | `Path` to `data/tickers.csv` |
 
 ## Conventions

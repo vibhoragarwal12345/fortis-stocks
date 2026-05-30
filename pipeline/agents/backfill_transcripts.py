@@ -41,12 +41,6 @@ def _db():
     return create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 
-def _portfolio_tickers(db) -> set[str]:
-    rows = (db.table("portfolio_holdings").select("ticker")
-            .execute().data or [])
-    return {r["ticker"] for r in rows if r.get("ticker")}
-
-
 def _recent_pick_tickers(db, lookback_days=90) -> set[str]:
     cutoff = (datetime.now(timezone.utc).date() -
               timedelta(days=lookback_days)).isoformat()
@@ -128,13 +122,10 @@ def main():
     db = _db()
     if args and args[0] == "--tickers":
         tickers = [t.upper() for t in args[1:]]
-    elif args and args[0] == "--portfolio":
-        tickers = list(_portfolio_tickers(db))
-    elif args and args[0] == "--picks":
-        tickers = list(_recent_pick_tickers(db))
     else:
-        # Default: union of holdings + recent picks
-        tickers = list(_portfolio_tickers(db) | _recent_pick_tickers(db))
+        # Default: recent graded picks. Portfolio-driven backfill was
+        # removed alongside the portfolio system.
+        tickers = list(_recent_pick_tickers(db))
     if not tickers:
         log.warning("no tickers to backfill")
         sys.exit(0)

@@ -29,7 +29,6 @@ SUPABASE_SERVICE_KEY: str = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
 GROQ_API_KEY: str = os.environ.get("GROQ_API_KEY", "")
 GEMINI_API_KEY: str = os.environ.get("GEMINI_API_KEY", "")
 FINNHUB_API_KEY: str = os.environ.get("FINNHUB_API_KEY", "")
-RESEND_API_KEY: str = os.environ.get("RESEND_API_KEY", "")
 FRED_API_KEY: str = os.environ.get("FRED_API_KEY", "")  # St. Louis Fed — economic data
 FMP_API_KEY: str  = os.environ.get("FMP_API_KEY", "")   # Financial Modeling Prep — analyst peers, financials
 TIINGO_API_KEY: str = os.environ.get("TIINGO_API_KEY", "")  # Tiingo — historical fundamentals, prices, news

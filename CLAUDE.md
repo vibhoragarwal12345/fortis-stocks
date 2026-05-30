@@ -67,13 +67,11 @@ Migration: `supabase/migrations/001_initial_schema.sql`
 | `sec_filings` | ticker, cik, form_type, filing_date, filing_url (unique) | authenticated SELECT |
 | `social_mentions` | ticker, source, mention_count, snapshot_date — unique (ticker, source, date) | authenticated SELECT |
 | `ranked_focus_list` | run_date, run_type, ticker, rank, composite_score, thesis, signals (jsonb) | authenticated SELECT |
-| `reports` | user_id → auth.users, report_type, report_date, content_html/markdown, delivered_email | owner only |
-| `portfolios` | user_id → auth.users, name | owner only |
-| `portfolio_holdings` | portfolio_id → portfolios, ticker, shares, cost_basis | owner only (via portfolio join) |
+| `reports` | user_id → auth.users, report_type, report_date, content_html/markdown | owner only |
 
 **RLS notes:**
 - Shared tables (news, snapshots, filings, social, rankings): authenticated users can SELECT; pipeline writes via `service_role` key which bypasses RLS.
-- User-owned tables (reports, portfolios, holdings): full CRUD for owner only.
+- Email + portfolios were removed in the lean rewrite (migration 044). Login-only platform; no user-held data.
 
 ## Multibagger Discovery Engine (parallel to the daily pipeline)
 
@@ -117,8 +115,8 @@ Migration `041_multi_tenancy.sql` introduces tenant-scoped data isolation. The p
 - `platform_admins` — `(user_id)`. Reach `/admin`. Bootstrapped to `vibhora030@gmail.com`.
 
 **Tenant-scoped data tables (RLS on)** — every one carries a `tenant_id` with a DEFAULT pointing at the Fortis tenant so older insert paths (report composer, cron route) keep working:
-- portfolios, portfolio_holdings, holdings_alerts, position_signals, portfolio_alert_summary, portfolio_rebalance_suggestions, reports
-- email_preferences, email_delivery_log, dashboard_events, user_action_summary (these also keep an owner check: `user_id = auth.uid() AND is_tenant_member(tenant_id)`)
+- reports, dashboard_events, user_action_summary (dashboard_events + user_action_summary keep an owner check: `user_id = auth.uid() AND is_tenant_member(tenant_id)`)
+- portfolios + email tables were dropped in migration 044 alongside the lean rewrite.
 
 **Access control — NO BILLING.** Tier gating is replaced by `tenant.access_status` + `tenant.feature_flags`. There is no Stripe, no pricing, no subscription tier, no checkout, no trial-expiration logic. Billing is deliberately deferred until the product is validated. `src/lib/permissions.ts` (`checkAccess`, `canAccessFeature`) is the single source of truth.
 
@@ -157,7 +155,6 @@ See `.env.local.example` for all required variables.
 | `GROQ_API_KEY` | Groq LLM inference |
 | `GEMINI_API_KEY` | Google Gemini LLM inference |
 | `FINNHUB_API_KEY` | Finnhub market data |
-| `RESEND_API_KEY` | Resend email delivery |
 | `API_NINJAS_KEY` | API Ninjas (earnings transcripts — note: free tier no longer includes the transcripts endpoint; kept here in case the plan is upgraded) |
 | `DATABASE_URL` | Direct Postgres URL (session pooler) for `pipeline/apply_migration.py` |
 
@@ -174,5 +171,5 @@ See `.env.local.example` for all required variables.
   4. **Press release fallback** — fetches the actual EX-99.1 body from SEC.
   5. **Audio transcription** (`agents/audio_transcriber.py`) — *conditional*: attempted only when the press release is thin (`minimal_press_release` / `unavailable`). Locates the publicly-webcast audio replay, transcribes locally with **whisper** (`agents/whisper_transcribe.py` auto-detects whisper.cpp or `openai-whisper`); a Groq pass adds speaker labels without altering words. Honours robots.txt; install with `bash pipeline/quant/install_whisper.sh`.
   **Transcript reality (2026):** most S&P 1500 mega-caps file only the earnings *press release* with SEC (typically 1500–9000 words) and keep the full call on their IR sites. A press release is not a failure — it carries the financials, guidance and prepared commentary; it lacks only live Q&A. So `validate_transcript_quality` grades on a **six-tier rubric** that drives `earnings_strength_baseline` in `smart_money_intel.py`: `full_call_with_qa`→100, `full_call_prepared_only`→85, `substantive_press_release` (>3000 words)→75, `standard_press_release` (1000–3000)→60, `minimal_press_release` (<1000)→40, `unavailable`→0. When the analysis rests on a press release the intel note discloses it verbatim (`"Analysis based on earnings press release filed via 8-K Item 2.02. Full transcript not publicly available -- Q&A pushback analysis not included."`) — honest disclosure, not a degradation flag. Transcripts cached on disk (30-day TTL) + `earnings_transcripts`; audio results also in `audio_transcripts` (migration 036). Validate the audio path with `python pipeline/test_audio_transcription.py`.
-- **Form 4 transaction codes** — insider sentiment is computed ONLY from *directional* SEC Form 4 codes: **P** (open-market purchase), **S** (open-market sale that is not a 10b5-1 scheduled trade), and **V** (voluntary non-10b5-1 transaction). All other codes are mechanical and excluded — A (grants), F (tax withholding), G (gifts), M/X (derivative exercises), etc. `smart_money_intel.py` filters its in-memory parse; `form4_transactions` (migration 037) persists every transaction with an `is_directional_signal` flag so `anomaly_detector` / `risk_flagger` / `catalyst_agent` filter the same way. Populate it with `python pipeline/agents/backfill_form4.py`; until then `insider_cluster` falls back to a filing count with direction "unknown". Picks generated after this fix carry `pick_outcomes.signal_quality_after_form4_fix = true` for backtest integrity.
+- **Form 4 transaction codes** — insider sentiment is computed ONLY from *directional* SEC Form 4 codes: **P** (open-market purchase), **S** (open-market sale that is not a 10b5-1 scheduled trade), and **V** (voluntary non-10b5-1 transaction). All other codes are mechanical and excluded — A (grants), F (tax withholding), G (gifts), M/X (derivative exercises), etc. `smart_money_intel.py` filters its in-memory parse; `form4_transactions` (migration 037) persists every transaction with an `is_directional_signal` flag so `anomaly_detector` / `catalyst_agent` filter the same way. Populate it with `python pipeline/agents/backfill_form4.py`; until then `insider_cluster` falls back to a filing count with direction "unknown". Picks generated after this fix carry `pick_outcomes.signal_quality_after_form4_fix = true` for backtest integrity.
 - **10b5-1 detection** — regex-based on Form 4 footnote text; a 10b5-1 code-S sale is scheduled, not discretionary, so it is excluded from directional signals. See `pipeline/test_10b5_1.py` for the spot test (also reports the transaction-code breakdown).

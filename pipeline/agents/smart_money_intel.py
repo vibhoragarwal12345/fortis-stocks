@@ -30,9 +30,9 @@ Watcher + House Stock Watcher JSON dumps, cached locally with a 24h TTL.
 
 OUTPUT
   Writes one row per (ticker, snapshot_date, run_type) to smart_money_intel
-  (migration 031). The seven downstream agents (catalyst, debate, critic,
-  conviction_grader_v2, report_generator, risk_flagger, outcome_tracker) read
-  this table and apply the integrations described in the spec.
+  (migration 031). Downstream agents (catalyst, debate, critic,
+  conviction_grader, outcome_tracker) read this table and apply the
+  integrations described in the spec.
 
 FORBIDDEN LANGUAGE CHECK
   Every intel_note is scanned for the words 'buy', 'sell', 'must', 'recommend

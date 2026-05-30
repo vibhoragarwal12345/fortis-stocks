@@ -53,10 +53,9 @@ STEPS = [
     # Per spec, slotted between critic_agent and quant desk. Today's row is
     # picked up by catalyst/debate/critic on tomorrow's pipeline run.
     ("smart_money_intel (midday top 30)", "pipeline/agents/smart_money_intel.py", ["midday", "30"]),
-    # ── Step 6.8 -- position management & exit signals for every portfolio.
-    # Runs AFTER smart_money_intel so today's pattern feeds thesis_degradation.
-    ("position_manager (all portfolios)", "pipeline/agents/position_manager.py", []),
-    ("quant desk: Monte Carlo + VaR (top 30)", "pipeline/quant/run_desk.py", ["30"]),
+    # Position management was removed alongside portfolios. The quant desk
+    # aggregator (run_desk.py) is being rebuilt per-ticker in PART 3 of the
+    # lean rewrite; until then we skip it here.
     ("GARCH desk (top 30)",         "pipeline/quant/run_garch.py", ["30"]),
     # ── Step 6.6 -- forward-track every A/B/C pick from this run. record
     # captures entry prices; update fills any matured forward returns for

@@ -727,14 +727,9 @@ def run(run_type: str = "midday") -> None:
     log.info("Loaded %d tickers in S&P 1500 universe", len(universe))
     db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
+    # Portfolios were removed. Crowd intelligence runs over the universe
+    # only; we no longer have user-held tickers to bias toward.
     portfolio: list[str] = []
-    try:
-        resp = db.table("portfolio_holdings").select("ticker").execute()
-        portfolio = sorted({
-            (r.get("ticker") or "").upper() for r in (resp.data or []) if r.get("ticker")
-        })
-    except Exception as exc:
-        log.warning("portfolio_holdings query failed: %s", exc)
 
     log.info("=" * 70)
     log.info("STAGE 1 -- COLLECT")
