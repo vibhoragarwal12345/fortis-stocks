@@ -14,12 +14,12 @@ name: Market scan · every 2 hours
 #     20:30 UTC  =  15:30 ET (EST)  / 16:30 ET (EDT)   close approach
 #     22:00 UTC  =  17:00 ET (EST)  / 18:00 ET (EDT)   post-close
 #
-# 6 runs/weekday × ~6 min/run (layers 1+2 only) = ~3h compute/week.
+# 6 runs/weekday × ~25 min/run (layers 1-4) ≈ 12h compute/week.
 # Well inside the GitHub Actions free 2000-min/month allowance.
 #
-# Layer 3 (LLM-heavy) + Layer 4 are wired but currently behind
-# --skip-layer3 --skip-layer4 until the existing agents are patched to
-# accept the new 'scan' run_type. Flip those flags off when ready.
+# Layer 3 (LLM-heavy) + Layer 4 are enabled. Layer 2 stamps the
+# shortlist with run_type='midday' so the unmodified deep agents pick
+# it up; scan_id is the real lineage key on every table.
 
 on:
   schedule:
@@ -81,7 +81,7 @@ jobs:
             fi
           fi
 
-      - name: Run scan (layers 1+2; deep agents off until run_type patch)
+      - name: Run scan (layers 1-4)
         run: |
           SAMPLE_ARG=""
           if [ -n "${{ github.event.inputs.sample }}" ]; then
@@ -90,5 +90,4 @@ jobs:
           python -m pipeline.scan.run_scan \
             --scan-type ${{ steps.derive.outputs.scan_type }} \
             --top-n 80 \
-            --skip-layer3 --skip-layer4 \
             $SAMPLE_ARG

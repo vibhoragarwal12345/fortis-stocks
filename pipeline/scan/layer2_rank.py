@@ -164,13 +164,22 @@ def rank_and_persist(scan_id: int, top_n: int = 80) -> int:
     # 2. Mirror the top N into ranked_focus_list so the existing layer-3
     #    agents (catalyst_agent, smart_money_intel, etc.) read them as
     #    today's focus list.
+    #
+    #    We deliberately stamp run_type='midday'. The legacy daily
+    #    pipeline (premarket/midday/close) is gone; reusing 'midday'
+    #    lets the unmodified deep agents pick the list up. scan_id is
+    #    the real lineage key -- multiple scans per day upsert into the
+    #    same (run_date, 'midday', ticker) row, with the latest scan
+    #    winning. The dashboard reads market_scans + scan_results, both
+    #    keyed on scan_id, so users always see the latest scan
+    #    unambiguously.
     today = date.today().isoformat()
     focus_rows = []
     for rank, (ticker, score, _r) in enumerate(top, start=1):
         focus_rows.append({
             "ticker":          ticker,
             "run_date":        today,
-            "run_type":        "scan",
+            "run_type":        "midday",
             "rank":            rank,
             "composite_score": score,
             "scan_id":         scan_id,

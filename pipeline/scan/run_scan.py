@@ -166,11 +166,15 @@ def run(
 
     # ── Layer 3 (expensive, can be skipped on quick refreshes) ──────────
     if not skip_layer3 and shortlist > 0:
+        # Each subprocess hits ranked_focus_list filtered by run_type=
+        # 'midday' (the existing module-level constant in debate +
+        # critic). Layer 2 wrote the shortlist under that same run_type,
+        # so the agents see exactly the names we want them to analyse.
         for name, cmd in [
             ("catalyst_agent",
              [PY, "pipeline/agents/catalyst_agent.py"]),
             ("smart_money_intel",
-             [PY, "pipeline/agents/smart_money_intel.py", "scan", str(top_n)]),
+             [PY, "pipeline/agents/smart_money_intel.py", "midday", str(top_n)]),
             ("debate_synthesizer",
              [PY, "pipeline/agents/debate_synthesizer.py", str(top_n)]),
             ("critic_agent",
