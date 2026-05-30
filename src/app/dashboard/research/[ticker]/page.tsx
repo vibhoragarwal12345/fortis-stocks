@@ -1,15 +1,8 @@
 import Link from "next/link"
-import { notFound } from "next/navigation"
 
 import { createClient } from "@/lib/supabase/server"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Reveal } from "@/components/ui/reveal"
 
 export const metadata = { title: "Research — Fortis" }
 export const dynamic = "force-dynamic"
@@ -53,15 +46,13 @@ export default async function ResearchPage({
 
   const pick = latestPickRow as Pick | null
 
-  // Last 90d insider posture (uses Form 4 directional filter from migration 037).
   const { data: form4 } = await supabase
     .from("form4_transactions")
-    .select("transaction_code,is_directional_signal,filing_date,person_name,person_title")
-    .eq("ticker", ticker)
-    .gte(
-      "filing_date",
-      new Date(Date.now() - 90 * 86_400_000).toISOString(),
+    .select(
+      "transaction_code,is_directional_signal,filing_date,person_name,person_title",
     )
+    .eq("ticker", ticker)
+    .gte("filing_date", new Date(Date.now() - 90 * 86_400_000).toISOString())
     .order("filing_date", { ascending: false })
     .limit(50)
 
@@ -73,7 +64,9 @@ export default async function ResearchPage({
     person_title: string | null
   }>
   const buys = insider.filter(
-    (i) => i.is_directional_signal && (i.transaction_code || "").toUpperCase() === "P",
+    (i) =>
+      i.is_directional_signal &&
+      (i.transaction_code || "").toUpperCase() === "P",
   ).length
   const sells = insider.filter(
     (i) =>
@@ -83,22 +76,20 @@ export default async function ResearchPage({
 
   if (!pick) {
     return (
-      <div className="mx-auto max-w-3xl px-6 py-10">
-        <Link
-          href="/dashboard/focus-list"
-          className="text-xs text-muted-foreground underline-offset-4 hover:underline"
-        >
-          ← Back to focus list
-        </Link>
-        <h1 className="mt-2 font-mono text-2xl font-semibold tracking-wider">
-          {ticker}
-        </h1>
-        <Card className="mt-6">
-          <CardContent className="py-12 text-center text-sm text-muted-foreground">
+      <div className="mx-auto max-w-[1120px] px-6 py-14 md:px-10 md:py-16 space-y-12">
+        <BackLink />
+        <header className="space-y-3">
+          <p className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+            Research
+          </p>
+          <h1 className="font-mono text-h1 tracking-tight">{ticker}</h1>
+        </header>
+        <Card>
+          <CardContent className="py-16 text-center text-small text-muted-foreground">
             We have no pipeline-generated thesis for{" "}
-            <code className="font-mono">{ticker}</code> yet. If you expected one,
-            confirm the ticker is in the universe and that a recent pipeline
-            run has executed.
+            <code className="font-mono">{ticker}</code> yet. If you expected
+            one, confirm the ticker is in the universe and that a recent
+            pipeline run has executed.
           </CardContent>
         </Card>
       </div>
@@ -106,123 +97,150 @@ export default async function ResearchPage({
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-10 space-y-6">
-      <div className="space-y-1">
-        <Link
-          href="/dashboard/focus-list"
-          className="text-xs text-muted-foreground underline-offset-4 hover:underline"
-        >
-          ← Back to focus list
-        </Link>
-        <div className="flex items-baseline gap-3">
-          <h1 className="font-mono text-3xl font-semibold tracking-wider">
-            {ticker}
-          </h1>
+    <div className="mx-auto max-w-[1120px] space-y-16 px-6 py-14 md:space-y-20 md:px-10 md:py-16">
+      <Reveal as="header" className="space-y-3">
+        <BackLink />
+        <p className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+          Research · {pick.run_date} {pick.run_type}
+        </p>
+        <div className="flex items-baseline gap-4">
+          <h1 className="font-mono text-display tracking-tight">{ticker}</h1>
           {pick.conviction_grade && (
-            <Badge
-              variant={
-                pick.conviction_grade === "A"
-                  ? "success"
-                  : pick.conviction_grade === "B"
-                  ? "info"
-                  : pick.conviction_grade === "C"
-                  ? "warning"
-                  : "neutral"
-              }
-            >
-              {pick.conviction_grade}
-            </Badge>
+            <span className="text-caption uppercase tracking-[0.14em] text-foreground">
+              Grade {pick.conviction_grade}
+            </span>
           )}
         </div>
-        <p className="text-xs text-muted-foreground">
-          From {pick.run_date} {pick.run_type} run · composite score{" "}
-          {pick.composite_score != null
-            ? Number(pick.composite_score).toFixed(1)
-            : "—"}
+        <p className="text-small text-muted-foreground">
+          Composite score{" "}
+          <span className="text-foreground tabular-nums">
+            {pick.composite_score != null
+              ? Number(pick.composite_score).toFixed(1)
+              : "—"}
+          </span>
         </p>
-      </div>
+      </Reveal>
 
       {pick.thesis && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Thesis</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="whitespace-pre-line text-sm leading-relaxed">{pick.thesis}</p>
-          </CardContent>
-        </Card>
+        <Reveal as="section" className="space-y-5">
+          <h2 className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+            Thesis
+          </h2>
+          <p className="text-body-lg whitespace-pre-line text-foreground/90">
+            {pick.thesis}
+          </p>
+        </Reveal>
       )}
 
-      <div className="grid gap-3 md:grid-cols-2">
+      <section className="grid gap-5 md:grid-cols-2">
         {pick.bull_case && (
-          <Card size="sm" className="bg-emerald-50/40">
-            <CardHeader>
-              <CardTitle className="text-sm">Bull case</CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm">{pick.bull_case}</CardContent>
-          </Card>
+          <Reveal>
+            <Card size="sm" className="h-full">
+              <CardHeader>
+                <CardTitle className="text-[15px]">Bull case</CardTitle>
+              </CardHeader>
+              <CardContent className="text-small text-foreground/85 leading-relaxed">
+                {pick.bull_case}
+              </CardContent>
+            </Card>
+          </Reveal>
         )}
         {pick.bear_case && (
-          <Card size="sm" className="bg-rose-50/40">
-            <CardHeader>
-              <CardTitle className="text-sm">Bear case</CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm">{pick.bear_case}</CardContent>
-          </Card>
+          <Reveal delay={80}>
+            <Card size="sm" className="h-full">
+              <CardHeader>
+                <CardTitle className="text-[15px]">Bear case</CardTitle>
+              </CardHeader>
+              <CardContent className="text-small text-foreground/85 leading-relaxed">
+                {pick.bear_case}
+              </CardContent>
+            </Card>
+          </Reveal>
         )}
-      </div>
+      </section>
 
       {pick.catalyst_description && (
-        <Card size="sm">
-          <CardHeader>
-            <CardTitle className="text-sm">Catalyst</CardTitle>
-            <CardDescription>{pick.catalyst_category ?? "—"}</CardDescription>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
+        <Reveal as="section" className="space-y-5">
+          <h2 className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+            Catalyst · {pick.catalyst_category ?? "—"}
+          </h2>
+          <p className="text-body text-foreground/85 leading-relaxed">
             {pick.catalyst_description}
-          </CardContent>
-        </Card>
+          </p>
+        </Reveal>
       )}
 
-      <Card size="sm">
-        <CardHeader>
-          <CardTitle className="text-sm">Insider posture (last 90 days)</CardTitle>
-          <CardDescription>
-            Directional Form 4 events only (codes P / S / V; A / F / G / M / X
-            excluded as mechanical).
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="text-sm">
-          {insider.length === 0 ? (
-            <span className="text-muted-foreground">
-              No Form 4 events on file in the last 90 days.
-            </span>
-          ) : (
-            <div className="flex flex-wrap gap-4">
-              <span>
-                <span className="font-semibold text-emerald-700">{buys}</span>{" "}
-                directional buys
-              </span>
-              <span>
-                <span className="font-semibold text-rose-700">{sells}</span>{" "}
-                directional sells
-              </span>
-              <span className="text-muted-foreground">
-                {insider.length - buys - sells} mechanical / other
-              </span>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <Reveal as="section" className="space-y-5">
+        <h2 className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+          Insider posture · last 90 days
+        </h2>
+        {insider.length === 0 ? (
+          <p className="text-small text-muted-foreground">
+            No Form 4 events on file in the last 90 days.
+          </p>
+        ) : (
+          <dl className="grid gap-6 sm:grid-cols-3">
+            <Stat label="Directional buys" value={buys} />
+            <Stat label="Directional sells" value={sells} />
+            <Stat
+              label="Mechanical / other"
+              value={insider.length - buys - sells}
+              muted
+            />
+          </dl>
+        )}
+        <p className="text-caption">
+          Codes P / S / V counted as directional; A / F / G / M / X excluded
+          as mechanical (grants, withholding, gifts, derivative exercises).
+        </p>
+      </Reveal>
 
       {pick.position_size_guidance && (
-        <Card size="sm">
-          <CardHeader>
-            <CardTitle className="text-sm">Position size guidance</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm">{pick.position_size_guidance}</CardContent>
-        </Card>
+        <Reveal as="section" className="space-y-5">
+          <h2 className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+            Position size guidance
+          </h2>
+          <p className="text-body text-foreground/85 leading-relaxed">
+            {pick.position_size_guidance}
+          </p>
+        </Reveal>
       )}
+    </div>
+  )
+}
+
+function BackLink() {
+  return (
+    <Link
+      href="/dashboard/focus-list"
+      className="inline-flex items-center gap-1 text-caption transition-premium hover:text-foreground"
+    >
+      ← Focus list
+    </Link>
+  )
+}
+
+function Stat({
+  label,
+  value,
+  muted,
+}: {
+  label: string
+  value: number
+  muted?: boolean
+}) {
+  return (
+    <div className="space-y-1">
+      <dt className="text-caption uppercase tracking-[0.14em] text-muted-foreground">
+        {label}
+      </dt>
+      <dd
+        className={`text-h2 tabular-nums ${
+          muted ? "text-muted-foreground" : "text-foreground"
+        }`}
+      >
+        {value}
+      </dd>
     </div>
   )
 }

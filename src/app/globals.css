@@ -289,4 +289,101 @@
       font-size: 26px;
     }
   }
+
+  /* ── Long-form prose for the report viewer ────────────────────────
+     The reports table stores LLM-composed HTML that we render with
+     dangerouslySetInnerHTML. Without these styles every <h2>, <p>, and
+     <table> would inherit Tailwind's reset and look unstyled. We don't
+     install @tailwindcss/typography because we only need this one place;
+     keeping it inline keeps the bundle small. */
+  .report-prose {
+    color: var(--foreground);
+    font-size: var(--text-body-size);
+    line-height: var(--text-body-leading);
+  }
+  .report-prose > * + * { margin-top: 1.25em; }
+  .report-prose h1 {
+    font-size: var(--text-h2-size);
+    line-height: var(--text-h2-leading);
+    letter-spacing: var(--text-h2-tracking);
+    font-weight: 600;
+    margin-top: 2em;
+  }
+  .report-prose h2 {
+    font-size: var(--text-h3-size);
+    line-height: var(--text-h3-leading);
+    letter-spacing: var(--text-h3-tracking);
+    font-weight: 600;
+    margin-top: 1.8em;
+  }
+  .report-prose h3 {
+    font-size: 17px;
+    line-height: 1.4;
+    letter-spacing: -0.005em;
+    font-weight: 600;
+    margin-top: 1.6em;
+  }
+  .report-prose p {
+    color: var(--muted-foreground);
+  }
+  .report-prose strong, .report-prose b {
+    color: var(--foreground);
+    font-weight: 600;
+  }
+  .report-prose a {
+    color: var(--foreground);
+    text-underline-offset: 4px;
+    text-decoration-color: var(--border);
+    transition: text-decoration-color 200ms var(--ease-out-quart);
+  }
+  .report-prose a:hover {
+    text-decoration-color: var(--foreground);
+  }
+  .report-prose ul, .report-prose ol {
+    padding-left: 1.25em;
+    color: var(--muted-foreground);
+  }
+  .report-prose li + li { margin-top: 0.4em; }
+  .report-prose hr {
+    border: 0;
+    border-top: 1px solid var(--border);
+    margin: 2.5em 0;
+  }
+  .report-prose blockquote {
+    border-left: 2px solid var(--border);
+    padding-left: 1em;
+    color: var(--muted-foreground);
+    font-style: italic;
+  }
+  .report-prose code {
+    font-family: var(--font-mono);
+    font-size: 0.92em;
+    background: var(--secondary);
+    padding: 0.1em 0.35em;
+    border-radius: 4px;
+  }
+  .report-prose pre {
+    background: var(--secondary);
+    padding: 1em;
+    border-radius: var(--radius);
+    overflow-x: auto;
+    font-size: var(--text-small-size);
+  }
+  .report-prose table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--text-small-size);
+  }
+  .report-prose th, .report-prose td {
+    padding: 0.65em 0.9em;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+  }
+  .report-prose th {
+    color: var(--muted-foreground);
+    font-weight: 500;
+    font-size: var(--text-caption-size);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+  }
 }

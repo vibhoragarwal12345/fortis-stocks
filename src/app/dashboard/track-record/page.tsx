@@ -1,16 +1,8 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 
 import { createClient } from "@/lib/supabase/server";
 import { trackEvent } from "@/lib/track";
-import { buttonVariants } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Reveal } from "@/components/ui/reveal";
 
 export const metadata = { title: "Track Record — Fortis" };
 export const dynamic = "force-dynamic";
@@ -102,8 +94,8 @@ function CumulativeChart({ outcomes }: { outcomes: PickOutcome[] }) {
 
   if (matured.length < 2) {
     return (
-      <div className="flex h-40 items-center justify-center text-xs text-muted-foreground">
-        Need at least 2 matured picks to chart cumulative returns
+      <div className="flex h-48 items-center justify-center text-small text-muted-foreground">
+        Need at least 2 matured picks to chart cumulative returns.
       </div>
     );
   }
@@ -126,7 +118,7 @@ function CumulativeChart({ outcomes }: { outcomes: PickOutcome[] }) {
   const maxY = Math.max(...allY);
   const padY = (maxY - minY) * 0.1 || 0.05;
   const W = 600;
-  const H = 160;
+  const H = 180;
   const xScale = (x: number) => (x / (xs.length - 1)) * W;
   const yScale = (y: number) =>
     H - ((y - (minY - padY)) / (maxY + padY - (minY - padY))) * H;
@@ -137,10 +129,10 @@ function CumulativeChart({ outcomes }: { outcomes: PickOutcome[] }) {
       .join(" ");
 
   return (
-    <div>
+    <div className="space-y-4">
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        className="h-40 w-full"
+        className="h-48 w-full"
         preserveAspectRatio="none"
       >
         <line
@@ -148,19 +140,38 @@ function CumulativeChart({ outcomes }: { outcomes: PickOutcome[] }) {
           y1={yScale(1)}
           x2={W}
           y2={yScale(1)}
-          stroke="currentColor"
-          strokeOpacity="0.15"
-          strokeDasharray="4 4"
+          stroke="var(--border)"
+          strokeDasharray="3 5"
         />
-        <path d={path("spy")} fill="none" stroke="#94a3b8" strokeWidth="1.5" />
-        <path d={path("picks")} fill="none" stroke="#0ea5e9" strokeWidth="2" />
+        <path
+          d={path("spy")}
+          fill="none"
+          stroke="var(--muted-foreground)"
+          strokeOpacity="0.45"
+          strokeWidth="1.25"
+        />
+        <path
+          d={path("picks")}
+          fill="none"
+          stroke="var(--foreground)"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+        />
       </svg>
-      <div className="mt-1 flex justify-end gap-4 text-xs text-muted-foreground">
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-0.5 w-4 bg-sky-500" /> Picks (compounded 20d)
+      <div className="flex justify-end gap-6 text-caption">
+        <span className="flex items-center gap-2">
+          <span
+            aria-hidden
+            className="inline-block h-px w-5 bg-foreground"
+          />
+          Picks (compounded 20d)
         </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-0.5 w-4 bg-slate-400" /> SPY (same windows)
+        <span className="flex items-center gap-2">
+          <span
+            aria-hidden
+            className="inline-block h-px w-5 bg-muted-foreground/50"
+          />
+          SPY (same windows)
         </span>
       </div>
     </div>
@@ -227,281 +238,341 @@ export default async function TrackRecordPage() {
   const buildingDisclaimer = matured < MIN_SAMPLE_FOR_CLAIMS;
 
   return (
-    <div className="px-6 py-10">
-      <div className="mx-auto max-w-7xl space-y-8">
+    <div className="mx-auto max-w-[1280px] space-y-20 px-6 py-14 md:space-y-24 md:px-10 md:py-16">
+      <Reveal as="header" className="space-y-3">
+        <p className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+          Track record
+        </p>
+        <h1 className="text-h1">
+          Forward performance of every pick — benchmarked against SPY.
+        </h1>
+        <p className="text-body-lg max-w-[680px] text-muted-foreground">
+          A / B / C grades graded honestly at 1d / 5d / 20d / 60d windows.
+          The system is only as good as the marks it stands by.
+        </p>
+      </Reveal>
+
+      {buildingDisclaimer && (
+        <Reveal>
+          <div className="rounded-md border border-border bg-secondary/40 px-4 py-3 text-small text-muted-foreground">
+            <span className="text-foreground">Track record building.</span>{" "}
+            Only {matured} pick{matured === 1 ? "" : "s"} have reached the
+            20-day window. At least 90 days of forward data is recommended
+            before drawing conclusions. Treat the numbers below as
+            directional only.
+          </div>
+        </Reveal>
+      )}
+
+      {/* ── Aggregate stats ────────────────────────────────────── */}
+      <section className="space-y-6">
+        <Reveal>
+          <h2 className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+            At a glance
+          </h2>
+        </Reveal>
+        <dl className="grid gap-10 sm:grid-cols-2 md:grid-cols-4">
+          <Reveal>
+            <Stat
+              label="Total picks tracked"
+              value={String(totalPicks)}
+              detail={`${matured} matured to 20d`}
+            />
+          </Reveal>
+          <Reveal delay={60}>
+            <Stat
+              label="A-grade win rate · 20d"
+              value={
+                aGrade?.win_rate_20d != null
+                  ? `${aGrade.win_rate_20d.toFixed(0)}%`
+                  : "—"
+              }
+              detail={`n = ${aGrade?.pick_count ?? 0}`}
+            />
+          </Reveal>
+          <Reveal delay={120}>
+            <Stat
+              label="Avg alpha vs SPY · 20d"
+              value={fmtPct(allGrade?.avg_alpha_20d ?? null)}
+              detail={
+                allGrade?.is_statistically_significant
+                  ? `t = ${fmtPlain(allGrade?.t_statistic_alpha_20d ?? null)} · significant`
+                  : allGrade?.sample_disclaimer ?? "—"
+              }
+            />
+          </Reveal>
+          <Reveal delay={180}>
+            <Stat
+              label="Last 30 days"
+              value={fmtPct(last30AvgAlpha)}
+              detail={
+                last30WinRate != null
+                  ? `${last30.length} picks · ${last30WinRate.toFixed(0)}% win`
+                  : `${last30.length} picks`
+              }
+            />
+          </Reveal>
+        </dl>
+      </section>
+
+      {/* ── Cumulative chart ───────────────────────────────────── */}
+      <section className="space-y-6">
+        <Reveal>
           <div>
-            <h1 className="text-3xl font-bold">Track Record</h1>
-            <p className="mt-1 text-muted-foreground">
-              Forward performance of every A / B / C pick produced by the
-              system, benchmarked against SPY at 1d / 5d / 20d / 60d.
+            <h2 className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+              Cumulative compounded 20d return
+            </h2>
+            <p className="mt-1 text-small text-muted-foreground">
+              Each matured pick compounded into a running line; SPY uses the
+              same 20-day windows.
             </p>
           </div>
+        </Reveal>
+        <Reveal>
+          <CumulativeChart outcomes={outcomes} />
+        </Reveal>
+      </section>
 
-          {buildingDisclaimer && (
-            <div className="rounded-lg border border-amber-300/50 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700/50 dark:bg-amber-950/50 dark:text-amber-200">
-              <strong>Track record building.</strong> Only {matured} pick
-              {matured === 1 ? "" : "s"} have reached the 20-day window. At
-              least 90 days of forward data is recommended before drawing
-              conclusions. Treat the numbers below as directional only.
-            </div>
-          )}
-
-          {/* Aggregate stats */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-            <Card>
-              <CardHeader>
-                <CardDescription>Total picks tracked</CardDescription>
-                <CardTitle className="text-2xl font-semibold">
-                  {totalPicks}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="px-4 text-xs text-muted-foreground">
-                {matured} matured to 20d
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardDescription>A-grade win rate (20d)</CardDescription>
-                <CardTitle className="text-2xl font-semibold">
-                  {aGrade?.win_rate_20d != null
-                    ? `${aGrade.win_rate_20d.toFixed(0)}%`
-                    : "—"}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="px-4 text-xs text-muted-foreground">
-                n = {aGrade?.pick_count ?? 0}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardDescription>Avg alpha vs SPY (20d, all)</CardDescription>
-                <CardTitle className="text-2xl font-semibold">
-                  {fmtPct(allGrade?.avg_alpha_20d ?? null)}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="px-4 text-xs text-muted-foreground">
-                {allGrade?.is_statistically_significant
-                  ? `t = ${fmtPlain(allGrade?.t_statistic_alpha_20d ?? null)} — significant`
-                  : allGrade?.sample_disclaimer ?? "—"}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardDescription>Last 30 days</CardDescription>
-                <CardTitle className="text-2xl font-semibold">
-                  {fmtPct(last30AvgAlpha)}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="px-4 text-xs text-muted-foreground">
-                {last30.length} picks; win rate{" "}
-                {last30WinRate != null ? `${last30WinRate.toFixed(0)}%` : "—"}
-              </CardContent>
-            </Card>
+      {/* ── Performance by grade ───────────────────────────────── */}
+      <section className="space-y-6">
+        <Reveal>
+          <div>
+            <h2 className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+              Performance by conviction grade
+            </h2>
+            <p className="mt-1 text-small text-muted-foreground">
+              A should outperform B should outperform C — if not, the
+              grading system has a problem.
+            </p>
           </div>
+        </Reveal>
+        <Reveal>
+          <div className="overflow-x-auto">
+            <table className="w-full text-small">
+              <thead>
+                <tr className="text-left">
+                  <TH>Grade</TH>
+                  <TH>N</TH>
+                  <TH>Avg ret 5d</TH>
+                  <TH>Avg ret 20d</TH>
+                  <TH>Avg alpha 20d</TH>
+                  <TH>Alpha-win 20d</TH>
+                  <TH>t-stat</TH>
+                  <TH>Sig?</TH>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { label: "A", r: aGrade },
+                  { label: "B", r: bGrade },
+                  { label: "C", r: cGrade },
+                ].map(({ label, r }) => (
+                  <tr
+                    key={label}
+                    className="border-t border-border transition-premium hover:bg-secondary/40"
+                  >
+                    <TD>
+                      <span className="font-medium">{label}</span>
+                    </TD>
+                    <TD className="tabular-nums">{r?.pick_count ?? 0}</TD>
+                    <TD className="tabular-nums">
+                      {fmtPct(r?.avg_return_5d ?? null)}
+                    </TD>
+                    <TD className="tabular-nums">
+                      {fmtPct(r?.avg_return_20d ?? null)}
+                    </TD>
+                    <TD className="tabular-nums">
+                      {fmtPct(r?.avg_alpha_20d ?? null)}
+                    </TD>
+                    <TD className="tabular-nums">
+                      {r?.alpha_win_rate_20d != null
+                        ? `${r.alpha_win_rate_20d.toFixed(0)}%`
+                        : "—"}
+                    </TD>
+                    <TD className="tabular-nums">
+                      {fmtPlain(r?.t_statistic_alpha_20d ?? null)}
+                    </TD>
+                    <TD>
+                      {r?.is_statistically_significant ? (
+                        <span className="text-caption uppercase tracking-[0.14em] text-foreground">
+                          Yes
+                        </span>
+                      ) : (
+                        <span className="text-caption uppercase tracking-[0.14em] text-muted-foreground">
+                          No
+                        </span>
+                      )}
+                    </TD>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Reveal>
+      </section>
 
-          {/* Cumulative chart */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Cumulative compounded 20d return</CardTitle>
-              <CardDescription>
-                Each matured pick is compounded into a running line; SPY uses
-                the same 20-day windows.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="px-4">
-              <CumulativeChart outcomes={outcomes} />
-            </CardContent>
-          </Card>
-
-          {/* Performance by grade */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Performance by Conviction Grade</CardTitle>
-              <CardDescription>
-                A should outperform B should outperform C — if not, the
-                grading system has a problem.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="overflow-x-auto px-0">
-              <table className="w-full text-sm">
-                <thead className="border-b text-left text-xs uppercase text-muted-foreground">
-                  <tr>
-                    <th className="px-4 py-2">Grade</th>
-                    <th className="px-4 py-2">N</th>
-                    <th className="px-4 py-2">Avg ret 5d</th>
-                    <th className="px-4 py-2">Avg ret 20d</th>
-                    <th className="px-4 py-2">Avg alpha 20d</th>
-                    <th className="px-4 py-2">Alpha-win 20d</th>
-                    <th className="px-4 py-2">t-stat</th>
-                    <th className="px-4 py-2">Sig?</th>
+      {/* ── Best / worst ───────────────────────────────────────── */}
+      <section className="grid gap-12 md:grid-cols-2">
+        <Reveal>
+          <div className="space-y-4">
+            <h2 className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+              Best 5 calls · 20d return
+            </h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-small">
+                <thead>
+                  <tr className="text-left">
+                    <TH>Ticker</TH>
+                    <TH>Grade</TH>
+                    <TH>Date</TH>
+                    <TH>Return 20d</TH>
+                    <TH>Alpha 20d</TH>
                   </tr>
                 </thead>
                 <tbody>
-                  {[
-                    { label: "A", r: aGrade },
-                    { label: "B", r: bGrade },
-                    { label: "C", r: cGrade },
-                  ].map(({ label, r }) => (
-                    <tr key={label} className="border-b last:border-0">
-                      <td className="px-4 py-2 font-medium">{label}</td>
-                      <td className="px-4 py-2 tabular-nums">{r?.pick_count ?? 0}</td>
-                      <td className="px-4 py-2 tabular-nums">
-                        {fmtPct(r?.avg_return_5d ?? null)}
-                      </td>
-                      <td className="px-4 py-2 tabular-nums">
-                        {fmtPct(r?.avg_return_20d ?? null)}
-                      </td>
-                      <td className="px-4 py-2 tabular-nums">
-                        {fmtPct(r?.avg_alpha_20d ?? null)}
-                      </td>
-                      <td className="px-4 py-2 tabular-nums">
-                        {r?.alpha_win_rate_20d != null
-                          ? `${r.alpha_win_rate_20d.toFixed(0)}%`
-                          : "—"}
-                      </td>
-                      <td className="px-4 py-2 tabular-nums">
-                        {fmtPlain(r?.t_statistic_alpha_20d ?? null)}
-                      </td>
-                      <td className="px-4 py-2">
-                        {r?.is_statistically_significant ? (
-                          <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-xs text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-                            yes
-                          </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">
-                            no
-                          </span>
-                        )}
-                      </td>
+                  {best5.map((o, i) => (
+                    <tr
+                      key={`best-${o.ticker}-${o.recommended_date}-${i}`}
+                      className="border-t border-border transition-premium hover:bg-secondary/40"
+                    >
+                      <TD>
+                        <span className="font-mono font-medium">
+                          {o.ticker}
+                        </span>
+                      </TD>
+                      <TD>{o.conviction_grade}</TD>
+                      <TD className="tabular-nums text-muted-foreground">
+                        {o.recommended_date}
+                      </TD>
+                      <TD className="tabular-nums text-foreground">
+                        {fmtPct(o.return_20d)}
+                      </TD>
+                      <TD className="tabular-nums">{fmtPct(o.alpha_20d)}</TD>
                     </tr>
                   ))}
+                  {best5.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="py-10 text-center text-caption text-muted-foreground"
+                      >
+                        No matured picks yet.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
+        </Reveal>
 
-          {/* Best / worst */}
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Best 5 calls (20d return)</CardTitle>
-              </CardHeader>
-              <CardContent className="overflow-x-auto px-0">
-                <table className="w-full text-sm">
-                  <thead className="border-b text-left text-xs uppercase text-muted-foreground">
-                    <tr>
-                      <th className="px-4 py-2">Ticker</th>
-                      <th className="px-4 py-2">Grade</th>
-                      <th className="px-4 py-2">Date</th>
-                      <th className="px-4 py-2">Return 20d</th>
-                      <th className="px-4 py-2">Alpha 20d</th>
+        <Reveal delay={80}>
+          <div className="space-y-4">
+            <h2 className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+              Worst 5 calls · 20d return
+            </h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-small">
+                <thead>
+                  <tr className="text-left">
+                    <TH>Ticker</TH>
+                    <TH>Grade</TH>
+                    <TH>Date</TH>
+                    <TH>Return 20d</TH>
+                    <TH>Max DD</TH>
+                  </tr>
+                </thead>
+                <tbody>
+                  {worst5.map((o, i) => (
+                    <tr
+                      key={`worst-${o.ticker}-${o.recommended_date}-${i}`}
+                      className="border-t border-border transition-premium hover:bg-secondary/40"
+                    >
+                      <TD>
+                        <span className="font-mono font-medium">
+                          {o.ticker}
+                        </span>
+                      </TD>
+                      <TD>{o.conviction_grade}</TD>
+                      <TD className="tabular-nums text-muted-foreground">
+                        {o.recommended_date}
+                      </TD>
+                      <TD className="tabular-nums text-destructive">
+                        {fmtPct(o.return_20d)}
+                      </TD>
+                      <TD className="tabular-nums">
+                        {fmtPct(o.max_drawdown_during_period)}
+                      </TD>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {best5.map((o, i) => (
-                      <tr
-                        key={`best-${o.ticker}-${o.recommended_date}-${i}`}
-                        className="border-b last:border-0"
-                      >
-                        <td className="px-4 py-2 font-medium">{o.ticker}</td>
-                        <td className="px-4 py-2">{o.conviction_grade}</td>
-                        <td className="px-4 py-2 tabular-nums">
-                          {o.recommended_date}
-                        </td>
-                        <td className="px-4 py-2 tabular-nums text-emerald-700 dark:text-emerald-400">
-                          {fmtPct(o.return_20d)}
-                        </td>
-                        <td className="px-4 py-2 tabular-nums">
-                          {fmtPct(o.alpha_20d)}
-                        </td>
-                      </tr>
-                    ))}
-                    {best5.length === 0 && (
-                      <tr>
-                        <td
-                          colSpan={5}
-                          className="px-4 py-6 text-center text-xs text-muted-foreground"
-                        >
-                          No matured picks yet.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Worst 5 calls (20d return)</CardTitle>
-              </CardHeader>
-              <CardContent className="overflow-x-auto px-0">
-                <table className="w-full text-sm">
-                  <thead className="border-b text-left text-xs uppercase text-muted-foreground">
+                  ))}
+                  {worst5.length === 0 && (
                     <tr>
-                      <th className="px-4 py-2">Ticker</th>
-                      <th className="px-4 py-2">Grade</th>
-                      <th className="px-4 py-2">Date</th>
-                      <th className="px-4 py-2">Return 20d</th>
-                      <th className="px-4 py-2">Max DD</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {worst5.map((o, i) => (
-                      <tr
-                        key={`worst-${o.ticker}-${o.recommended_date}-${i}`}
-                        className="border-b last:border-0"
+                      <td
+                        colSpan={5}
+                        className="py-10 text-center text-caption text-muted-foreground"
                       >
-                        <td className="px-4 py-2 font-medium">{o.ticker}</td>
-                        <td className="px-4 py-2">{o.conviction_grade}</td>
-                        <td className="px-4 py-2 tabular-nums">
-                          {o.recommended_date}
-                        </td>
-                        <td className="px-4 py-2 tabular-nums text-rose-700 dark:text-rose-400">
-                          {fmtPct(o.return_20d)}
-                        </td>
-                        <td className="px-4 py-2 tabular-nums">
-                          {fmtPct(o.max_drawdown_during_period)}
-                        </td>
-                      </tr>
-                    ))}
-                    {worst5.length === 0 && (
-                      <tr>
-                        <td
-                          colSpan={5}
-                          className="px-4 py-6 text-center text-xs text-muted-foreground"
-                        >
-                          No matured picks yet.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </CardContent>
-            </Card>
+                        No matured picks yet.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
+        </Reveal>
+      </section>
 
-          <div className="rounded-lg border bg-card px-4 py-3 text-xs text-muted-foreground">
-            <strong className="text-foreground">Methodology.</strong>{" "}
-            Forward returns use TRADING days (1, 5, 20, 60) measured from the
-            close on each pick&apos;s recommendation date, with SPY as
-            benchmark for alpha. Statistical significance is gated by{" "}
-            <span className="font-mono">|t| ≥ 1.5</span> and{" "}
-            <span className="font-mono">n ≥ 10</span>. Delisted and bankrupt
-            tickers remain in the dataset; rows whose forward prices cannot
-            be fetched will show &quot;—&quot;. Rollups are recomputed weekly
-            by <span className="font-mono">outcome_tracker.compute_rollups</span>.
-          </div>
-
-          <div className="flex justify-end">
-            <Link
-              href="/dashboard"
-              className={buttonVariants({ variant: "outline", size: "sm" })}
-            >
-              Back to dashboard
-            </Link>
-          </div>
-        </div>
+      <Reveal>
+        <p className="text-caption">
+          <span className="text-foreground">Methodology.</span> Forward
+          returns use trading days (1, 5, 20, 60) measured from the close on
+          each pick&apos;s recommendation date, with SPY as benchmark for
+          alpha. Statistical significance is gated by{" "}
+          <code className="font-mono">|t| ≥ 1.5</code> and{" "}
+          <code className="font-mono">n ≥ 10</code>. Delisted and bankrupt
+          tickers remain in the dataset; rows whose forward prices cannot
+          be fetched will show &quot;—&quot;. Rollups are recomputed weekly
+          by <code className="font-mono">outcome_tracker.compute_rollups</code>.
+        </p>
+      </Reveal>
     </div>
   );
+}
+
+function Stat({
+  label,
+  value,
+  detail,
+}: {
+  label: string
+  value: string
+  detail?: string
+}) {
+  return (
+    <div className="space-y-1.5">
+      <dt className="text-caption uppercase tracking-[0.14em] text-muted-foreground">
+        {label}
+      </dt>
+      <dd className="text-h2 tabular-nums">{value}</dd>
+      {detail && <p className="text-caption">{detail}</p>}
+    </div>
+  )
+}
+
+function TH({ children }: { children: React.ReactNode }) {
+  return (
+    <th className="py-3 pr-6 text-caption uppercase tracking-[0.14em] font-medium text-muted-foreground">
+      {children}
+    </th>
+  )
+}
+
+function TD({
+  children,
+  className,
+}: {
+  children: React.ReactNode
+  className?: string
+}) {
+  return <td className={`py-3 pr-6 ${className ?? ""}`}>{children}</td>
 }

@@ -1,15 +1,8 @@
 import Link from "next/link"
-import { notFound } from "next/navigation"
 
 import { createClient } from "@/lib/supabase/server"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { Card, CardContent } from "@/components/ui/card"
+import { Reveal } from "@/components/ui/reveal"
 
 export const metadata = { title: "Report — Fortis" }
 export const dynamic = "force-dynamic"
@@ -31,7 +24,7 @@ const RUN_TYPE_LABEL: Record<string, string> = {
   premarket: "Pre-market brief",
   midday: "Midday brief",
   close: "Close brief",
-  monthly_emerging: "Emerging opportunities (monthly)",
+  monthly_emerging: "Emerging opportunities · monthly",
   quarterly_thesis_review: "Quarterly thesis review",
 }
 
@@ -58,22 +51,18 @@ export default async function ReportPage({
 
   if (!report) {
     return (
-      <div className="mx-auto max-w-3xl px-6 py-10">
-        <Link
-          href="/dashboard"
-          className="text-xs text-muted-foreground underline-offset-4 hover:underline"
-        >
-          ← Back to dashboard
-        </Link>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight">
-          {RUN_TYPE_LABEL[run_type] ?? run_type} — {date}
-        </h1>
-        <Card className="mt-6">
-          <CardContent className="py-12 text-center text-sm text-muted-foreground">
-            No report exists for{" "}
-            <code className="font-mono">{run_type}</code> on{" "}
-            <code className="font-mono">{date}</code>. If you expected one, the
-            pipeline may not have run that day — daily briefs run weekdays only.
+      <div className="mx-auto max-w-[720px] px-6 py-14 md:px-10 md:py-16 space-y-12">
+        <BackLink />
+        <header className="space-y-3">
+          <p className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+            {RUN_TYPE_LABEL[run_type] ?? run_type}
+          </p>
+          <h1 className="text-h1">No report for {date}.</h1>
+        </header>
+        <Card>
+          <CardContent className="py-16 text-center text-small text-muted-foreground">
+            The pipeline may not have run that day — daily briefs run
+            weekdays only.
           </CardContent>
         </Card>
       </div>
@@ -81,61 +70,69 @@ export default async function ReportPage({
   }
 
   const label = RUN_TYPE_LABEL[report.report_type] ?? report.report_type
+  const verifiedPct =
+    report.avg_verification_score != null
+      ? Math.round(Number(report.avg_verification_score) * 100)
+      : null
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-10 space-y-6">
-      <div>
-        <Link
-          href="/dashboard"
-          className="text-xs text-muted-foreground underline-offset-4 hover:underline"
-        >
-          ← Back to dashboard
-        </Link>
-        <div className="mt-2 flex flex-wrap items-baseline gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight">{label}</h1>
-          <span className="text-sm text-muted-foreground">{report.report_date}</span>
-          {report.avg_verification_score != null && (
-            <Badge variant="info">
-              {(Number(report.avg_verification_score) * 100).toFixed(0)}% verified
-            </Badge>
-          )}
-        </div>
+    <div className="mx-auto max-w-[860px] space-y-12 px-6 py-14 md:space-y-16 md:px-10 md:py-16">
+      <Reveal as="header" className="space-y-4">
+        <BackLink />
+        <p className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+          {label} · {report.report_date}
+        </p>
+        <h1 className="text-h1">{label}.</h1>
         {(report.a_grade_count != null ||
           report.b_grade_count != null ||
-          report.c_grade_count != null) && (
-          <p className="mt-1 text-xs text-muted-foreground">
-            {report.a_grade_count ?? 0} A · {report.b_grade_count ?? 0} B ·{" "}
-            {report.c_grade_count ?? 0} C
+          report.c_grade_count != null ||
+          verifiedPct != null) && (
+          <p className="text-small text-muted-foreground tabular-nums">
+            <span className="font-medium text-foreground">
+              {report.a_grade_count ?? 0} A
+            </span>{" "}
+            · {report.b_grade_count ?? 0} B · {report.c_grade_count ?? 0} C
+            {verifiedPct != null && (
+              <>
+                {" · "}verified {verifiedPct}%
+              </>
+            )}
           </p>
         )}
-      </div>
+      </Reveal>
 
-      {report.content_html ? (
-        <Card>
-          <CardContent className="px-6 py-6">
-            <div
-              className="prose prose-sm max-w-none dark:prose-invert"
-              dangerouslySetInnerHTML={{ __html: report.content_html }}
-            />
-          </CardContent>
-        </Card>
-      ) : report.content_markdown ? (
-        <Card>
-          <CardContent className="px-6 py-6">
-            <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
-              {report.content_markdown}
-            </pre>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardContent className="py-12 text-center text-sm text-muted-foreground">
-            Report exists but content is empty. The composer likely failed to
-            render — check pipeline logs for{" "}
-            <code className="font-mono">report_composer.py</code> on this date.
-          </CardContent>
-        </Card>
-      )}
+      <Reveal>
+        {report.content_html ? (
+          <article
+            className="report-prose"
+            dangerouslySetInnerHTML={{ __html: report.content_html }}
+          />
+        ) : report.content_markdown ? (
+          <pre className="report-prose whitespace-pre-wrap font-sans text-body leading-relaxed">
+            {report.content_markdown}
+          </pre>
+        ) : (
+          <Card>
+            <CardContent className="py-16 text-center text-small text-muted-foreground">
+              Report exists but content is empty. The composer likely failed
+              to render — check pipeline logs for{" "}
+              <code className="font-mono">report_composer.py</code> on this
+              date.
+            </CardContent>
+          </Card>
+        )}
+      </Reveal>
     </div>
+  )
+}
+
+function BackLink() {
+  return (
+    <Link
+      href="/dashboard"
+      className="inline-flex items-center gap-1 text-caption transition-premium hover:text-foreground"
+    >
+      ← Today
+    </Link>
   )
 }

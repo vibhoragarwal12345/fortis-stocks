@@ -3,14 +3,8 @@ import Link from "next/link";
 
 import { createClient } from "@/lib/supabase/server";
 import { trackEvent } from "@/lib/track";
-import { buttonVariants } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { Reveal } from "@/components/ui/reveal";
 
 export const metadata = { title: "Positions — Fortis" };
 export const dynamic = "force-dynamic";
@@ -62,32 +56,16 @@ function fmtMoney(v: number | null | undefined): string {
 }
 
 function statusForSignal(s: PositionSignal): {
-  color: string;
   label: string;
-  bgClass: string;
+  dot: string;
 } {
   if (s.requires_immediate_attention) {
-    return {
-      color: "red",
-      label: "Review",
-      bgClass:
-        "bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-200",
-    };
+    return { label: "Review", dot: "bg-destructive" };
   }
   if ((s.signal_strength ?? 0) >= 30 && s.signal_type !== "no_action") {
-    return {
-      color: "yellow",
-      label: "Monitor",
-      bgClass:
-        "bg-amber-50 border-amber-200 text-amber-900 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-200",
-    };
+    return { label: "Monitor", dot: "bg-foreground" };
   }
-  return {
-    color: "green",
-    label: "OK",
-    bgClass:
-      "bg-emerald-50 border-emerald-200 text-emerald-900 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-200",
-  };
+  return { label: "OK", dot: "bg-muted-foreground/30" };
 }
 
 export default async function PositionsPage() {
@@ -108,18 +86,25 @@ export default async function PositionsPage() {
 
   if (portfolioList.length === 0) {
     return (
-      <div className="mx-auto max-w-7xl px-6 py-10">
-        <h1 className="text-3xl font-bold">Positions</h1>
-        <Card className="mt-6">
-          <CardContent className="py-12 text-center text-sm text-muted-foreground">
-            <p className="font-medium text-foreground">No portfolios linked to this account yet.</p>
-            <p className="mt-1">
-              Add a portfolio via{" "}
-              <code className="rounded bg-muted px-1 py-0.5 text-xs">
-                pipeline/data/load_sample_portfolio.py
-              </code>
-              {" "}or upload one from <Link href="/dashboard/settings/branding" className="underline-offset-4 hover:underline">Settings</Link>.
-            </p>
+      <div className="mx-auto max-w-[1280px] px-6 py-14 md:px-10 md:py-16">
+        <header className="space-y-2">
+          <p className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+            Positions
+          </p>
+          <h1 className="text-h1">No portfolios yet.</h1>
+        </header>
+        <Card className="mt-12">
+          <CardContent className="py-16 text-center text-small text-muted-foreground">
+            Add a portfolio via{" "}
+            <code className="font-mono">pipeline/data/load_sample_portfolio.py</code>
+            {" "}or upload one from{" "}
+            <Link
+              href="/dashboard/settings/branding"
+              className="underline-offset-4 hover:text-foreground hover:underline"
+            >
+              Settings
+            </Link>
+            .
           </CardContent>
         </Card>
       </div>
@@ -147,7 +132,6 @@ export default async function PositionsPage() {
   const signals: PositionSignal[] = (signalsRaw ?? []) as PositionSignal[];
   const rebalances: Rebalance[] = (rebalanceRaw ?? []) as Rebalance[];
 
-  // Latest snapshot per portfolio
   const latestSignalsByPortfolio = new Map<string, PositionSignal[]>();
   const latestDatePerPortfolio = new Map<string, string>();
   for (const s of signals) {
@@ -171,7 +155,6 @@ export default async function PositionsPage() {
     }
   }
 
-  // Historical per (portfolio, ticker)
   const historyByPortfolioTicker = new Map<string, PositionSignal[]>();
   for (const s of signals) {
     const key = `${s.portfolio_id}::${s.ticker}`;
@@ -185,247 +168,237 @@ export default async function PositionsPage() {
     .filter((s) => s.requires_immediate_attention).length;
 
   return (
-    <div className="px-6 py-10">
-      <div className="mx-auto max-w-7xl space-y-8">
-          <div className="flex items-baseline justify-between">
-            <div>
-              <h1 className="text-3xl font-bold">Positions</h1>
-              <p className="mt-1 text-muted-foreground">
-                Position-management signals for every tracked portfolio.
-                Color-coded per holding: green = no action, yellow = monitor,
-                red = review. <strong>For advisor review — not a recommendation.</strong>
-              </p>
-            </div>
-            {totalUrgent > 0 && (
-              <div className="rounded-lg border border-rose-300/60 bg-rose-50 px-3 py-2 text-sm text-rose-900 dark:border-rose-700/60 dark:bg-rose-950/40 dark:text-rose-200">
-                <strong>{totalUrgent}</strong> position
-                {totalUrgent === 1 ? "" : "s"} requiring review
-              </div>
-            )}
-          </div>
-
-          {portfolioList.map((p) => {
-            const latestSigs = latestSignalsByPortfolio.get(p.id) ?? [];
-            const rb = latestRebalanceByPortfolio.get(p.id) ?? null;
-            const urgent = latestSigs.filter(
-              (s) => s.requires_immediate_attention
-            );
-            return (
-              <Card key={p.id}>
-                <CardHeader>
-                  <CardTitle>{p.name}</CardTitle>
-                  <CardDescription>
-                    {latestSigs.length} position{latestSigs.length === 1 ? "" : "s"}
-                    {rb?.current_total_value && (
-                      <> · {fmtMoney(rb.current_total_value)} total value</>
-                    )}
-                    {urgent.length > 0 && (
-                      <>
-                        {" · "}
-                        <span className="font-medium text-rose-700 dark:text-rose-400">
-                          {urgent.length} requiring review
-                        </span>
-                      </>
-                    )}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6 px-4">
-                  {rb?.reasoning && (
-                    <div className="rounded-md border bg-muted/30 px-4 py-3 text-sm">
-                      {rb.reasoning}
-                    </div>
-                  )}
-
-                  {rb?.top_3_priorities && rb.top_3_priorities.length > 0 && (
-                    <div>
-                      <h3 className="mb-2 text-sm font-semibold tracking-tight">
-                        Top priorities
-                      </h3>
-                      <ol className="space-y-2 text-sm">
-                        {rb.top_3_priorities.map((pr, i) => (
-                          <li
-                            key={i}
-                            className="rounded-md border bg-card px-3 py-2"
-                          >
-                            <div className="text-xs font-medium uppercase text-muted-foreground">
-                              {(pr.action || "").replace(/_/g, " ")} · {pr.ticker}
-                            </div>
-                            <div className="mt-1">{pr.reasoning}</div>
-                          </li>
-                        ))}
-                      </ol>
-                    </div>
-                  )}
-
-                  {rb?.concentration_alerts && rb.concentration_alerts.length > 0 && (
-                    <div>
-                      <h3 className="mb-2 text-sm font-semibold tracking-tight">
-                        Concentration alerts
-                      </h3>
-                      <ul className="space-y-1 text-sm">
-                        {rb.concentration_alerts.map((c, i) => (
-                          <li key={i} className="text-muted-foreground">
-                            <span className="font-medium">{c.severity}:</span>{" "}
-                            {c.description}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  <div>
-                    <h3 className="mb-2 text-sm font-semibold tracking-tight">
-                      Holdings
-                    </h3>
-                    {latestSigs.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">
-                        No position signals yet. Run{" "}
-                        <code className="rounded bg-muted px-1 py-0.5 text-xs">
-                          pipeline/agents/position_manager.py
-                        </code>
-                        .
-                      </p>
-                    ) : (
-                      <div className="space-y-2">
-                        {latestSigs
-                          .slice()
-                          .sort((a, b) => {
-                            // urgent first, then by strength desc
-                            if (
-                              a.requires_immediate_attention !==
-                              b.requires_immediate_attention
-                            ) {
-                              return a.requires_immediate_attention ? -1 : 1;
-                            }
-                            return (
-                              (b.signal_strength ?? 0) -
-                              (a.signal_strength ?? 0)
-                            );
-                          })
-                          .map((s) => {
-                            const status = statusForSignal(s);
-                            const historyKey = `${s.portfolio_id}::${s.ticker}`;
-                            const history =
-                              historyByPortfolioTicker.get(historyKey) ?? [];
-                            return (
-                              <details
-                                key={s.id}
-                                className={`group rounded-md border px-4 py-3 ${status.bgClass}`}
-                              >
-                                <summary className="flex cursor-pointer items-center justify-between gap-3 list-none">
-                                  <div className="flex items-center gap-3">
-                                    <span className="inline-block min-w-[3rem] font-mono text-base font-semibold">
-                                      {s.ticker}
-                                    </span>
-                                    <span className="rounded bg-background/60 px-2 py-0.5 text-xs font-medium">
-                                      {status.label}
-                                    </span>
-                                    <span className="text-xs">
-                                      {(s.signal_type || "").replace(/_/g, " ")}
-                                      {s.signal_strength
-                                        ? ` · strength ${s.signal_strength}`
-                                        : ""}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center gap-4 text-xs tabular-nums">
-                                    <span>{fmtPct(s.unrealized_return_pct)}</span>
-                                    <span className="text-muted-foreground group-open:rotate-90 transition-transform">
-                                      ›
-                                    </span>
-                                  </div>
-                                </summary>
-                                <div className="mt-3 space-y-3 text-sm">
-                                  <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
-                                    <div>
-                                      <div className="text-muted-foreground">
-                                        Cost basis
-                                      </div>
-                                      <div className="tabular-nums">
-                                        ${Number(s.cost_basis ?? 0).toFixed(2)}
-                                      </div>
-                                    </div>
-                                    <div>
-                                      <div className="text-muted-foreground">
-                                        Current
-                                      </div>
-                                      <div className="tabular-nums">
-                                        $
-                                        {Number(s.current_price ?? 0).toFixed(2)}
-                                      </div>
-                                    </div>
-                                    <div>
-                                      <div className="text-muted-foreground">
-                                        Held
-                                      </div>
-                                      <div className="tabular-nums">
-                                        {s.holding_period_days ?? "—"}d
-                                      </div>
-                                    </div>
-                                    <div>
-                                      <div className="text-muted-foreground">
-                                        Action
-                                      </div>
-                                      <div>
-                                        {(s.recommended_action || "—").replace(
-                                          /_/g,
-                                          " "
-                                        )}
-                                        {s.recommended_size_change_pct
-                                          ? ` (${s.recommended_size_change_pct}%)`
-                                          : ""}
-                                      </div>
-                                    </div>
-                                  </div>
-                                  {s.reasoning && (
-                                    <div className="rounded bg-background/60 px-3 py-2 text-sm leading-relaxed">
-                                      {s.reasoning}
-                                    </div>
-                                  )}
-                                  {history.length > 1 && (
-                                    <div>
-                                      <div className="mb-1 text-xs text-muted-foreground">
-                                        History ({history.length - 1} prior
-                                        signal{history.length - 1 === 1 ? "" : "s"})
-                                      </div>
-                                      <ul className="space-y-1 text-xs">
-                                        {history.slice(1, 6).map((h) => (
-                                          <li key={h.id} className="tabular-nums">
-                                            <span className="font-mono text-muted-foreground">
-                                              {h.snapshot_date}
-                                            </span>{" "}
-                                            · {(h.signal_type || "").replace(
-                                              /_/g,
-                                              " "
-                                            )}
-                                            {h.signal_strength
-                                              ? ` (${h.signal_strength})`
-                                              : ""}
-                                          </li>
-                                        ))}
-                                      </ul>
-                                    </div>
-                                  )}
-                                </div>
-                              </details>
-                            );
-                          })}
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-
-          <div className="flex justify-end">
-            <Link
-              href="/dashboard"
-              className={buttonVariants({ variant: "outline", size: "sm" })}
-            >
-              Back to dashboard
-            </Link>
-          </div>
+    <div className="mx-auto max-w-[1280px] space-y-20 px-6 py-14 md:space-y-24 md:px-10 md:py-16">
+      <Reveal as="header" className="flex flex-wrap items-end justify-between gap-6">
+        <div className="space-y-3">
+          <p className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+            Positions
+          </p>
+          <h1 className="text-h1">Position-management signals.</h1>
+          <p className="text-body-lg max-w-[640px] text-muted-foreground">
+            Color-coded per holding: solid = review, foreground dot = monitor,
+            muted = no action. <span className="text-foreground">For advisor review — not a recommendation.</span>
+          </p>
         </div>
+        {totalUrgent > 0 && (
+          <p className="text-caption uppercase tracking-[0.14em] text-destructive">
+            {totalUrgent} position{totalUrgent === 1 ? "" : "s"} requiring review
+          </p>
+        )}
+      </Reveal>
+
+      {portfolioList.map((p, pIdx) => {
+        const latestSigs = latestSignalsByPortfolio.get(p.id) ?? [];
+        const rb = latestRebalanceByPortfolio.get(p.id) ?? null;
+        const urgent = latestSigs.filter((s) => s.requires_immediate_attention);
+
+        return (
+          <section key={p.id} className="space-y-8">
+            <Reveal>
+              <div className="space-y-2 border-b border-border pb-4">
+                <h2 className="text-h2">{p.name}</h2>
+                <p className="text-small text-muted-foreground tabular-nums">
+                  {latestSigs.length} position{latestSigs.length === 1 ? "" : "s"}
+                  {rb?.current_total_value && (
+                    <> · {fmtMoney(rb.current_total_value)} total value</>
+                  )}
+                  {urgent.length > 0 && (
+                    <>
+                      {" · "}
+                      <span className="text-destructive">
+                        {urgent.length} requiring review
+                      </span>
+                    </>
+                  )}
+                </p>
+              </div>
+            </Reveal>
+
+            {rb?.reasoning && (
+              <Reveal>
+                <p className="text-body text-muted-foreground leading-relaxed">
+                  {rb.reasoning}
+                </p>
+              </Reveal>
+            )}
+
+            {rb?.top_3_priorities && rb.top_3_priorities.length > 0 && (
+              <Reveal as="section" className="space-y-5">
+                <h3 className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+                  Top priorities
+                </h3>
+                <ol className="space-y-3">
+                  {rb.top_3_priorities.map((pr, i) => (
+                    <li key={i} className="grid grid-cols-[28px_1fr] gap-4">
+                      <span className="text-h3 tabular-nums text-muted-foreground/60">
+                        {i + 1}
+                      </span>
+                      <div className="space-y-1">
+                        <p className="text-caption uppercase tracking-[0.14em]">
+                          {(pr.action || "").replace(/_/g, " ")} ·{" "}
+                          <span className="font-mono text-foreground">{pr.ticker}</span>
+                        </p>
+                        <p className="text-small text-muted-foreground">
+                          {pr.reasoning}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </Reveal>
+            )}
+
+            {rb?.concentration_alerts && rb.concentration_alerts.length > 0 && (
+              <Reveal as="section" className="space-y-3">
+                <h3 className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+                  Concentration alerts
+                </h3>
+                <ul className="space-y-1.5 text-small text-muted-foreground">
+                  {rb.concentration_alerts.map((c, i) => (
+                    <li key={i}>
+                      <span className="text-foreground">{c.severity}:</span>{" "}
+                      {c.description}
+                    </li>
+                  ))}
+                </ul>
+              </Reveal>
+            )}
+
+            <Reveal as="section" className="space-y-5">
+              <h3 className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+                Holdings
+              </h3>
+              {latestSigs.length === 0 ? (
+                <p className="text-small text-muted-foreground">
+                  No position signals yet. Run{" "}
+                  <code className="font-mono">pipeline/agents/position_manager.py</code>.
+                </p>
+              ) : (
+                <ul className="divide-y divide-border border-y border-border">
+                  {latestSigs
+                    .slice()
+                    .sort((a, b) => {
+                      if (
+                        a.requires_immediate_attention !==
+                        b.requires_immediate_attention
+                      ) {
+                        return a.requires_immediate_attention ? -1 : 1;
+                      }
+                      return (
+                        (b.signal_strength ?? 0) - (a.signal_strength ?? 0)
+                      );
+                    })
+                    .map((s) => {
+                      const status = statusForSignal(s);
+                      const historyKey = `${s.portfolio_id}::${s.ticker}`;
+                      const history =
+                        historyByPortfolioTicker.get(historyKey) ?? [];
+                      const ret = s.unrealized_return_pct ?? 0;
+                      return (
+                        <li key={s.id}>
+                          <details className="group">
+                            <summary className="grid cursor-pointer list-none grid-cols-[auto_1fr_auto] items-center gap-4 py-4 transition-premium hover:bg-secondary/40 px-2 -mx-2 rounded-md">
+                              <span className="flex items-center gap-3">
+                                <span
+                                  aria-hidden
+                                  className={`inline-block size-1.5 rounded-full ${status.dot}`}
+                                />
+                                <span className="font-mono text-[16px] font-semibold tracking-tight min-w-[3rem]">
+                                  {s.ticker}
+                                </span>
+                              </span>
+                              <span className="text-small text-muted-foreground">
+                                <span className="text-foreground">
+                                  {status.label}
+                                </span>
+                                {" · "}
+                                {(s.signal_type || "").replace(/_/g, " ")}
+                                {s.signal_strength
+                                  ? ` · strength ${s.signal_strength}`
+                                  : ""}
+                              </span>
+                              <span className="flex items-center gap-3 text-small tabular-nums">
+                                <span
+                                  className={
+                                    ret >= 0
+                                      ? "text-foreground"
+                                      : "text-destructive"
+                                  }
+                                >
+                                  {fmtPct(s.unrealized_return_pct)}
+                                </span>
+                                <span className="text-muted-foreground transition-transform group-open:rotate-90">
+                                  ›
+                                </span>
+                              </span>
+                            </summary>
+                            <div className="space-y-5 px-2 pb-6">
+                              <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-small sm:grid-cols-4">
+                                <Cell label="Cost basis" value={`$${Number(s.cost_basis ?? 0).toFixed(2)}`} />
+                                <Cell label="Current" value={`$${Number(s.current_price ?? 0).toFixed(2)}`} />
+                                <Cell label="Held" value={`${s.holding_period_days ?? "—"}d`} />
+                                <Cell
+                                  label="Action"
+                                  value={
+                                    (s.recommended_action || "—").replace(/_/g, " ") +
+                                    (s.recommended_size_change_pct
+                                      ? ` (${s.recommended_size_change_pct}%)`
+                                      : "")
+                                  }
+                                />
+                              </dl>
+                              {s.reasoning && (
+                                <p className="text-small text-muted-foreground leading-relaxed">
+                                  {s.reasoning}
+                                </p>
+                              )}
+                              {history.length > 1 && (
+                                <div className="space-y-2">
+                                  <p className="text-caption uppercase tracking-[0.14em] text-muted-foreground">
+                                    History · {history.length - 1} prior signal
+                                    {history.length - 1 === 1 ? "" : "s"}
+                                  </p>
+                                  <ul className="space-y-1 text-caption tabular-nums">
+                                    {history.slice(1, 6).map((h) => (
+                                      <li key={h.id}>
+                                        <span className="font-mono text-muted-foreground">
+                                          {h.snapshot_date}
+                                        </span>{" "}
+                                        ·{" "}
+                                        {(h.signal_type || "").replace(
+                                          /_/g,
+                                          " ",
+                                        )}
+                                        {h.signal_strength
+                                          ? ` (${h.signal_strength})`
+                                          : ""}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
+                          </details>
+                        </li>
+                      );
+                    })}
+                </ul>
+              )}
+            </Reveal>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+function Cell({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="space-y-0.5">
+      <dt className="text-caption uppercase tracking-[0.14em] text-muted-foreground">
+        {label}
+      </dt>
+      <dd className="tabular-nums text-foreground">{value}</dd>
     </div>
   );
 }

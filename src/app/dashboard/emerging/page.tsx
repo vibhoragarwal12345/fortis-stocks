@@ -1,7 +1,6 @@
-import Link from "next/link"
-
 import { createClient } from "@/lib/supabase/server"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
+import { Reveal } from "@/components/ui/reveal"
 
 export const metadata = { title: "Emerging Watchlist — Fortis" }
 export const dynamic = "force-dynamic"
@@ -10,7 +9,11 @@ type WatchlistRow = {
   id: number
   ticker: string
   added_date: string
-  conviction_tier: "tier_1_high_conviction" | "tier_2_promising" | "tier_3_speculative" | null
+  conviction_tier:
+    | "tier_1_high_conviction"
+    | "tier_2_promising"
+    | "tier_3_speculative"
+    | null
   entry_price: number | null
   entry_market_cap: number | null
   thesis_summary: string | null
@@ -35,24 +38,9 @@ const TIER_ORDER: Record<string, number> = {
 }
 
 const TIER_LABEL: Record<string, string> = {
-  tier_1_high_conviction: "Tier 1 — Higher conviction",
-  tier_2_promising: "Tier 2 — Promising",
-  tier_3_speculative: "Tier 3 — Speculative",
-}
-
-const TIER_HUE: Record<string, string> = {
-  tier_1_high_conviction: "bg-emerald-50 border-emerald-200",
-  tier_2_promising: "bg-sky-50 border-sky-200",
-  tier_3_speculative: "bg-amber-50 border-amber-200",
-}
-
-const STATUS_HUE: Record<string, string> = {
-  active: "bg-zinc-100 text-zinc-700",
-  thesis_intact: "bg-emerald-100 text-emerald-800",
-  thesis_weakening: "bg-amber-100 text-amber-800",
-  thesis_broken: "bg-red-100 text-red-800",
-  graduated: "bg-violet-100 text-violet-800",
-  archived: "bg-zinc-200 text-zinc-600",
+  tier_1_high_conviction: "Tier 1 · Higher conviction",
+  tier_2_promising: "Tier 2 · Promising",
+  tier_3_speculative: "Tier 3 · Speculative",
 }
 
 function pct(v: number | null): string {
@@ -79,7 +67,9 @@ export default async function EmergingPage() {
 
   const rows = (data ?? []) as WatchlistRow[]
   rows.sort((a, b) => {
-    const t = (TIER_ORDER[a.conviction_tier ?? ""] ?? 9) - (TIER_ORDER[b.conviction_tier ?? ""] ?? 9)
+    const t =
+      (TIER_ORDER[a.conviction_tier ?? ""] ?? 9) -
+      (TIER_ORDER[b.conviction_tier ?? ""] ?? 9)
     if (t !== 0) return t
     return (b.multibagger_score ?? 0) - (a.multibagger_score ?? 0)
   })
@@ -91,162 +81,176 @@ export default async function EmergingPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-8 space-y-6">
-      <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-        <div className="font-semibold tracking-tight">
-          Emerging candidates are speculative, long-horizon, high-risk positions.
-        </div>
-        <div className="mt-1 leading-snug">
-          Most will not become multibaggers. Position sizing should reflect the
-          asymmetric risk: small bets, long horizons, expect many failures and
-          a few large winners. For licensed advisor review — not investment
-          advice.
-        </div>
-      </div>
+    <div className="mx-auto max-w-[1280px] space-y-16 px-6 py-14 md:space-y-20 md:px-10 md:py-16">
+      <Reveal as="header" className="space-y-3">
+        <p className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+          Emerging watchlist · long horizon
+        </p>
+        <h1 className="text-h1">Structured speculation.</h1>
+        <p className="text-body-lg max-w-[680px] text-muted-foreground">
+          Small-cap multibagger candidates tracked over years. Researched
+          honestly, risk-framed relentlessly. Updates monthly; thesis review
+          quarterly.
+        </p>
+      </Reveal>
 
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Emerging Watchlist</h1>
-          <p className="text-sm text-muted-foreground">
-            Structured speculation. Researched honestly, risk-framed
-            relentlessly. Updates monthly; thesis review quarterly.
+      <Reveal>
+        <div className="rounded-md border border-border bg-secondary/40 p-5">
+          <p className="text-caption uppercase tracking-[0.18em] text-foreground">
+            Risk framing
           </p>
+          <p className="mt-2 text-small text-muted-foreground leading-relaxed">
+            Emerging candidates are speculative, long-horizon, high-risk
+            positions. Most will not become multibaggers. Position sizing
+            should reflect the asymmetric risk: small bets, long horizons,
+            expect many failures and a few large winners. For licensed
+            advisor review — not investment advice.
+          </p>
+          <dl className="mt-5 grid gap-4 text-small sm:grid-cols-3">
+            <Tier label="Tier 1" body="Multibagger DNA across all six traits and a clean balance sheet." />
+            <Tier label="Tier 2" body="Promising but at least one gap (margin trajectory, runway, or discovery)." />
+            <Tier label="Tier 3" body="Speculative; the engine rates these honestly as long shots even on its own list." />
+          </dl>
         </div>
-        <Link
-          href="/dashboard"
-          className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-        >
-          ← Back to daily
-        </Link>
-      </div>
-
-      <div className="rounded-md border bg-card px-4 py-3 text-xs text-muted-foreground">
-        <strong className="text-foreground">Tiers.</strong>{" "}
-        <span className="font-medium">Tier 1</span> — multibagger DNA across all
-        six traits and a clean balance sheet.{" "}
-        <span className="font-medium">Tier 2</span> — promising but at least one
-        gap (margin trajectory, runway, or discovery profile).{" "}
-        <span className="font-medium">Tier 3</span> — speculative; the engine
-        rates these honestly as long shots even on its own list. Every name
-        carries the asymmetric framing above.
-      </div>
+      </Reveal>
 
       {rows.length === 0 && (
-        <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            No candidates on the watchlist yet. The next monthly screen will
-            populate it.
-          </CardContent>
-        </Card>
+        <Reveal>
+          <Card>
+            <CardContent className="py-16 text-center text-small text-muted-foreground">
+              No candidates on the watchlist yet. The next monthly screen
+              will populate it.
+            </CardContent>
+          </Card>
+        </Reveal>
       )}
 
-      {(["tier_1_high_conviction", "tier_2_promising", "tier_3_speculative"] as const)
+      {(
+        [
+          "tier_1_high_conviction",
+          "tier_2_promising",
+          "tier_3_speculative",
+        ] as const
+      )
         .filter((tier) => grouped[tier])
         .map((tier) => (
-          <section key={tier} className="space-y-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              {TIER_LABEL[tier]}
-            </h2>
-            <div className="grid gap-3">
-              {grouped[tier]!.map((r) => (
-                <Card key={r.id} className={TIER_HUE[tier]}>
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <CardTitle className="flex items-baseline gap-2 text-lg">
-                          <span className="font-mono">{r.ticker}</span>
-                          <span
-                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider ${
-                              STATUS_HUE[r.status] ?? "bg-zinc-100 text-zinc-700"
+          <section key={tier} className="space-y-6">
+            <Reveal>
+              <h2 className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+                {TIER_LABEL[tier]}
+              </h2>
+            </Reveal>
+            <ul className="space-y-5">
+              {grouped[tier]!.map((r, idx) => (
+                <Reveal key={r.id} as="li" delay={Math.min(idx, 5) * 60}>
+                  <Card size="sm">
+                    <CardContent className="space-y-6 pt-5">
+                      {/* ── Top row ─────────────────────────────────── */}
+                      <div className="flex items-start justify-between gap-6">
+                        <div className="space-y-1">
+                          <p className="font-mono text-[24px] font-semibold tracking-tight">
+                            {r.ticker}
+                          </p>
+                          <p className="text-caption tabular-nums">
+                            Added {r.added_date} · entry{" "}
+                            {money(r.entry_market_cap)} · score{" "}
+                            <span className="text-foreground">
+                              {r.multibagger_score?.toFixed(1) ?? "—"}
+                            </span>{" "}
+                            ·{" "}
+                            <span className="uppercase tracking-[0.14em]">
+                              {r.status.replace(/_/g, " ")}
+                            </span>
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-caption uppercase tracking-[0.14em] text-muted-foreground">
+                            Return since added
+                          </p>
+                          <p
+                            className={`text-h2 tabular-nums ${
+                              (r.return_since_added ?? 0) >= 0
+                                ? "text-foreground"
+                                : "text-destructive"
                             }`}
                           >
-                            {r.status.replace(/_/g, " ")}
-                          </span>
-                        </CardTitle>
-                        <div className="mt-0.5 text-xs text-muted-foreground">
-                          Added {r.added_date} · entry {money(r.entry_market_cap)}{" "}
-                          · multibagger score{" "}
-                          <span className="font-semibold text-foreground">
-                            {r.multibagger_score?.toFixed(1) ?? "—"}
-                          </span>
+                            {pct(r.return_since_added)}
+                          </p>
+                          <p className="text-caption tabular-nums">
+                            peak {pct(r.peak_return_pct)} · max DD{" "}
+                            {pct(r.max_drawdown_pct)}
+                          </p>
                         </div>
                       </div>
-                      <div className="text-right text-sm">
-                        <div className="text-xs text-muted-foreground">return since added</div>
-                        <div
-                          className={`text-xl font-semibold tabular-nums ${
-                            (r.return_since_added ?? 0) >= 0
-                              ? "text-emerald-700"
-                              : "text-red-700"
-                          }`}
-                        >
-                          {pct(r.return_since_added)}
-                        </div>
-                        <div className="text-[10px] text-muted-foreground">
-                          peak {pct(r.peak_return_pct)} · max DD {pct(r.max_drawdown_pct)}
-                        </div>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="grid gap-3 text-sm">
-                    {r.thesis_summary && (
-                      <div>
-                        <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                          Thesis
-                        </div>
-                        <div className="text-foreground/90">{r.thesis_summary}</div>
-                      </div>
-                    )}
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      {r.the_10x_path && (
-                        <div>
-                          <div className="text-[11px] font-semibold uppercase tracking-wider text-emerald-800">
-                            The 10x path
+
+                      {r.thesis_summary && (
+                        <p className="text-body text-foreground/90 leading-relaxed">
+                          {r.thesis_summary}
+                        </p>
+                      )}
+
+                      <div className="grid gap-6 sm:grid-cols-2">
+                        {r.the_10x_path && (
+                          <div className="space-y-2">
+                            <p className="text-caption uppercase tracking-[0.14em] text-foreground">
+                              The 10x path
+                            </p>
+                            <p className="text-small text-muted-foreground leading-relaxed">
+                              {r.the_10x_path}
+                            </p>
                           </div>
-                          <div className="text-foreground/85 leading-snug">
-                            {r.the_10x_path}
+                        )}
+                        {r.what_kills_it && (
+                          <div className="space-y-2">
+                            <p className="text-caption uppercase tracking-[0.14em] text-destructive">
+                              What kills it
+                            </p>
+                            <p className="text-small text-muted-foreground leading-relaxed">
+                              {r.what_kills_it}
+                            </p>
                           </div>
+                        )}
+                      </div>
+
+                      {r.key_metrics_to_track && r.key_metrics_to_track.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-caption uppercase tracking-[0.14em] text-muted-foreground">
+                            Key metrics to track
+                          </p>
+                          <ul className="flex flex-wrap gap-2 text-caption">
+                            {r.key_metrics_to_track.map((m, i) => (
+                              <li
+                                key={i}
+                                className="rounded-md border border-border px-2 py-1 text-foreground/80"
+                              >
+                                {m}
+                              </li>
+                            ))}
+                          </ul>
                         </div>
                       )}
-                      {r.what_kills_it && (
-                        <div>
-                          <div className="text-[11px] font-semibold uppercase tracking-wider text-red-800">
-                            What kills it
-                          </div>
-                          <div className="text-foreground/85 leading-snug">
-                            {r.what_kills_it}
-                          </div>
-                        </div>
+
+                      {r.notes && (
+                        <p className="text-caption">Last review: {r.notes}</p>
                       )}
-                    </div>
-                    {r.key_metrics_to_track && r.key_metrics_to_track.length > 0 && (
-                      <div>
-                        <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                          Key metrics to track
-                        </div>
-                        <ul className="mt-0.5 flex flex-wrap gap-1">
-                          {r.key_metrics_to_track.map((m, i) => (
-                            <li
-                              key={i}
-                              className="rounded bg-white/70 px-2 py-0.5 text-xs text-foreground/80 border"
-                            >
-                              {m}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {r.notes && (
-                      <div className="text-xs text-muted-foreground">
-                        Last review: {r.notes}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+                </Reveal>
               ))}
-            </div>
+            </ul>
           </section>
         ))}
+    </div>
+  )
+}
+
+function Tier({ label, body }: { label: string; body: string }) {
+  return (
+    <div className="space-y-1">
+      <dt className="text-caption uppercase tracking-[0.14em] text-foreground">
+        {label}
+      </dt>
+      <dd className="text-small text-muted-foreground leading-snug">{body}</dd>
     </div>
   )
 }
