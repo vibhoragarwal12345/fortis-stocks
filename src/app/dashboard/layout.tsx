@@ -15,6 +15,7 @@ const navItems = [
   { href: "/dashboard/focus-list",   label: "Focus list" },
   { href: "/dashboard/track-record", label: "Track record" },
   { href: "/dashboard/emerging",     label: "Emerging" },
+  { href: "/dashboard/scan-history", label: "Scan history" },
 ]
 
 export default async function DashboardLayout({

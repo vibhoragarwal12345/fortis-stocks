@@ -33,6 +33,8 @@ export default async function ResearchPage({
   const ticker = rawTicker.toUpperCase()
   const supabase = await createClient()
 
+  // Latest deep-analysis row (from a recent scan that ran Layer 3+4 on
+  // this ticker). Tickers outside the latest shortlist will be null.
   const { data: latestPickRow } = await supabase
     .from("ranked_focus_list")
     .select(
@@ -45,6 +47,38 @@ export default async function ResearchPage({
     .maybeSingle()
 
   const pick = latestPickRow as Pick | null
+
+  // Latest Layer-1 scan metrics for the ticker -- this is what gives the
+  // page real-time market context even when the ticker is NOT on the
+  // current shortlist.
+  const { data: latestScanRow } = await supabase
+    .from("scan_results")
+    .select(
+      "scan_id,price,day_change_pct,gap_pct,return_5d_pct,return_20d_pct,relative_volume,rsi_14,pct_from_52w_high,pct_from_52w_low,is_breakout,is_breakdown,composite_score,rank,data_as_of",
+    )
+    .eq("ticker", ticker)
+    .order("scan_id", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  type ScanMetrics = {
+    scan_id: number
+    price: number | null
+    day_change_pct: number | null
+    gap_pct: number | null
+    return_5d_pct: number | null
+    return_20d_pct: number | null
+    relative_volume: number | null
+    rsi_14: number | null
+    pct_from_52w_high: number | null
+    pct_from_52w_low: number | null
+    is_breakout: boolean | null
+    is_breakdown: boolean | null
+    composite_score: number | null
+    rank: number | null
+    data_as_of: string | null
+  }
+  const scan = latestScanRow as ScanMetrics | null
 
   const { data: form4 } = await supabase
     .from("form4_transactions")
@@ -74,7 +108,7 @@ export default async function ResearchPage({
       ["S", "V"].includes((i.transaction_code || "").toUpperCase()),
   ).length
 
-  if (!pick) {
+  if (!pick && !scan) {
     return (
       <div className="mx-auto max-w-[1120px] px-6 py-14 md:px-10 md:py-16 space-y-12">
         <BackLink />
@@ -86,26 +120,32 @@ export default async function ResearchPage({
         </header>
         <Card>
           <CardContent className="py-16 text-center text-small text-muted-foreground">
-            We have no pipeline-generated thesis for{" "}
-            <code className="font-mono">{ticker}</code> yet. If you expected
-            one, confirm the ticker is in the universe and that a recent
-            pipeline run has executed.
+            <code className="font-mono">{ticker}</code> isn&rsquo;t in the
+            current liquid universe. The universe refreshes weekly with
+            names that have $1M+ average daily dollar volume; if this
+            ticker meets that bar it&rsquo;ll appear after the next refresh.
           </CardContent>
         </Card>
       </div>
     )
   }
 
+  // The page header shows either the scan or the pick metadata --
+  // whichever is fresher. If we only have scan metrics (Layer 1+2), we
+  // skip the deep-analysis sections gracefully.
+  const headerRunDate = pick?.run_date ?? "—"
+  const headerRunType = pick?.run_type ?? "scan"
+
   return (
     <div className="mx-auto max-w-[1120px] space-y-16 px-6 py-14 md:space-y-20 md:px-10 md:py-16">
       <Reveal as="header" className="space-y-3">
         <BackLink />
         <p className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
-          Research · {pick.run_date} {pick.run_type}
+          Research · {headerRunDate} {headerRunType}
         </p>
         <div className="flex items-baseline gap-4">
           <h1 className="font-mono text-display tracking-tight">{ticker}</h1>
-          {pick.conviction_grade && (
+          {pick?.conviction_grade && (
             <span className="text-caption uppercase tracking-[0.14em] text-foreground">
               Grade {pick.conviction_grade}
             </span>
@@ -114,14 +154,60 @@ export default async function ResearchPage({
         <p className="text-small text-muted-foreground">
           Composite score{" "}
           <span className="text-foreground tabular-nums">
-            {pick.composite_score != null
+            {pick?.composite_score != null
               ? Number(pick.composite_score).toFixed(1)
               : "—"}
           </span>
         </p>
       </Reveal>
 
-      {pick.thesis && (
+      {scan && (
+        <Reveal as="section" className="space-y-5">
+          <h2 className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+            Latest market scan · 15-min delayed
+          </h2>
+          <dl className="grid grid-cols-2 gap-x-8 gap-y-5 sm:grid-cols-4">
+            <Stat
+              label="Price"
+              value={scan.price != null ? `$${scan.price.toFixed(2)}` : "—"}
+            />
+            <Stat
+              label="Day change"
+              value={fmtPct(scan.day_change_pct)}
+              tone={scan.day_change_pct ?? 0}
+            />
+            <Stat
+              label="20d return"
+              value={fmtPct(scan.return_20d_pct)}
+              tone={scan.return_20d_pct ?? 0}
+            />
+            <Stat
+              label="Rel. volume"
+              value={
+                scan.relative_volume != null
+                  ? `${scan.relative_volume.toFixed(2)}×`
+                  : "—"
+              }
+            />
+            <Stat
+              label="RSI(14)"
+              value={scan.rsi_14 != null ? scan.rsi_14.toFixed(0) : "—"}
+            />
+            <Stat label="From 52w high" value={fmtPct(scan.pct_from_52w_high)} />
+            <Stat label="From 52w low" value={fmtPct(scan.pct_from_52w_low)} />
+            <Stat
+              label="Composite"
+              value={
+                scan.composite_score != null
+                  ? scan.composite_score.toFixed(0)
+                  : "—"
+              }
+            />
+          </dl>
+        </Reveal>
+      )}
+
+      {pick?.thesis && (
         <Reveal as="section" className="space-y-5">
           <h2 className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
             Thesis
@@ -133,7 +219,7 @@ export default async function ResearchPage({
       )}
 
       <section className="grid gap-5 md:grid-cols-2">
-        {pick.bull_case && (
+        {pick?.bull_case && (
           <Reveal>
             <Card size="sm" className="h-full">
               <CardHeader>
@@ -145,7 +231,7 @@ export default async function ResearchPage({
             </Card>
           </Reveal>
         )}
-        {pick.bear_case && (
+        {pick?.bear_case && (
           <Reveal delay={80}>
             <Card size="sm" className="h-full">
               <CardHeader>
@@ -159,7 +245,7 @@ export default async function ResearchPage({
         )}
       </section>
 
-      {pick.catalyst_description && (
+      {pick?.catalyst_description && (
         <Reveal as="section" className="space-y-5">
           <h2 className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
             Catalyst · {pick.catalyst_category ?? "—"}
@@ -195,7 +281,7 @@ export default async function ResearchPage({
         </p>
       </Reveal>
 
-      {pick.position_size_guidance && (
+      {pick?.position_size_guidance && (
         <Reveal as="section" className="space-y-5">
           <h2 className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
             Position size guidance
@@ -207,6 +293,12 @@ export default async function ResearchPage({
       )}
     </div>
   )
+}
+
+function fmtPct(v: number | null | undefined): string {
+  if (v == null) return "—"
+  const sign = v > 0 ? "+" : ""
+  return `${sign}${v.toFixed(2)}%`
 }
 
 function BackLink() {
@@ -224,23 +316,29 @@ function Stat({
   label,
   value,
   muted,
+  tone,
 }: {
   label: string
-  value: number
+  value: React.ReactNode
   muted?: boolean
+  tone?: number
 }) {
+  const colorCls =
+    tone != null
+      ? tone > 0
+        ? "text-foreground"
+        : tone < 0
+        ? "text-destructive"
+        : "text-foreground"
+      : muted
+      ? "text-muted-foreground"
+      : "text-foreground"
   return (
     <div className="space-y-1">
       <dt className="text-caption uppercase tracking-[0.14em] text-muted-foreground">
         {label}
       </dt>
-      <dd
-        className={`text-h2 tabular-nums ${
-          muted ? "text-muted-foreground" : "text-foreground"
-        }`}
-      >
-        {value}
-      </dd>
+      <dd className={`text-h3 tabular-nums ${colorCls}`}>{value}</dd>
     </div>
   )
 }

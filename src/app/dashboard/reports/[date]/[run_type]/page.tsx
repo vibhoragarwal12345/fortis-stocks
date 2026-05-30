@@ -99,6 +99,20 @@ export default async function ReportPage({
             )}
           </p>
         )}
+        {/* Daily reports are deprecated under the lean rewrite. We keep
+            the viewer alive so historical reports stay readable + email
+            links from older notifications still resolve. */}
+        <div className="rounded-md border border-border bg-secondary/40 px-4 py-3 text-small text-muted-foreground">
+          <span className="text-foreground">Historical report.</span>{" "}
+          Fortis no longer composes daily briefs — the platform refreshes
+          the dashboard every 2 hours instead.{" "}
+          <Link
+            href="/dashboard"
+            className="underline-offset-4 hover:text-foreground hover:underline"
+          >
+            See the latest scan →
+          </Link>
+        </div>
       </Reveal>
 
       <Reveal>

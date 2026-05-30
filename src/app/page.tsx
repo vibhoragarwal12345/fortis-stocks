@@ -33,14 +33,14 @@ export default function Home() {
             Fortis · Stock Intelligence
           </p>
           <h1 className="text-display">
-            Institutional research,
+            The full US market,
             <br />
-            distilled for the desk.
+            scanned every two hours.
           </h1>
           <p className="text-body-lg max-w-[640px] text-muted-foreground">
-            Conviction-graded daily briefs, focus lists, and long-horizon
-            watchlists — every claim traced to its underlying data. Built for
-            wealth advisors who&rsquo;d rather act than scroll.
+            Cheap math across every liquid US ticker. Deep analysis on the
+            highest-scoring eighty. Conviction grades on what survives.
+            One live dashboard — every claim traced to its underlying data.
           </p>
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-2">
             <Link
@@ -61,11 +61,12 @@ export default function Home() {
       <Section spacing="default" width="default" surface>
         <Reveal as="header" className="mb-14 max-w-[640px]">
           <p className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
-            What you get
+            How it works
           </p>
           <h2 className="mt-2 text-h1">
-            Three surfaces. <br className="hidden md:inline" />
-            Each one earns its place.
+            A two-speed funnel.{" "}
+            <br className="hidden md:inline" />
+            Cheap on everything, expensive on what matters.
           </h2>
         </Reveal>
 
@@ -131,21 +132,21 @@ export default function Home() {
 
 const FEATURES = [
   {
-    eyebrow: "Daily",
-    title: "Conviction-graded briefs.",
+    eyebrow: "Layer 1 · every 2 hours",
+    title: "Full-market scan.",
     body:
-      "Pre-market, midday, and close briefs. Every pick carries an A / B / C / D grade with the quant signals that earned it.",
+      "Cheap math over every liquid US common stock with $1M+ in average daily dollar volume — price action, RSI, relative volume, 52-week proximity, breakout flags.",
   },
   {
-    eyebrow: "Weekly",
-    title: "Focus list with thesis.",
+    eyebrow: "Layer 2 · composite",
+    title: "Top-80 shortlist.",
     body:
-      "The ranked names with bull case, bear case, catalyst category, position guidance, and the insider posture behind them.",
+      "A weighted composite picks the eighty names most worth a closer look this cycle. No LLM tokens spent until something earns them.",
   },
   {
-    eyebrow: "Long-horizon",
-    title: "Emerging watchlist.",
+    eyebrow: "Layers 3 + 4 · deep analysis",
+    title: "Graded conviction.",
     body:
-      "Small-cap multibagger candidates tracked over years. Honest tier framing — most will fail, the winners can return many multiples.",
+      "Catalyst, smart-money insider posture, two-sided debate, critic verdict, per-ticker quant — synthesized into an A / B / C grade. Every claim factcheck-verified against its source.",
   },
 ] as const

@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic"
 type Row = {
   ticker: string
   rank: number | null
-  conviction_grade: "A" | "B" | "C" | "D" | null
+  conviction_grade: "A" | "B" | "C" | "D" | "U" | null
   composite_score: number | null
   conviction_score_adjusted: number | null
   catalyst_category: string | null
@@ -30,70 +30,89 @@ const GRADE_LABEL: Record<string, string> = {
   B: "Grade B — promising",
   C: "Grade C — watch list",
   D: "Grade D — passed on",
+  U: "Ungraded — Layer 4 pending",
 }
 
 export default async function FocusListPage() {
   const supabase = await createClient()
 
-  const { data: latestRow } = await supabase
-    .from("ranked_focus_list")
-    .select("run_date")
-    .order("run_date", { ascending: false })
+  // The focus list reflects the LATEST completed market scan. We look up
+  // the scan first (canonical source of truth) and then pull its picks --
+  // not the other way around. This way, even on weekends/holidays we
+  // surface meaningful data from the most recent scan.
+  const { data: latestScanRow } = await supabase
+    .from("market_scans")
+    .select("id, scan_timestamp, scan_type, completed_at")
+    .eq("status", "complete")
+    .order("completed_at", { ascending: false })
     .limit(1)
     .maybeSingle()
 
-  if (!latestRow) {
+  if (!latestScanRow) {
     return (
       <div className="mx-auto max-w-[1280px] px-6 py-14 md:px-10 md:py-16">
         <header className="space-y-2">
           <p className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
             Focus list
           </p>
-          <h1 className="text-h1">No picks yet.</h1>
+          <h1 className="text-h1">No completed scan yet.</h1>
         </header>
         <Card className="mt-12">
           <CardContent className="py-16 text-center text-small text-muted-foreground">
-            Picks appear here after the next pre-market or midday pipeline
-            run on a weekday.
+            Picks appear here after the next 2-hour scan completes (weekdays,
+            roughly every 2 hours during US market hours).
           </CardContent>
         </Card>
       </div>
     )
   }
 
-  const latest = latestRow.run_date
-
   const { data: rows } = await supabase
     .from("ranked_focus_list")
     .select(
       "ticker,rank,conviction_grade,composite_score,conviction_score_adjusted,catalyst_category,catalyst_description,thesis,run_date,run_type",
     )
-    .eq("run_date", latest)
+    .eq("scan_id", latestScanRow.id)
     .order("rank", { ascending: true })
-    .limit(50)
+    .limit(80)
 
   const picks = (rows ?? []) as Row[]
   const grouped: Record<string, Row[]> = {}
   for (const r of picks) {
-    const g = r.conviction_grade ?? "D"
+    // Picks that haven't been through Layer 4 yet (conviction_grader) get
+    // bucketed as 'U' for "ungraded" -- still useful to see the composite
+    // top-N before the deep analysis lands.
+    const g = r.conviction_grade ?? "U"
     ;(grouped[g] = grouped[g] ?? []).push(r)
   }
+
+  const lastUpdated =
+    latestScanRow.completed_at ?? latestScanRow.scan_timestamp
+  const fmtTime = new Date(lastUpdated).toLocaleString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+  })
 
   return (
     <div className="mx-auto max-w-[1280px] space-y-20 px-6 py-14 md:space-y-24 md:px-10 md:py-16">
       <Reveal as="header" className="space-y-3">
         <p className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
-          Focus list · {latest}
+          Focus list · {latestScanRow.scan_type} scan · {fmtTime}
         </p>
-        <h1 className="text-h1">{picks.length} names ranked today.</h1>
-        <p className="text-body-lg max-w-[640px] text-muted-foreground">
-          Conviction-graded picks across A / B / C tiers. Click into any
-          ticker for the full thesis, catalyst, insider posture, and bull /
-          bear cases.
+        <h1 className="text-h1">{picks.length} names from the latest scan.</h1>
+        <p className="text-body-lg max-w-[680px] text-muted-foreground">
+          The top eighty by composite score, grouped by conviction grade.
+          Click into any ticker for the full thesis, catalyst, insider
+          posture, and bull / bear cases. Ungraded picks are shortlisted
+          but haven&rsquo;t cleared Layer 4 yet.
         </p>
       </Reveal>
 
-      {(["A", "B", "C", "D"] as const).map((grade) => {
+      {(["A", "B", "C", "D", "U"] as const).map((grade) => {
         const list = grouped[grade] ?? []
         if (list.length === 0) return null
         return (
