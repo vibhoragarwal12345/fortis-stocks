@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 import { trackEvent } from "@/lib/track";
+import { CountUp } from "@/components/ui/count-up";
 import { Reveal } from "@/components/ui/reveal";
 
 export const metadata = { title: "Track Record — Fortis" };
@@ -273,44 +274,64 @@ export default async function TrackRecordPage() {
         </Reveal>
         <dl className="grid gap-10 sm:grid-cols-2 md:grid-cols-4">
           <Reveal>
-            <Stat
-              label="Total picks tracked"
-              value={String(totalPicks)}
-              detail={`${matured} matured to 20d`}
-            />
+            <Stat label="Total picks tracked" detail={`${matured} matured to 20d`}>
+              <CountUp value={totalPicks} />
+            </Stat>
           </Reveal>
           <Reveal delay={60}>
             <Stat
               label="A-grade win rate · 20d"
-              value={
-                aGrade?.win_rate_20d != null
-                  ? `${aGrade.win_rate_20d.toFixed(0)}%`
-                  : "—"
-              }
               detail={`n = ${aGrade?.pick_count ?? 0}`}
-            />
+            >
+              {aGrade?.win_rate_20d != null ? (
+                <>
+                  <CountUp
+                    value={aGrade.win_rate_20d}
+                    format={(n) => `${n.toFixed(0)}%`}
+                  />
+                </>
+              ) : (
+                "—"
+              )}
+            </Stat>
           </Reveal>
           <Reveal delay={120}>
             <Stat
               label="Avg alpha vs SPY · 20d"
-              value={fmtPct(allGrade?.avg_alpha_20d ?? null)}
               detail={
                 allGrade?.is_statistically_significant
                   ? `t = ${fmtPlain(allGrade?.t_statistic_alpha_20d ?? null)} · significant`
                   : allGrade?.sample_disclaimer ?? "—"
               }
-            />
+            >
+              {allGrade?.avg_alpha_20d != null ? (
+                <CountUp
+                  value={Number(allGrade.avg_alpha_20d)}
+                  format={(n) => `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`}
+                />
+              ) : (
+                "—"
+              )}
+            </Stat>
           </Reveal>
           <Reveal delay={180}>
             <Stat
               label="Last 30 days"
-              value={fmtPct(last30AvgAlpha)}
               detail={
                 last30WinRate != null
                   ? `${last30.length} picks · ${last30WinRate.toFixed(0)}% win`
                   : `${last30.length} picks`
               }
-            />
+            >
+              {last30AvgAlpha != null ? (
+                <CountUp
+                  value={last30AvgAlpha}
+                  format={(n) => `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`}
+                />
+              ) : (
+                "—"
+              )}
+            </Stat>
           </Reveal>
         </dl>
       </section>
@@ -541,11 +562,11 @@ export default async function TrackRecordPage() {
 
 function Stat({
   label,
-  value,
+  children,
   detail,
 }: {
   label: string
-  value: string
+  children: React.ReactNode
   detail?: string
 }) {
   return (
@@ -553,7 +574,7 @@ function Stat({
       <dt className="text-caption uppercase tracking-[0.14em] text-muted-foreground">
         {label}
       </dt>
-      <dd className="text-h2 tabular-nums">{value}</dd>
+      <dd className="text-h2 tabular-nums">{children}</dd>
       {detail && <p className="text-caption">{detail}</p>}
     </div>
   )

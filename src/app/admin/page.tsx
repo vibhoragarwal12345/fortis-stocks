@@ -4,7 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Reveal } from "@/components/ui/reveal"
 import { createTenant } from "./actions"
 
 export const dynamic = "force-dynamic"
@@ -23,10 +23,11 @@ export default async function AdminHome() {
   const service = createServiceClient()
   const { data: tenants } = await service
     .from("tenants")
-    .select("id, name, slug, access_status, access_granted_until, notes, created_at")
+    .select(
+      "id, name, slug, access_status, access_granted_until, notes, created_at",
+    )
     .order("created_at", { ascending: false })
 
-  // Member counts in one query
   const { data: memberCounts } = await service
     .from("tenant_members")
     .select("tenant_id")
@@ -38,114 +39,142 @@ export default async function AdminHome() {
   const rows = (tenants ?? []) as TenantRow[]
 
   return (
-    <div className="mx-auto max-w-7xl px-6 py-8 space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Tenants</h1>
-        <p className="text-sm text-muted-foreground">
+    <div className="mx-auto max-w-[1280px] space-y-16 px-6 py-14 md:space-y-20 md:px-10 md:py-16">
+      <Reveal as="header" className="space-y-3">
+        <p className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+          Platform admin
+        </p>
+        <h1 className="text-h1">Tenants.</h1>
+        <p className="text-body-lg max-w-[640px] text-muted-foreground">
           Manage tenant access, feature flags, and member invites.
         </p>
-      </div>
+      </Reveal>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Create tenant</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form action={createTenant} className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-2">
-              <Label htmlFor="name">Tenant name</Label>
-              <Input id="name" name="name" required placeholder="Acme Wealth" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="admin_email">Admin email</Label>
-              <Input
-                id="admin_email"
-                name="admin_email"
-                type="email"
-                required
-                placeholder="admin@acmewealth.com"
-              />
-            </div>
-            <div className="flex items-end">
-              <Button type="submit" className="w-full">Create + invite admin</Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+      <Reveal as="section" className="space-y-5">
+        <h2 className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+          Create tenant
+        </h2>
+        <form
+          action={createTenant}
+          className="grid gap-4 border-y border-border py-6 sm:grid-cols-[1fr_1fr_auto]"
+        >
+          <div className="space-y-2">
+            <Label htmlFor="name">Tenant name</Label>
+            <Input id="name" name="name" required placeholder="Acme Wealth" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="admin_email">Admin email</Label>
+            <Input
+              id="admin_email"
+              name="admin_email"
+              type="email"
+              required
+              placeholder="admin@acmewealth.com"
+            />
+          </div>
+          <div className="flex items-end">
+            <Button type="submit" size="lg" className="w-full sm:w-auto">
+              Create + invite
+            </Button>
+          </div>
+        </form>
+      </Reveal>
 
-      <div className="rounded-lg border bg-card overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
-            <tr>
-              <th className="px-4 py-2.5">Name</th>
-              <th className="px-4 py-2.5">Status</th>
-              <th className="px-4 py-2.5">Members</th>
-              <th className="px-4 py-2.5">Granted until</th>
-              <th className="px-4 py-2.5">Notes</th>
-              <th className="px-4 py-2.5"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((t) => (
-              <tr key={t.id} className="border-t">
-                <td className="px-4 py-2.5">
-                  <Link
-                    href={`/admin/tenants/${t.id}`}
-                    className="font-medium text-foreground underline-offset-4 hover:underline"
+      <Reveal as="section" className="space-y-5">
+        <div className="flex items-baseline justify-between gap-4">
+          <h2 className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+            All tenants
+          </h2>
+          <span className="text-caption tabular-nums">
+            {rows.length} {rows.length === 1 ? "tenant" : "tenants"}
+          </span>
+        </div>
+
+        {rows.length === 0 ? (
+          <p className="border-y border-border py-12 text-center text-small text-muted-foreground">
+            No tenants yet.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-small">
+              <thead>
+                <tr className="text-left">
+                  <TH>Name</TH>
+                  <TH>Status</TH>
+                  <TH>Members</TH>
+                  <TH>Granted until</TH>
+                  <TH>Notes</TH>
+                  <TH>{""}</TH>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((t) => (
+                  <tr
+                    key={t.id}
+                    className="border-t border-border transition-premium hover:bg-secondary/40"
                   >
-                    {t.name}
-                  </Link>
-                  <div className="text-xs text-muted-foreground">{t.slug}</div>
-                </td>
-                <td className="px-4 py-2.5">
-                  <StatusPill status={t.access_status} />
-                </td>
-                <td className="px-4 py-2.5">{memberByTenant.get(t.id) ?? 0}</td>
-                <td className="px-4 py-2.5 text-muted-foreground">
-                  {t.access_granted_until
-                    ? new Date(t.access_granted_until).toLocaleDateString()
-                    : "Indefinite"}
-                </td>
-                <td className="px-4 py-2.5 text-muted-foreground truncate max-w-[280px]">
-                  {t.notes ?? ""}
-                </td>
-                <td className="px-4 py-2.5 text-right">
-                  <Link
-                    href={`/admin/tenants/${t.id}`}
-                    className="text-xs font-medium text-foreground underline-offset-4 hover:underline"
-                  >
-                    Manage
-                  </Link>
-                </td>
-              </tr>
-            ))}
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                  No tenants yet.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+                    <TD>
+                      <Link
+                        href={`/admin/tenants/${t.id}`}
+                        className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                      >
+                        <span className="font-medium text-foreground">
+                          {t.name}
+                        </span>
+                        <span className="ml-2 text-caption text-muted-foreground">
+                          {t.slug}
+                        </span>
+                      </Link>
+                    </TD>
+                    <TD>
+                      <span className="text-caption uppercase tracking-[0.14em]">
+                        {t.access_status}
+                      </span>
+                    </TD>
+                    <TD className="tabular-nums">
+                      {memberByTenant.get(t.id) ?? 0}
+                    </TD>
+                    <TD className="tabular-nums text-muted-foreground">
+                      {t.access_granted_until
+                        ? new Date(t.access_granted_until).toLocaleDateString()
+                        : "Indefinite"}
+                    </TD>
+                    <TD className="max-w-[320px] truncate text-muted-foreground">
+                      {t.notes ?? ""}
+                    </TD>
+                    <TD className="text-right">
+                      <Link
+                        href={`/admin/tenants/${t.id}`}
+                        className="text-caption uppercase tracking-[0.14em] transition-premium hover:text-foreground"
+                      >
+                        Manage →
+                      </Link>
+                    </TD>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Reveal>
     </div>
   )
 }
 
-function StatusPill({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    active: "bg-emerald-100 text-emerald-800",
-    suspended: "bg-amber-100 text-amber-800",
-    archived: "bg-zinc-200 text-zinc-700",
-  }
+function TH({ children }: { children: React.ReactNode }) {
   return (
-    <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-        map[status] ?? "bg-zinc-100 text-zinc-700"
-      }`}
-    >
-      {status}
-    </span>
+    <th className="py-3 pr-6 text-caption uppercase tracking-[0.14em] font-medium text-muted-foreground">
+      {children}
+    </th>
   )
+}
+
+function TD({
+  children,
+  className,
+}: {
+  children: React.ReactNode
+  className?: string
+}) {
+  return <td className={`py-3 pr-6 ${className ?? ""}`}>{children}</td>
 }

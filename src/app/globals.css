@@ -276,6 +276,18 @@
       opacity, box-shadow;
   }
 
+  /* Page transition fade. Used by <PageTransition> which remounts on
+     pathname change. Opacity-only (no transform) keeps text rendering
+     stable; cheap to composite. */
+  @keyframes pageFade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
   /* Responsive headline shrinks. Display is gigantic on mobile -- step it
      down so it doesn't bleed off-screen. */
   @media (max-width: 768px) {

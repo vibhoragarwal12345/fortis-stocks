@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getActiveTenantMember } from "@/lib/tenant"
 import { themeFromTenant, tenantCssVars } from "@/lib/theme"
 import { checkAccess } from "@/lib/permissions"
+import { PageTransition } from "@/components/ui/page-transition"
 import { signout } from "./actions"
 
 // Top-level nav for every /dashboard route. Active-link highlighting is
@@ -130,7 +131,9 @@ export default async function DashboardLayout({
         </nav>
       </header>
 
-      <main className="flex-1">{children}</main>
+      <main className="flex-1">
+        <PageTransition>{children}</PageTransition>
+      </main>
 
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-3 px-6 py-6 md:px-10">
