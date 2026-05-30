@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import { Inter, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-// Inter for the full type scale. Loaded with axes for weights 400 + 600 (the
-// only two we use anywhere -- premium = restraint, including font weights).
+import { ThemeProvider } from "@/components/theme-provider";
+
+// Inter for the full type scale. Loaded with axes for weights 400 + 500 + 600
+// (the only weights used across the design system).
 // Geist_Mono kept for tabular data + tickers.
 const inter = Inter({
   variable: "--font-inter",
@@ -32,9 +34,17 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${inter.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col font-sans text-foreground bg-background">
-        {children}
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem={false}
+          disableTransitionOnChange
+        >
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -1,6 +1,6 @@
 import Link from "next/link"
 
-import { Button } from "@/components/ui/button"
+import { DottedSurface } from "@/components/ui/dotted-surface"
 import { Reveal } from "@/components/ui/reveal"
 import { Section } from "@/components/ui/section"
 
@@ -16,9 +16,19 @@ export const metadata = {
 export default function Home() {
   return (
     <main className="min-h-screen bg-background text-foreground">
-      {/* ─── Hero ─────────────────────────────────────────────── */}
-      <Section spacing="hero" width="default">
-        <Reveal as="div" className="max-w-[860px] space-y-8">
+      {/* ─── Hero with dotted-surface backdrop ─────────────────── */}
+      <div className="relative overflow-hidden">
+        {/* Animated dot field. Scoped to the hero only -- sits absolute
+            inside this wrapper so the rest of the page stays clean. */}
+        <DottedSurface className="absolute inset-0 -z-10" />
+        {/* Soft radial vignette so the headline never fights the dot
+            pattern. The mask blends to transparent at the edges. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 -z-10 [background:radial-gradient(ellipse_at_25%_40%,var(--background)_0%,transparent_55%)]"
+        />
+        <Section spacing="hero" width="default" className="relative">
+          <Reveal as="div" className="max-w-[860px] space-y-8">
           <p className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
             Fortis · Stock Intelligence
           </p>
@@ -45,6 +55,7 @@ export default function Home() {
           </div>
         </Reveal>
       </Section>
+      </div>
 
       {/* ─── What you get ─────────────────────────────────────── */}
       <Section spacing="default" width="default" surface>
