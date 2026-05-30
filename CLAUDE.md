@@ -1,7 +1,33 @@
 # Fortis Stock Intelligence — CLAUDE.md
 
 ## Project Purpose
-Stock intelligence SaaS for **The Fortis Agency**, a financial advisory firm. The platform provides institutional-grade stock research, screening, and analytics tools for financial advisors and their clients.
+Stock intelligence platform for **The Fortis Agency** — a login-only research surface for licensed advisors. We scan the full liquid US market every 2 hours during market hours and surface the highest-scoring opportunities with deep analysis.
+
+## Architecture (post-lean-rewrite, May 2026)
+
+**One sentence:** every 2 hours, run a two-speed funnel over ~3,300 liquid US common stocks; the dashboard reads the latest scan.
+
+```
+pipeline/data/build_full_universe.py        weekly
+  → pipeline/data/full_universe.csv          ~3,300 tickers ($1M ADV floor)
+
+pipeline/scan/run_scan.py                    every 2h, weekdays
+  Layer 1   layer1_fast_scan   pure math on EVERY ticker      ~2-3 min
+  Layer 2   layer2_rank        composite score, top 80         ~10 s
+  Layer 3   catalyst, smart_money_intel, debate, critic       ~15-20 min
+  Layer 4   conviction_grader + factcheck                      ~2-3 min
+
+  → market_scans         row per scan; dashboard reads LATEST status='complete'
+  → scan_results         per-ticker Layer-1 metrics + composite_score
+  → ranked_focus_list    top 80 with deep analysis + A/B/C grade
+                         (Layer 2 stamps run_type='midday' so the existing
+                          deep agents pick them up unmodified; scan_id is
+                          the real lineage key)
+```
+
+**No email. No portfolios. No positions.** All gone in migration 044 (lean rewrite). The product is login-only research; we hold no user-held data.
+
+**Dashboard:** `/dashboard` shows the latest scan's top 80 with a "Last updated · 15-min delayed" honesty banner. Click any ticker for `/dashboard/research/[ticker]`. `/dashboard/focus-list` shows the graded shortlist by grade. `/dashboard/track-record` reports honest forward returns on past picks (uses `pick_outcomes`, not portfolios).
 
 ## Tech Stack
 
@@ -16,8 +42,8 @@ Stock intelligence SaaS for **The Fortis Agency**, a financial advisory firm. Th
 - **Language**: Python 3.11
 - **Data sources**: yfinance (prices), Finnhub (fundamentals), SEC EDGAR (filings), feedparser (news)
 - **AI / ML**: Groq (LLM inference), Gemini (LLM inference), HuggingFace Transformers (embeddings)
-- **Email**: Resend
 - **Virtual env**: `pipeline/venv/` (gitignored)
+- **Cadence**: every 2 hours during market hours (`.github/workflows/market_scan.yml`); universe refresh weekly (`universe_weekly.yml`).
 
 ## Folder Structure
 ```
