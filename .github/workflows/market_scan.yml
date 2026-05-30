@@ -1,0 +1,94 @@
+name: Market scan · every 2 hours
+
+# Lean rewrite PART 4. Runs the two-speed funnel every 2 hours during
+# market hours plus one pre-market and one post-close pass.
+#
+# Cron is UTC; GitHub Actions doesn't honour DST. We pick year-round UTC
+# slots tied to EST (UTC-5). During EDT (UTC-4) every run shifts one
+# wall-clock hour later -- acceptable for a 2-hour cadence.
+#
+#     12:00 UTC  =  07:00 ET (EST)  / 08:00 ET (EDT)   pre-market
+#     14:30 UTC  =  09:30 ET (EST)  / 10:30 ET (EDT)   market open
+#     16:30 UTC  =  11:30 ET (EST)  / 12:30 ET (EDT)   late morning
+#     18:30 UTC  =  13:30 ET (EST)  / 14:30 ET (EDT)   early afternoon
+#     20:30 UTC  =  15:30 ET (EST)  / 16:30 ET (EDT)   close approach
+#     22:00 UTC  =  17:00 ET (EST)  / 18:00 ET (EDT)   post-close
+#
+# 6 runs/weekday × ~6 min/run (layers 1+2 only) = ~3h compute/week.
+# Well inside the GitHub Actions free 2000-min/month allowance.
+#
+# Layer 3 (LLM-heavy) + Layer 4 are wired but currently behind
+# --skip-layer3 --skip-layer4 until the existing agents are patched to
+# accept the new 'scan' run_type. Flip those flags off when ready.
+
+on:
+  schedule:
+    - cron: "0 12 * * 1-5"   # pre-market
+    - cron: "30 14 * * 1-5"  # open
+    - cron: "30 16 * * 1-5"  # late morning
+    - cron: "30 18 * * 1-5"  # early afternoon
+    - cron: "30 20 * * 1-5"  # close approach
+    - cron: "0 22 * * 1-5"   # post-close
+  workflow_dispatch:
+    inputs:
+      scan_type:
+        description: "Scan label"
+        required: false
+        default: "manual"
+        type: choice
+        options:
+          - premarket
+          - intraday
+          - postclose
+          - manual
+      sample:
+        description: "Universe sample size (blank = full)"
+        required: false
+        default: ""
+
+concurrency:
+  group: market-scan
+  cancel-in-progress: false
+
+env:
+  NEXT_PUBLIC_SUPABASE_URL:    ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_ROLE_KEY:   ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  FINNHUB_API_KEY:             ${{ secrets.FINNHUB_API_KEY }}
+  GROQ_API_KEY:                ${{ secrets.GROQ_API_KEY }}
+  GEMINI_API_KEY:              ${{ secrets.GEMINI_API_KEY }}
+  TIINGO_API_KEY:              ${{ secrets.TIINGO_API_KEY }}
+
+jobs:
+  scan:
+    name: "Run two-speed funnel"
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-pipeline
+
+      - name: Derive scan_type from cron slot
+        id: derive
+        run: |
+          if [ -n "${{ github.event.inputs.scan_type }}" ]; then
+            echo "scan_type=${{ github.event.inputs.scan_type }}" >> $GITHUB_OUTPUT
+          else
+            HOUR=$(date -u +%H)
+            MIN=$(date -u +%M)
+            if [ "$HOUR" = "12" ]; then echo "scan_type=premarket" >> $GITHUB_OUTPUT
+            elif [ "$HOUR" = "22" ]; then echo "scan_type=postclose" >> $GITHUB_OUTPUT
+            else echo "scan_type=intraday" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Run scan (layers 1+2; deep agents off until run_type patch)
+        run: |
+          SAMPLE_ARG=""
+          if [ -n "${{ github.event.inputs.sample }}" ]; then
+            SAMPLE_ARG="--sample ${{ github.event.inputs.sample }}"
+          fi
+          python -m pipeline.scan.run_scan \
+            --scan-type ${{ steps.derive.outputs.scan_type }} \
+            --top-n 80 \
+            --skip-layer3 --skip-layer4 \
+            $SAMPLE_ARG

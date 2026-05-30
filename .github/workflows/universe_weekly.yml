@@ -1,0 +1,46 @@
+name: Universe · Weekly refresh
+
+# Sundays 13:00 UTC. The full liquid US universe needs a weekly refresh so:
+#   - new listings appear within a week of their IPO,
+#   - delistings drop out,
+#   - liquidity-floored names move in/out of the universe as ADV shifts.
+#
+# Runs before the multibagger weekly job (14:00 UTC) so downstream scans
+# see the freshest list.
+on:
+  schedule:
+    - cron: "0 13 * * 0"
+  workflow_dispatch:
+
+concurrency:
+  group: universe-weekly
+  cancel-in-progress: false
+
+env:
+  NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+
+jobs:
+  build:
+    name: "Build full_universe.csv"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-pipeline
+
+      - name: Build the liquid US universe
+        run: python -m pipeline.data.build_full_universe
+
+      - name: Upload as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: full_universe
+          path: pipeline/data/full_universe.csv
+          retention-days: 14
+
+      - name: Show sector mix
+        run: |
+          echo "row count + first 20 by ADV:"
+          head -21 pipeline/data/full_universe.csv
