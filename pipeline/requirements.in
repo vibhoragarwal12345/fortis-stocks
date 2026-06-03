@@ -39,6 +39,7 @@ arch
 # --- LLM / ML ---
 groq
 google-generativeai
+openai         # unified client for OpenAI-compatible providers in the gateway (Cerebras, Groq, NVIDIA NIM)
 transformers
 torch
 sentence-transformers

@@ -69,6 +69,7 @@ from config import (  # noqa: E402
     SUPABASE_SERVICE_KEY, SUPABASE_URL,
 )
 from supabase import create_client  # noqa: E402
+from llm import complete  # noqa: E402 -- shared provider-waterfall gateway
 
 # Re-use the strict factcheck implementation we already shipped.
 from agents.factcheck_agent import factcheck  # noqa: E402
@@ -1321,19 +1322,9 @@ def _build_intel_user_prompt(data, congress):
 
 
 def _groq_intel_note(prompt: str) -> str | None:
-    if not GROQ_API_KEY:
-        return None
-    try:
-        from groq import Groq
-        resp = Groq(api_key=GROQ_API_KEY).chat.completions.create(
-            model=GROQ_MODEL,
-            messages=[{"role": "system", "content": _INTEL_SYSTEM},
-                      {"role": "user", "content": prompt}],
-            temperature=GROQ_TEMPERATURE, max_tokens=1600)
-        return (resp.choices[0].message.content or "").strip() or None
-    except Exception as exc:
-        log.warning("Groq intel note failed: %s", exc)
-        return None
+    text, _ = complete(prompt, system=_INTEL_SYSTEM,
+                       temperature=GROQ_TEMPERATURE, max_tokens=1600)
+    return text
 
 
 def _forbidden_language_check(text: str) -> list[str]:

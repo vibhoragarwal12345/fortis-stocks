@@ -44,6 +44,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from agents.factcheck_agent import factcheck, strip_data_refs  # noqa: E402
 from config import GROQ_API_KEY, SUPABASE_SERVICE_KEY, SUPABASE_URL  # noqa: E402
 from supabase import create_client  # noqa: E402
+from llm import complete  # noqa: E402 -- shared provider-waterfall gateway
 
 logging.basicConfig(
     level=logging.INFO,
@@ -252,24 +253,11 @@ def _build_prompt(data: dict) -> str:
 
 
 def _call_groq(prompt: str) -> str | None:
-    if not GROQ_API_KEY:
-        log.warning("GROQ_API_KEY missing -- cannot generate thesis.")
-        return None
-    try:
-        from groq import Groq
-        resp = Groq(api_key=GROQ_API_KEY).chat.completions.create(
-            model=GROQ_MODEL,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user",   "content": prompt},
-            ],
-            temperature=0.2,
-            response_format={"type": "json_object"},
-        )
-        return (resp.choices[0].message.content or "").strip()
-    except Exception as exc:
-        log.warning("Groq call failed: %s", exc)
-        return None
+    # Name kept for call-site stability; now routes through the shared gateway
+    # (Cerebras -> Groq -> NVIDIA -> Gemini) with JSON-object output.
+    text, _ = complete(prompt, system=SYSTEM_PROMPT, temperature=0.2,
+                       max_tokens=8000, json_mode=True)
+    return text
 
 
 def _parse_json(text: str) -> dict | None:

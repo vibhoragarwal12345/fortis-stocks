@@ -40,11 +40,10 @@ from config import (  # noqa: E402
     GEMINI_API_KEY, GROQ_API_KEY, SUPABASE_SERVICE_KEY, SUPABASE_URL,
 )
 from supabase import create_client  # noqa: E402
+from llm import available_providers, complete  # noqa: E402 -- shared provider-waterfall gateway
 
 DEFAULT_N    = 30
 RANK_SOURCE  = "midday"
-GEMINI_MODEL = "gemini-2.5-flash"   # 2.0-flash free-tier quota is exhausted; 2.5 is its successor
-GROQ_MODEL   = "llama-3.3-70b-versatile"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -59,12 +58,6 @@ _SYSTEM = ("You are a contrarian risk officer at a hedge fund. Your job is to "
 
 _HEADERS = ["THESIS_WEAKNESSES", "DISCONFIRMING_DATA", "PRECEDENT_FAILURES",
             "HIDDEN_RISKS", "CONVICTION_ADJUSTMENT", "REWRITTEN_BEAR_CASE"]
-
-# Gemini free-tier has a 20-req/day daily cap on 2.5-flash. Once we hit a
-# quota error, stop retrying for the rest of the run -- log once, route every
-# remaining critique straight to Groq.
-_gemini_disabled = False
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Prompt
@@ -118,56 +111,11 @@ the bull case typically is. Be specific."""
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# LLM generation -- Gemini (preferred), Groq fallback
+# LLM generation -- shared gateway (Cerebras -> Groq -> NVIDIA -> Gemini)
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _try_gemini(prompt: str) -> str | None:
-    global _gemini_disabled
-    if not GEMINI_API_KEY or _gemini_disabled:
-        return None
-    try:
-        import google.generativeai as genai
-        genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel(GEMINI_MODEL, system_instruction=_SYSTEM)
-        return (model.generate_content(prompt).text or "").strip() or None
-    except Exception as exc:
-        msg = str(exc)
-        # Quota errors are sticky -- stop banging the API for every remaining
-        # pick. Disable Gemini for the rest of this run and route to Groq.
-        if any(s in msg for s in ("429", "RESOURCE_EXHAUSTED")) \
-                or "quota" in msg.lower():
-            log.warning("Gemini quota exhausted -- routing remaining "
-                        "critiques to Groq for the rest of this run")
-            _gemini_disabled = True
-        else:
-            log.warning("Gemini failed: %s -- falling back to Groq", exc)
-        return None
-
-
-def _try_groq(prompt: str) -> str | None:
-    if not GROQ_API_KEY:
-        return None
-    try:
-        from groq import Groq
-        resp = Groq(api_key=GROQ_API_KEY).chat.completions.create(
-            model=GROQ_MODEL,
-            messages=[{"role": "system", "content": _SYSTEM},
-                      {"role": "user", "content": prompt}],
-            temperature=0.5, max_tokens=1600)
-        return (resp.choices[0].message.content or "").strip() or None
-    except Exception as exc:
-        log.warning("Groq fallback failed: %s", exc)
-        return None
-
-
 def _generate(prompt: str) -> tuple[str | None, str]:
-    text = _try_gemini(prompt)
-    if text:
-        return text, "gemini"
-    text = _try_groq(prompt)
-    if text:
-        return text, "groq (fallback)"
-    return None, "none"
+    return complete(prompt, system=_SYSTEM, temperature=0.5, max_tokens=1600)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -210,12 +158,8 @@ def _parse(text: str) -> dict:
 
 def run(limit: int = DEFAULT_N) -> None:
     db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-    primary = GEMINI_MODEL if GEMINI_API_KEY else "Groq Llama (FALLBACK)"
-    log.info("Critic Agent -- top %d, model: %s", limit, primary)
-    if not GEMINI_API_KEY:
-        log.warning("GEMINI_API_KEY not set -- critic uses the SAME model family "
-                    "as the thesis writer. Cross-model independence is lost. "
-                    "Set GEMINI_API_KEY for the intended behaviour.")
+    log.info("Critic Agent -- top %d, LLM waterfall: %s",
+             limit, " -> ".join(available_providers()) or "NONE")
 
     recent = (db.table("ranked_focus_list").select("run_date")
               .order("run_date", desc=True).limit(1).execute().data)

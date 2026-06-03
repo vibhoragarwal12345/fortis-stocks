@@ -12,6 +12,7 @@ anyio==4.13.0
     # via
     #   groq
     #   httpx
+    #   openai
 arch==8.0.0
     # via -r D:/fortis-stocks/pipeline/requirements.in
 attrs==26.1.0
@@ -72,7 +73,9 @@ deprecation==2.1.0
     #   postgrest
     #   storage3
 distro==1.9.0
-    # via groq
+    # via
+    #   groq
+    #   openai
 faiss-cpu==1.14.2
     # via -r D:/fortis-stocks/pipeline/requirements.in
 feedparser==6.0.12
@@ -140,6 +143,7 @@ httpx==0.28.1
     # via
     #   groq
     #   huggingface-hub
+    #   openai
     #   postgrest
     #   storage3
     #   supabase
@@ -166,6 +170,8 @@ jinja2==3.1.6
     #   -r D:/fortis-stocks/pipeline/requirements.in
     #   spacy
     #   torch
+jiter==0.15.0
+    # via openai
 joblib==1.5.3
     # via scikit-learn
 llvmlite==0.44.0
@@ -222,6 +228,8 @@ numpy==2.2.6
     #   thinc
     #   transformers
     #   yfinance
+openai==2.40.0
+    # via -r D:/fortis-stocks/pipeline/requirements.in
 openai-whisper==20250625
     # via -r D:/fortis-stocks/pipeline/requirements.in
 packaging==26.2
@@ -285,6 +293,7 @@ pydantic==2.13.4
     # via
     #   google-generativeai
     #   groq
+    #   openai
     #   postgrest
     #   pyiceberg
     #   realtime
@@ -372,7 +381,9 @@ six==1.17.0
 smart-open==7.6.1
     # via weasel
 sniffio==1.3.1
-    # via groq
+    # via
+    #   groq
+    #   openai
 soupsieve==2.8.4
     # via beautifulsoup4
 spacy==3.8.14
@@ -423,6 +434,7 @@ tqdm==4.67.3
     # via
     #   google-generativeai
     #   huggingface-hub
+    #   openai
     #   openai-whisper
     #   pandas-ta
     #   sentence-transformers
@@ -448,6 +460,7 @@ typing-extensions==4.15.0
     #   groq
     #   grpcio
     #   huggingface-hub
+    #   openai
     #   pydantic
     #   pydantic-core
     #   realtime

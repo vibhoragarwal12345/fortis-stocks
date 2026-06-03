@@ -52,6 +52,8 @@ env:
   FINNHUB_API_KEY:             ${{ secrets.FINNHUB_API_KEY }}
   GROQ_API_KEY:                ${{ secrets.GROQ_API_KEY }}
   GEMINI_API_KEY:              ${{ secrets.GEMINI_API_KEY }}
+  CEREBRAS_API_KEY:            ${{ secrets.CEREBRAS_API_KEY }}
+  NVIDIA_API_KEY:              ${{ secrets.NVIDIA_API_KEY }}
   TIINGO_API_KEY:              ${{ secrets.TIINGO_API_KEY }}
 
 jobs:

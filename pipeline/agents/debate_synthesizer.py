@@ -34,6 +34,7 @@ from config import (  # noqa: E402
     GEMINI_API_KEY, GROQ_API_KEY, SUPABASE_SERVICE_KEY, SUPABASE_URL,
 )
 from supabase import create_client  # noqa: E402
+from llm import complete  # noqa: E402 -- shared provider-waterfall gateway
 
 DEFAULT_N    = 30
 RANK_SOURCE  = "midday"        # which ranked_focus_list run to read
@@ -309,46 +310,11 @@ thesis. Format each as its own line starting with "- "."""
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# LLM generation -- Groq, then Gemini fallback
+# LLM generation -- shared gateway (Cerebras -> Groq -> NVIDIA -> Gemini)
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _try_groq(prompt: str) -> str | None:
-    if not GROQ_API_KEY:
-        return None
-    try:
-        from groq import Groq
-        resp = Groq(api_key=GROQ_API_KEY).chat.completions.create(
-            model=GROQ_MODEL,
-            messages=[{"role": "system", "content": _SYSTEM},
-                      {"role": "user", "content": prompt}],
-            temperature=0.5, max_tokens=1600)
-        return (resp.choices[0].message.content or "").strip() or None
-    except Exception as exc:
-        log.warning("Groq failed: %s -- trying Gemini", exc)
-        return None
-
-
-def _try_gemini(prompt: str) -> str | None:
-    if not GEMINI_API_KEY:
-        return None
-    try:
-        import google.generativeai as genai
-        genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel(GEMINI_MODEL, system_instruction=_SYSTEM)
-        return (model.generate_content(prompt).text or "").strip() or None
-    except Exception as exc:
-        log.warning("Gemini fallback failed: %s", exc)
-        return None
-
-
 def _generate(prompt: str) -> tuple[str | None, str]:
-    text = _try_groq(prompt)
-    if text:
-        return text, "groq"
-    text = _try_gemini(prompt)
-    if text:
-        return text, "gemini"
-    return None, "none"
+    return complete(prompt, system=_SYSTEM, temperature=0.5, max_tokens=1600)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

@@ -180,11 +180,19 @@ See `.env.local.example` for all required variables.
 |----------|-------------|
 | `NEXT_PUBLIC_SUPABASE_URL` | Same as above |
 | `SUPABASE_SERVICE_ROLE_KEY` | Same as above |
-| `GROQ_API_KEY` | Groq LLM inference |
-| `GEMINI_API_KEY` | Google Gemini LLM inference |
+| `GROQ_API_KEY` | Groq LLM inference (gateway provider) |
+| `GEMINI_API_KEY` | Google Gemini LLM inference (gateway provider) |
+| `CEREBRAS_API_KEY` | Cerebras Cloud LLM inference (gateway provider; optional) |
+| `NVIDIA_API_KEY` | NVIDIA NIM LLM inference (gateway provider; optional) |
 | `FINNHUB_API_KEY` | Finnhub market data |
 | `API_NINJAS_KEY` | API Ninjas (earnings transcripts — note: free tier no longer includes the transcripts endpoint; kept here in case the plan is upgraded) |
 | `DATABASE_URL` | Direct Postgres URL (session pooler) for `pipeline/apply_migration.py` |
+
+## LLM gateway (`pipeline/llm.py`)
+
+Every agent generates text through one shared `complete(prompt, system, temperature, max_tokens, json_mode)` call instead of rolling its own provider logic. It runs a **quota-aware waterfall**: `cerebras → groq → nvidia → gemini`. On a 429 / quota error a provider is disabled for the rest of the process and the next one takes over; a provider with no API key is skipped. All providers serve the same `llama-3.3-70b` except Gemini, so output stays reproducible regardless of who answered.
+
+**Why:** a single deep scan can exhaust one free tier's daily token budget (this took the critic agent down in June 2026). Fanning the same workload across several free providers multiplies the effective daily budget and removes the single point of failure. Add a provider in one place (`_providers()`). For production reliability, a paid tier (e.g. Groq Dev) is still recommended as the primary; the free chain is then insurance. Refactored agents: catalyst, smart_money_intel, debate_synthesizer, critic_agent (daily scan) + multibagger deep_research. (`conviction_grader` is rule-based — no LLM. `crowd_intelligence` keeps its own fallback.)
 
 ## Data integrity principles
 

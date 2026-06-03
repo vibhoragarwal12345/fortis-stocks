@@ -51,6 +51,7 @@ from config import (  # noqa: E402
     FINNHUB_API_KEY, GROQ_API_KEY, SUPABASE_SERVICE_KEY, SUPABASE_URL,
 )
 from supabase import create_client  # noqa: E402
+from llm import complete  # noqa: E402 -- shared provider-waterfall gateway
 
 HTTP_TIMEOUT       = 20
 GROQ_MODEL         = "llama-3.3-70b-versatile"
@@ -433,28 +434,16 @@ def _template_description(ticker: str, cat: dict) -> str:
             f"aggregate signal strength rather than one discrete event.")
 
 
-def _groq_description(ticker: str, cat: dict) -> str | None:
-    if not GROQ_API_KEY:
-        return None
-    try:
-        from groq import Groq
-        client = Groq(api_key=GROQ_API_KEY)
-        prompt = (f"Stock: {ticker}\nCatalyst category: {cat['category']}\n"
-                  f"Supporting data: {cat['data']}\n\n"
-                  f"Write the catalyst description.")
-        resp = client.chat.completions.create(
-            model=GROQ_MODEL,
-            messages=[{"role": "system", "content": _GROQ_SYSTEM},
-                      {"role": "user", "content": prompt}],
-            temperature=0.3, max_tokens=120)
-        return (resp.choices[0].message.content or "").strip() or None
-    except Exception as exc:
-        log.debug("Groq description failed for %s: %s", ticker, exc)
-        return None
+def _llm_description(ticker: str, cat: dict) -> str | None:
+    prompt = (f"Stock: {ticker}\nCatalyst category: {cat['category']}\n"
+              f"Supporting data: {cat['data']}\n\n"
+              f"Write the catalyst description.")
+    text, _ = complete(prompt, system=_GROQ_SYSTEM, temperature=0.3, max_tokens=120)
+    return text
 
 
 def describe(ticker: str, cat: dict) -> str:
-    return _groq_description(ticker, cat) or _template_description(ticker, cat)
+    return _llm_description(ticker, cat) or _template_description(ticker, cat)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
