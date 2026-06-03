@@ -6,7 +6,7 @@ Python data pipeline that ingests market data, filings, and news into the Supaba
 
 ```bash
 cd pipeline
-python3.11 -m venv venv
+python3.12 -m venv venv
 source venv/bin/activate   # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
@@ -19,7 +19,7 @@ Create a `.env` file at the **repo root** (not inside `/pipeline`) with all requ
 pipeline/
 ├── config.py           # Loads .env, exports all constants
 ├── requirements.txt
-├── .python-version     # 3.11
+├── .python-version     # 3.12
 ├── data/
 │   ├── tickers.csv     # Ticker universe (populated by sp1500.py)
 │   └── sp1500.py       # Scrapes S&P 1500 constituents from Wikipedia

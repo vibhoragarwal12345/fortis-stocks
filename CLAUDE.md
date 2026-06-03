@@ -39,7 +39,7 @@ pipeline/scan/run_scan.py                    every 2h, weekdays
 - **Package Manager**: npm
 
 ### Data Pipeline (`/pipeline`)
-- **Language**: Python 3.11
+- **Language**: Python 3.12
 - **Data sources**: yfinance (prices), Finnhub (fundamentals), SEC EDGAR (filings), feedparser (news)
 - **AI / ML**: Groq (LLM inference), Gemini (LLM inference), HuggingFace Transformers (embeddings)
 - **Virtual env**: `pipeline/venv/` (gitignored)
@@ -63,7 +63,7 @@ fortis-stocks/
 └── pipeline/                   # Python data pipeline
     ├── config.py               # Loads .env, exports all API key constants
     ├── requirements.txt
-    ├── .python-version         # 3.11
+    ├── .python-version         # 3.12
     ├── data/
     │   ├── tickers.csv         # Ticker universe
     │   └── sp1500.py           # Populates tickers.csv from Wikipedia

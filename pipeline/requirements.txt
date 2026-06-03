@@ -1,34 +1,486 @@
-supabase
-python-dotenv
-yfinance
-pandas-ta
-requests
-feedparser
-aiohttp
-asyncio
-groq
-google-generativeai
-transformers
-torch
-sentence-transformers
-spacy
-faiss-cpu
-pyarrow
-pandas
-numpy
-sec-edgar-downloader
-# Quantitative Models Desk
-scipy
-statsmodels
-arch
-riskfolio-lib
-cvxpy
-pyfolio
-# Tier-4 audio transcription (earnings-call webcasts).
-# whisper.cpp is the primary backend (built via pipeline/quant/install_whisper.sh);
-# openai-whisper is the pure-Python fallback. imageio-ffmpeg supplies a bundled
-# ffmpeg binary when the system has none.
-openai-whisper
-imageio-ffmpeg
-# Step 7.1 Report Composer -- HTML templating for the three daily briefs.
-jinja2
+aiohappyeyeballs==2.6.2
+    # via aiohttp
+aiohttp==3.14.0
+    # via -r D:/fortis-stocks/pipeline/requirements.in
+aiosignal==1.4.0
+    # via aiohttp
+annotated-doc==0.0.4
+    # via typer
+annotated-types==0.7.0
+    # via pydantic
+anyio==4.13.0
+    # via
+    #   groq
+    #   httpx
+arch==8.0.0
+    # via -r D:/fortis-stocks/pipeline/requirements.in
+attrs==26.1.0
+    # via aiohttp
+beautifulsoup4==4.14.3
+    # via yfinance
+blis==1.3.3
+    # via thinc
+cachetools==6.2.6
+    # via pyiceberg
+catalogue==2.0.10
+    # via
+    #   spacy
+    #   srsly
+    #   thinc
+certifi==2026.5.20
+    # via
+    #   curl-cffi
+    #   httpcore
+    #   httpx
+    #   requests
+cffi==2.0.0
+    # via
+    #   cryptography
+    #   curl-cffi
+charset-normalizer==3.4.7
+    # via requests
+click==8.4.1
+    # via
+    #   huggingface-hub
+    #   pyiceberg
+    #   typer
+cloudpathlib==0.24.0
+    # via weasel
+colorama==0.4.6
+    # via
+    #   click
+    #   tqdm
+    #   wasabi
+confection==1.3.3
+    # via
+    #   spacy
+    #   thinc
+    #   weasel
+cryptography==48.0.0
+    # via
+    #   google-auth
+    #   pyjwt
+curl-cffi==0.15.0
+    # via yfinance
+cymem==2.0.13
+    # via
+    #   preshed
+    #   spacy
+    #   thinc
+deprecation==2.1.0
+    # via
+    #   postgrest
+    #   storage3
+distro==1.9.0
+    # via groq
+faiss-cpu==1.14.2
+    # via -r D:/fortis-stocks/pipeline/requirements.in
+feedparser==6.0.12
+    # via -r D:/fortis-stocks/pipeline/requirements.in
+filelock==3.29.0
+    # via
+    #   huggingface-hub
+    #   torch
+frozenlist==1.8.0
+    # via
+    #   aiohttp
+    #   aiosignal
+fsspec==2026.4.0
+    # via
+    #   huggingface-hub
+    #   pyiceberg
+    #   torch
+google-ai-generativelanguage==0.6.15
+    # via google-generativeai
+google-api-core==2.30.3
+    # via
+    #   google-ai-generativelanguage
+    #   google-api-python-client
+    #   google-generativeai
+google-api-python-client==2.197.0
+    # via google-generativeai
+google-auth==2.53.0
+    # via
+    #   google-ai-generativelanguage
+    #   google-api-core
+    #   google-api-python-client
+    #   google-auth-httplib2
+    #   google-generativeai
+google-auth-httplib2==0.4.0
+    # via google-api-python-client
+google-generativeai==0.8.6
+    # via -r D:/fortis-stocks/pipeline/requirements.in
+googleapis-common-protos==1.75.0
+    # via
+    #   google-api-core
+    #   grpcio-status
+groq==1.4.0
+    # via -r D:/fortis-stocks/pipeline/requirements.in
+grpcio==1.81.0
+    # via
+    #   google-api-core
+    #   grpcio-status
+grpcio-status==1.71.2
+    # via google-api-core
+h11==0.16.0
+    # via httpcore
+h2==4.3.0
+    # via httpx
+hf-xet==1.5.0
+    # via huggingface-hub
+hpack==4.1.0
+    # via h2
+httpcore==1.0.9
+    # via httpx
+httplib2==0.31.2
+    # via
+    #   google-api-python-client
+    #   google-auth-httplib2
+httpx==0.28.1
+    # via
+    #   groq
+    #   huggingface-hub
+    #   postgrest
+    #   storage3
+    #   supabase
+    #   supabase-auth
+    #   supabase-functions
+    #   weasel
+huggingface-hub==1.17.0
+    # via
+    #   sentence-transformers
+    #   tokenizers
+    #   transformers
+hyperframe==6.1.0
+    # via h2
+idna==3.18
+    # via
+    #   anyio
+    #   httpx
+    #   requests
+    #   yarl
+imageio-ffmpeg==0.6.0
+    # via -r D:/fortis-stocks/pipeline/requirements.in
+jinja2==3.1.6
+    # via
+    #   -r D:/fortis-stocks/pipeline/requirements.in
+    #   spacy
+    #   torch
+joblib==1.5.3
+    # via scikit-learn
+llvmlite==0.44.0
+    # via numba
+markdown-it-py==4.2.0
+    # via rich
+markupsafe==3.0.3
+    # via jinja2
+mdurl==0.1.2
+    # via markdown-it-py
+mmh3==5.2.1
+    # via pyiceberg
+more-itertools==11.1.0
+    # via openai-whisper
+mpmath==1.3.0
+    # via sympy
+multidict==6.7.1
+    # via
+    #   aiohttp
+    #   yarl
+multitasking==0.0.13
+    # via yfinance
+murmurhash==1.0.15
+    # via
+    #   preshed
+    #   spacy
+    #   thinc
+narwhals==2.22.0
+    # via scikit-learn
+networkx==3.6.1
+    # via torch
+numba==0.61.2
+    # via
+    #   openai-whisper
+    #   pandas-ta
+numpy==2.2.6
+    # via
+    #   -r D:/fortis-stocks/pipeline/requirements.in
+    #   arch
+    #   blis
+    #   faiss-cpu
+    #   numba
+    #   openai-whisper
+    #   pandas
+    #   pandas-ta
+    #   patsy
+    #   scikit-learn
+    #   scipy
+    #   sentence-transformers
+    #   spacy
+    #   statsmodels
+    #   thinc
+    #   transformers
+    #   yfinance
+openai-whisper==20250625
+    # via -r D:/fortis-stocks/pipeline/requirements.in
+packaging==26.2
+    # via
+    #   arch
+    #   deprecation
+    #   faiss-cpu
+    #   huggingface-hub
+    #   spacy
+    #   statsmodels
+    #   thinc
+    #   transformers
+    #   weasel
+pandas==2.3.3
+    # via
+    #   -r D:/fortis-stocks/pipeline/requirements.in
+    #   arch
+    #   pandas-ta
+    #   statsmodels
+    #   yfinance
+pandas-ta==0.4.71b0
+    # via -r D:/fortis-stocks/pipeline/requirements.in
+patsy==1.0.2
+    # via statsmodels
+peewee==4.0.6
+    # via yfinance
+platformdirs==4.10.0
+    # via yfinance
+postgrest==2.30.1
+    # via supabase
+preshed==3.0.13
+    # via
+    #   spacy
+    #   thinc
+propcache==0.5.2
+    # via
+    #   aiohttp
+    #   yarl
+proto-plus==1.28.0
+    # via
+    #   google-ai-generativelanguage
+    #   google-api-core
+protobuf==5.29.6
+    # via
+    #   google-ai-generativelanguage
+    #   google-api-core
+    #   google-generativeai
+    #   googleapis-common-protos
+    #   grpcio-status
+    #   proto-plus
+    #   yfinance
+pyarrow==24.0.0
+    # via -r D:/fortis-stocks/pipeline/requirements.in
+pyasn1==0.6.3
+    # via pyasn1-modules
+pyasn1-modules==0.4.2
+    # via google-auth
+pycparser==3.0
+    # via cffi
+pydantic==2.13.4
+    # via
+    #   google-generativeai
+    #   groq
+    #   postgrest
+    #   pyiceberg
+    #   realtime
+    #   spacy
+    #   storage3
+    #   supabase-auth
+    #   thinc
+    #   weasel
+pydantic-core==2.46.4
+    # via pydantic
+pygments==2.20.0
+    # via rich
+pyiceberg==0.11.1
+    # via storage3
+pyjwt==2.13.0
+    # via supabase-auth
+pyparsing==3.3.2
+    # via
+    #   httplib2
+    #   pyiceberg
+pyrate-limiter==4.2.0
+    # via sec-edgar-downloader
+pyroaring==1.1.0
+    # via pyiceberg
+python-dateutil==2.9.0.post0
+    # via
+    #   pandas
+    #   strictyaml
+python-dotenv==1.2.2
+    # via -r D:/fortis-stocks/pipeline/requirements.in
+pytz==2026.2
+    # via
+    #   pandas
+    #   yfinance
+pyyaml==6.0.3
+    # via
+    #   huggingface-hub
+    #   transformers
+realtime==2.30.1
+    # via supabase
+regex==2026.5.9
+    # via
+    #   tiktoken
+    #   transformers
+requests==2.34.2
+    # via
+    #   -r D:/fortis-stocks/pipeline/requirements.in
+    #   google-api-core
+    #   pyiceberg
+    #   sec-edgar-downloader
+    #   spacy
+    #   tiktoken
+    #   yfinance
+rich==14.3.4
+    # via
+    #   curl-cffi
+    #   pyiceberg
+    #   typer
+safetensors==0.7.0
+    # via transformers
+scikit-learn==1.9.0
+    # via sentence-transformers
+scipy==1.17.1
+    # via
+    #   -r D:/fortis-stocks/pipeline/requirements.in
+    #   arch
+    #   scikit-learn
+    #   sentence-transformers
+    #   statsmodels
+sec-edgar-downloader==5.1.0
+    # via -r D:/fortis-stocks/pipeline/requirements.in
+sentence-transformers==5.5.1
+    # via -r D:/fortis-stocks/pipeline/requirements.in
+setuptools==81.0.0
+    # via
+    #   spacy
+    #   thinc
+    #   torch
+sgmllib3k==1.0.0
+    # via feedparser
+shellingham==1.5.4
+    # via typer
+six==1.17.0
+    # via python-dateutil
+smart-open==7.6.1
+    # via weasel
+sniffio==1.3.1
+    # via groq
+soupsieve==2.8.4
+    # via beautifulsoup4
+spacy==3.8.14
+    # via -r D:/fortis-stocks/pipeline/requirements.in
+spacy-legacy==3.0.12
+    # via spacy
+spacy-loggers==1.0.5
+    # via spacy
+srsly==2.5.3
+    # via
+    #   spacy
+    #   thinc
+    #   weasel
+statsmodels==0.14.6
+    # via
+    #   -r D:/fortis-stocks/pipeline/requirements.in
+    #   arch
+storage3==2.30.1
+    # via supabase
+strenum==0.4.15
+    # via supabase-functions
+strictyaml==1.7.3
+    # via pyiceberg
+supabase==2.30.1
+    # via -r D:/fortis-stocks/pipeline/requirements.in
+supabase-auth==2.30.1
+    # via supabase
+supabase-functions==2.30.1
+    # via supabase
+sympy==1.14.0
+    # via torch
+tenacity==9.1.4
+    # via pyiceberg
+thinc==8.3.13
+    # via spacy
+threadpoolctl==3.6.0
+    # via scikit-learn
+tiktoken==0.13.0
+    # via openai-whisper
+tokenizers==0.22.2
+    # via transformers
+torch==2.12.0
+    # via
+    #   -r D:/fortis-stocks/pipeline/requirements.in
+    #   openai-whisper
+    #   sentence-transformers
+tqdm==4.67.3
+    # via
+    #   google-generativeai
+    #   huggingface-hub
+    #   openai-whisper
+    #   pandas-ta
+    #   sentence-transformers
+    #   spacy
+    #   transformers
+transformers==5.9.0
+    # via
+    #   -r D:/fortis-stocks/pipeline/requirements.in
+    #   sentence-transformers
+typer==0.25.1
+    # via
+    #   huggingface-hub
+    #   spacy
+    #   transformers
+    #   weasel
+typing-extensions==4.15.0
+    # via
+    #   aiohttp
+    #   aiosignal
+    #   anyio
+    #   beautifulsoup4
+    #   google-generativeai
+    #   groq
+    #   grpcio
+    #   huggingface-hub
+    #   pydantic
+    #   pydantic-core
+    #   realtime
+    #   sentence-transformers
+    #   torch
+    #   typing-inspection
+typing-inspection==0.4.2
+    # via pydantic
+tzdata==2026.2
+    # via pandas
+uritemplate==4.2.0
+    # via google-api-python-client
+urllib3==2.7.0
+    # via requests
+wasabi==1.1.3
+    # via
+    #   spacy
+    #   thinc
+    #   weasel
+weasel==1.0.0
+    # via spacy
+websockets==15.0.1
+    # via
+    #   realtime
+    #   yfinance
+wrapt==2.2.1
+    # via smart-open
+yarl==1.24.2
+    # via
+    #   aiohttp
+    #   postgrest
+    #   storage3
+    #   supabase
+    #   supabase-functions
+yfinance==1.4.1
+    # via -r D:/fortis-stocks/pipeline/requirements.in
+zstandard==0.25.0
+    # via pyiceberg

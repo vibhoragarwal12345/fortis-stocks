@@ -1,0 +1,58 @@
+# Source dependency list for the Fortis pipeline.
+#
+# This is the file humans edit. The pinned, fully-resolved lockfile that CI
+# actually installs is `requirements.txt`, generated from this file with:
+#
+#     uv pip compile pipeline/requirements.in -o pipeline/requirements.txt
+#
+# Never edit requirements.txt by hand. Pinning is mandatory: an unpinned build
+# re-rolls every dependency on every run, which is exactly how the May-2026
+# outage happened (pandas-ta shipped a 3.12-only release and the unpinned
+# Python-3.11 install could no longer find any compatible version).
+
+# --- Core data + infra ---
+supabase
+python-dotenv
+requests
+pyarrow
+jinja2
+
+# --- Market data / ingestion ---
+yfinance
+feedparser
+aiohttp
+sec-edgar-downloader
+
+# --- Numeric stack ---
+# pandas<3 / numpy<3: stay off bleeding-edge majors (pandas 3.0 / a future
+# numpy 3) that the quant libraries below are not yet validated against.
+numpy<3
+pandas<3
+scipy
+pandas-ta
+
+# --- Quantitative Models Desk ---
+statsmodels
+arch
+
+# --- LLM / ML ---
+groq
+google-generativeai
+transformers
+torch
+sentence-transformers
+spacy
+faiss-cpu
+
+# --- Tier-4 audio transcription (earnings-call webcasts) ---
+# whisper.cpp is the primary backend (built via pipeline/quant/install_whisper.sh);
+# openai-whisper is the pure-Python fallback. imageio-ffmpeg supplies a bundled
+# ffmpeg binary when the system has none.
+openai-whisper
+imageio-ffmpeg
+
+# Removed in the May-2026 dependency repair:
+#   asyncio        -- stdlib since Py3.4; the PyPI backport is a dead Py3.3 relic
+#   pyfolio        -- unmaintained, unbuildable on modern Python, imported nowhere
+#   riskfolio-lib  -- imported nowhere
+#   cvxpy          -- only pulled in transitively by riskfolio-lib, imported nowhere
