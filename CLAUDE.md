@@ -1,29 +1,31 @@
 # Fortis Stock Intelligence — CLAUDE.md
 
 ## Project Purpose
-Stock intelligence platform for **The Fortis Agency** — a login-only research surface for licensed advisors. We scan the full liquid US market every 2 hours during market hours and surface the highest-scoring opportunities with deep analysis.
+Stock intelligence platform for **The Fortis Agency** — a login-only research surface for licensed advisors. We scan the full liquid US market twice each weekday and surface the highest-scoring opportunities with deep analysis.
 
 ## Architecture (post-lean-rewrite, May 2026)
 
-**One sentence:** every 2 hours, run a two-speed funnel over ~3,300 liquid US common stocks; the dashboard reads the latest scan.
+**One sentence:** twice each weekday, run a two-speed funnel over ~3,300 liquid US common stocks; the dashboard reads the latest scan.
 
 ```
 pipeline/data/build_full_universe.py        weekly
   → pipeline/data/full_universe.csv          ~3,300 tickers ($1M ADV floor)
 
-pipeline/scan/run_scan.py                    every 2h, weekdays
-  Layer 1   layer1_fast_scan   pure math on EVERY ticker      ~2-3 min
-  Layer 2   layer2_rank        composite score, top 80         ~10 s
-  Layer 3   catalyst, smart_money_intel, debate, critic       ~15-20 min
-  Layer 4   conviction_grader + factcheck                      ~2-3 min
+pipeline/scan/run_scan.py                    2x/weekday (pre-market + midday)
+  Layer 1   layer1_fast_scan   pure math on EVERY ticker      ~3-4 min
+  Layer 2   layer2_rank        composite score, top 30         ~10 s
+  Layer 3   catalyst, smart_money_intel, debate, critic       ~20 min (top 30)
+  Layer 4   conviction_grader + factcheck                      ~5 s
 
   → market_scans         row per scan; dashboard reads LATEST status='complete'
-  → scan_results         per-ticker Layer-1 metrics + composite_score
-  → ranked_focus_list    top 80 with deep analysis + A/B/C grade
+  → scan_results         per-ticker Layer-1 metrics + composite_score (ALL ~3,300)
+  → ranked_focus_list    top 30 with deep analysis + A/B/C grade
                          (Layer 2 stamps run_type='midday' so the existing
                           deep agents pick them up unmodified; scan_id is
                           the real lineage key)
 ```
+
+**Cadence & cost.** The slow part is Layer 3 — `critic_agent` runs ~30s/ticker, so deep analysis is capped at the top 30 (not 80) to fit the workflow timeout and the GitHub Actions free 2,000-min/month budget. At ~30 min/run × 2 runs/weekday that is ~1,400 min/month. Raising the deep-analysis count or the cadence requires either a paid Actions plan or speeding up `critic_agent`.
 
 **No email. No portfolios. No positions.** All gone in migration 044 (lean rewrite). The product is login-only research; we hold no user-held data.
 

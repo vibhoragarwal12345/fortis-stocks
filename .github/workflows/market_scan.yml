@@ -1,21 +1,21 @@
-name: Market scan · every 2 hours
+name: Market scan · twice daily
 
-# Lean rewrite PART 4. Runs the two-speed funnel every 2 hours during
-# market hours plus one pre-market and one post-close pass.
+# Lean rewrite PART 4. Runs the two-speed funnel twice each weekday:
+# a pre-market pass and a midday pass.
 #
 # Cron is UTC; GitHub Actions doesn't honour DST. We pick year-round UTC
 # slots tied to EST (UTC-5). During EDT (UTC-4) every run shifts one
-# wall-clock hour later -- acceptable for a 2-hour cadence.
+# wall-clock hour later -- acceptable for this cadence.
 #
 #     12:00 UTC  =  07:00 ET (EST)  / 08:00 ET (EDT)   pre-market
-#     14:30 UTC  =  09:30 ET (EST)  / 10:30 ET (EDT)   market open
-#     16:30 UTC  =  11:30 ET (EST)  / 12:30 ET (EDT)   late morning
-#     18:30 UTC  =  13:30 ET (EST)  / 14:30 ET (EDT)   early afternoon
-#     20:30 UTC  =  15:30 ET (EST)  / 16:30 ET (EDT)   close approach
-#     22:00 UTC  =  17:00 ET (EST)  / 18:00 ET (EDT)   post-close
+#     16:30 UTC  =  11:30 ET (EST)  / 12:30 ET (EDT)   midday
 #
-# 6 runs/weekday × ~25 min/run (layers 1-4) ≈ 12h compute/week.
-# Well inside the GitHub Actions free 2000-min/month allowance.
+# Budget: Layer 1 scores the full ~3,300-name universe; the slow LLM
+# agents (Layer 3) + grader (Layer 4) run on the top 30 only. That is
+# ~30 min/run, so 2 runs/weekday ≈ 1,400 Actions-min/month -- inside the
+# free 2,000-min/month allowance with headroom for the other workflows.
+# (critic_agent dominates Layer 3 at ~30s/ticker; deep-analysing 80
+# names would blow both the timeout and the free-tier budget.)
 #
 # Layer 3 (LLM-heavy) + Layer 4 are enabled. Layer 2 stamps the
 # shortlist with run_type='midday' so the unmodified deep agents pick
@@ -24,11 +24,7 @@ name: Market scan · every 2 hours
 on:
   schedule:
     - cron: "0 12 * * 1-5"   # pre-market
-    - cron: "30 14 * * 1-5"  # open
-    - cron: "30 16 * * 1-5"  # late morning
-    - cron: "30 18 * * 1-5"  # early afternoon
-    - cron: "30 20 * * 1-5"  # close approach
-    - cron: "0 22 * * 1-5"   # post-close
+    - cron: "30 16 * * 1-5"  # midday
   workflow_dispatch:
     inputs:
       scan_type:
@@ -62,7 +58,7 @@ jobs:
   scan:
     name: "Run two-speed funnel"
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-pipeline
@@ -89,5 +85,5 @@ jobs:
           fi
           python -m pipeline.scan.run_scan \
             --scan-type ${{ steps.derive.outputs.scan_type }} \
-            --top-n 80 \
+            --top-n 30 \
             $SAMPLE_ARG

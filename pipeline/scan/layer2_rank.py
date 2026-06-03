@@ -189,7 +189,7 @@ def rank_and_persist(scan_id: int, top_n: int = 80) -> int:
             focus_rows[i : i + 200],
             on_conflict="run_date,run_type,ticker",
         ).execute()
-    log.info("Wrote %d ranked_focus_list rows (run_type='scan')", len(focus_rows))
+    log.info("Wrote %d ranked_focus_list rows (run_type='midday')", len(focus_rows))
     return len(top)
 
 
