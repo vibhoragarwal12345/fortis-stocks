@@ -12,14 +12,18 @@ WHY: a single full deep scan can exhaust one free tier's daily token budget
 same workload across several free providers multiplies the effective daily
 budget and removes the single point of failure.
 
-PROVIDER ORDER (most-generous / fastest free tier first):
+PROVIDER ORDER:
 
-    cerebras  ->  groq  ->  nvidia  ->  gemini
+    groq  ->  cerebras  ->  nvidia  ->  gemini
 
-All of them serve the SAME ``llama-3.3-70b`` except Gemini, so critiques stay
-reproducible no matter which provider answered. Cerebras / Groq / NVIDIA are
-all OpenAI-compatible (same ``/chat/completions`` shape) and go through the
-``openai`` SDK by swapping ``base_url``; Gemini uses its own SDK and sits last
+Groq (the tuned default) leads; Cerebras -- by far the largest free quota --
+is the overflow that absorbs heavy load once Groq's daily cap drains.
+
+Groq and NVIDIA serve ``llama-3.3-70b``; Cerebras serves ``gpt-oss-120b``
+(it no longer offers Llama) and Gemini serves ``gemini-2.5-flash``. Cerebras /
+Groq / NVIDIA are all OpenAI-compatible (same ``/chat/completions`` shape) and
+go through the ``openai`` SDK by swapping ``base_url``; Gemini uses its own SDK
+and sits last
 (its free tier may train on inputs -- keep proprietary theses off it when a
 peer is available).
 
@@ -60,10 +64,14 @@ class _Provider:
 def _providers() -> list[_Provider]:
     """Build the waterfall from whatever API keys are configured."""
     candidates = [
-        _Provider("cerebras", "openai", CEREBRAS_API_KEY,
-                  "llama-3.3-70b", "https://api.cerebras.ai/v1"),
+        # Groq (llama) is the tuned default and serves short-output tasks
+        # (e.g. catalyst's 120-token calls) that the gpt-oss reasoning model
+        # can't. Cerebras has by far the biggest free quota, so it sits second
+        # as the overflow that absorbs heavy load once Groq's daily cap drains.
         _Provider("groq", "openai", GROQ_API_KEY,
                   "llama-3.3-70b-versatile", "https://api.groq.com/openai/v1"),
+        _Provider("cerebras", "openai", CEREBRAS_API_KEY,
+                  "gpt-oss-120b", "https://api.cerebras.ai/v1"),
         _Provider("nvidia", "openai", NVIDIA_API_KEY,
                   "meta/llama-3.3-70b-instruct", "https://integrate.api.nvidia.com/v1"),
         _Provider("gemini", "gemini", GEMINI_API_KEY,
