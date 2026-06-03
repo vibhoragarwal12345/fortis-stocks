@@ -110,7 +110,13 @@ def run(
     log.info("Opened market_scans id=%d (%s)", scan_id, scan_type)
 
     notes: list[str] = []
-    failures = 0
+    # Layers 1-2 are the pure-math core: without them the scan has no data,
+    # so their failure is fatal (status='failed'). Layers 3-4 are LLM-driven
+    # enrichments (catalyst/smart-money/debate/critic/grade); a transient LLM
+    # outage or rate-limit there must NOT blank the dashboard, so those
+    # failures are recorded in `notes` but the scan still completes.
+    critical_failures = 0
+    soft_failures = 0
 
     # ── Layer 1 ─────────────────────────────────────────────────────────
     t0 = time.time()
@@ -119,7 +125,7 @@ def run(
         args += ["--sample", str(sample)]
     ok, msg = _run_step("Layer 1 fast scan", [PY, *args])
     if not ok:
-        failures += 1
+        critical_failures += 1
         notes.append(msg)
     layer1_seconds = int(time.time() - t0)
 
@@ -146,7 +152,7 @@ def run(
     ]
     ok, msg = _run_step("Layer 2 rank", [PY, *args])
     if not ok:
-        failures += 1
+        critical_failures += 1
         notes.append(msg)
 
     cnt = (
@@ -182,8 +188,8 @@ def run(
         ]:
             ok, msg = _run_step(f"Layer 3: {name}", cmd)
             if not ok:
-                failures += 1
-                notes.append(msg)
+                soft_failures += 1
+                notes.append(f"[non-fatal] {msg}")
         db.table("market_scans").update({
             "layer3_completed_at": _now(),
         }).eq("id", scan_id).execute()
@@ -195,8 +201,8 @@ def run(
             [PY, "pipeline/agents/conviction_grader.py", "scan"],
         )
         if not ok:
-            failures += 1
-            notes.append(msg)
+            soft_failures += 1
+            notes.append(f"[non-fatal] {msg}")
 
     # Count final graded rows.
     cnt = (
@@ -209,7 +215,17 @@ def run(
     )
     graded = int(getattr(cnt, "count", 0) or 0)
 
-    status = "complete" if failures == 0 else "failed"
+    # The scan is 'complete' as long as the pure-math core (Layers 1-2)
+    # succeeded. LLM-enrichment failures (Layers 3-4) are surfaced in notes
+    # and the logs but do not invalidate the scan or fail the CI job --
+    # otherwise a single rate-limited agent would hide a full, fresh scan
+    # from the dashboard.
+    status = "complete" if critical_failures == 0 else "failed"
+    if soft_failures:
+        log.warning(
+            "%d Layer-3/4 enrichment step(s) degraded (e.g. LLM rate-limit); "
+            "scan still marked '%s'. See notes.", soft_failures, status,
+        )
     db.table("market_scans").update({
         "status":               status,
         "graded_count":         graded,
@@ -220,10 +236,12 @@ def run(
 
     total = time.time() - t_total
     log.info(
-        "Scan id=%d %s: scanned=%d shortlist=%d graded=%d in %.0fs (%d failures)",
-        scan_id, status, tickers_scanned, shortlist, graded, total, failures,
+        "Scan id=%d %s: scanned=%d shortlist=%d graded=%d in %.0fs "
+        "(%d critical, %d soft failures)",
+        scan_id, status, tickers_scanned, shortlist, graded, total,
+        critical_failures, soft_failures,
     )
-    return 0 if failures == 0 else 1
+    return 0 if critical_failures == 0 else 1
 
 
 def main() -> int:

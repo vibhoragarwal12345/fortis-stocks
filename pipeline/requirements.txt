@@ -170,6 +170,8 @@ joblib==1.5.3
     # via scikit-learn
 llvmlite==0.44.0
     # via numba
+lxml==6.1.1
+    # via -r D:/fortis-stocks/pipeline/requirements.in
 markdown-it-py==4.2.0
     # via rich
 markupsafe==3.0.3

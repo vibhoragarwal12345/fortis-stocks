@@ -22,6 +22,7 @@ yfinance
 feedparser
 aiohttp
 sec-edgar-downloader
+lxml          # BeautifulSoup parser backend; smart_money_intel scrapes with BeautifulSoup(..., "lxml")
 
 # --- Numeric stack ---
 # pandas<3 / numpy<3: stay off bleeding-edge majors (pandas 3.0 / a future
