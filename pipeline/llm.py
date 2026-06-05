@@ -40,6 +40,7 @@ USAGE
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass
 
 from config import (  # noqa: E402
@@ -80,18 +81,31 @@ def _providers() -> list[_Provider]:
     return [p for p in candidates if p.api_key]
 
 
-# Providers that returned a quota / rate-limit error are skipped for the rest
-# of THIS process (one scan run / one agent invocation). A fresh CI job starts
-# with a clean slate.
+# Providers that hit a *daily* cap are skipped for the rest of THIS process
+# (one scan run / one agent subprocess). A fresh CI job starts clean.
 _exhausted: set[str] = set()
 
+# Per-call retry budget for transient per-minute rate-limits (HTTP 429 without
+# a daily-cap signal). Cerebras free tier is ~30 req/min, so a short backoff
+# lets it keep carrying load instead of being dropped for the whole run.
+_MAX_RETRIES = 3
+_BACKOFF_BASE_SEC = 4
 
-def _is_quota_error(exc: Exception) -> bool:
+
+def _is_daily_cap(exc: Exception) -> bool:
+    """A hard cap that won't recover within this run -- disable the provider."""
     m = str(exc).lower()
     return any(s in m for s in (
-        "429", "resource_exhausted", "quota",
-        "rate limit", "rate_limit", "too many requests",
+        "per day", "tpd", "rpd", "requests per day", "tokens per day",
+        "daily", "resource_exhausted", "quota",
     ))
+
+
+def _is_rate_limit(exc: Exception) -> bool:
+    """A transient per-minute throttle -- back off and retry the same provider."""
+    m = str(exc).lower()
+    return ("429" in m or "too many requests" in m
+            or "rate limit" in m or "rate_limit" in m)
 
 
 def _call_openai(p: _Provider, prompt: str, system: str | None,
@@ -147,22 +161,34 @@ def complete(
     for p in providers:
         if p.name in _exhausted:
             continue
-        try:
-            if p.kind == "openai":
-                text = _call_openai(p, prompt, system, temperature, max_tokens, json_mode)
-            else:
-                text = _call_gemini(p, prompt, system, temperature, max_tokens, json_mode)
-            if text:
-                return text, p.name
-            # Empty completion -- treat as a miss and try the next provider.
-            log.debug("LLM %s returned empty -- trying next provider", p.name)
-        except Exception as exc:  # noqa: BLE001 -- providers raise many error types
-            if _is_quota_error(exc):
-                log.warning("LLM %s quota/rate-limit hit -- disabling for the "
-                            "rest of this run", p.name)
-                _exhausted.add(p.name)
-            else:
+        # Per-provider retry loop: a transient per-minute 429 backs off and
+        # retries the SAME provider (so a fast, big-quota provider like
+        # Cerebras keeps carrying load); a daily cap disables it; anything
+        # else falls through to the next provider.
+        for attempt in range(_MAX_RETRIES):
+            try:
+                if p.kind == "openai":
+                    text = _call_openai(p, prompt, system, temperature, max_tokens, json_mode)
+                else:
+                    text = _call_gemini(p, prompt, system, temperature, max_tokens, json_mode)
+                if text:
+                    return text, p.name
+                log.debug("LLM %s returned empty -- trying next provider", p.name)
+                break  # empty completion -- next provider
+            except Exception as exc:  # noqa: BLE001 -- providers raise many error types
+                if _is_daily_cap(exc):
+                    log.warning("LLM %s daily cap hit -- disabling for the rest "
+                                "of this run", p.name)
+                    _exhausted.add(p.name)
+                    break  # next provider
+                if _is_rate_limit(exc) and attempt < _MAX_RETRIES - 1:
+                    wait = _BACKOFF_BASE_SEC * (attempt + 1)
+                    log.info("LLM %s rate-limited (per-minute) -- backing off %ds "
+                             "and retrying", p.name, wait)
+                    time.sleep(wait)
+                    continue  # retry SAME provider
                 log.warning("LLM %s failed: %s -- trying next provider", p.name, exc)
+                break  # next provider (do not disable -- may recover next call)
 
     return None, "none"
 

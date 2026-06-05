@@ -438,7 +438,9 @@ def _llm_description(ticker: str, cat: dict) -> str | None:
     prompt = (f"Stock: {ticker}\nCatalyst category: {cat['category']}\n"
               f"Supporting data: {cat['data']}\n\n"
               f"Write the catalyst description.")
-    text, _ = complete(prompt, system=_GROQ_SYSTEM, temperature=0.3, max_tokens=120)
+    # 512 (not 120): reasoning models in the gateway (e.g. Cerebras gpt-oss)
+    # spend tokens thinking before the answer, so a tight cap yields empty.
+    text, _ = complete(prompt, system=_GROQ_SYSTEM, temperature=0.3, max_tokens=512)
     return text
 
 
