@@ -57,6 +57,18 @@ def _db():
     return create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 
+def _set_scan_state(db, **fields) -> None:
+    """Upsert the singleton scan_state row (id=1) that the dashboard's manual
+    refresh + status polling read. Best-effort: a state-write failure must
+    never crash a scan."""
+    try:
+        fields["id"] = 1
+        fields["updated_at"] = _now()
+        db.table("scan_state").upsert(fields, on_conflict="id").execute()
+    except Exception as exc:  # noqa: BLE001
+        log.warning("scan_state update failed (%s): %s", fields, exc)
+
+
 def _run_step(name: str, cmd: list[str]) -> tuple[bool, str]:
     """Run an external Python step. Returns (ok, summary)."""
     log.info("→ %s", name)
@@ -94,6 +106,17 @@ def run(
 ) -> int:
     db = _db()
     t_total = time.time()
+
+    # Mark the shared scan_state 'running' so the dashboard reflects it
+    # immediately (covers cron runs; the manual trigger endpoint also sets
+    # this before dispatch).
+    _set_scan_state(
+        db,
+        current_status="running",
+        running_since=_now(),
+        triggered_by="manual" if scan_type == "manual" else "cron",
+        last_error=None,
+    )
 
     # 1. Open the market_scans row.
     scan_row = (
@@ -233,6 +256,25 @@ def run(
         "completed_at":         _now(),
         "notes":                "; ".join(notes) if notes else None,
     }).eq("id", scan_id).execute()
+
+    # Update the shared scan_state so the dashboard's refresh control flips
+    # back to idle and points at this scan (or surfaces the failure).
+    if status == "complete":
+        _set_scan_state(
+            db,
+            current_status="idle",
+            latest_scan_id=scan_id,
+            latest_scan_completed_at=_now(),
+            running_since=None,
+            last_error=None,
+        )
+    else:
+        _set_scan_state(
+            db,
+            current_status="failed",
+            running_since=None,
+            last_error=("; ".join(notes)[:500] if notes else "scan failed"),
+        )
 
     total = time.time() - t_total
     log.info(

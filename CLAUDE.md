@@ -25,7 +25,9 @@ pipeline/scan/run_scan.py                    2x/weekday (pre-market + midday)
                           the real lineage key)
 ```
 
-**Cadence & cost.** The slow part is Layer 3 — `critic_agent` runs ~30s/ticker, so deep analysis is capped at the top 30 (not 80) to fit the workflow timeout and the GitHub Actions free 2,000-min/month budget. At ~30 min/run × 2 runs/weekday that is ~1,400 min/month. Raising the deep-analysis count or the cadence requires either a paid Actions plan or speeding up `critic_agent`.
+**Cadence & cost.** The slow part is Layer 3 — `critic_agent` runs ~30s/ticker, so deep analysis is capped at the top 30 (not 80) to fit the workflow timeout and the GitHub Actions free 2,000-min/month budget. Automated cadence is **3×/weekday** (pre-market 12:00, midday 16:30, post-close 22:00 UTC) at ~25-30 min/run ≈ ~1,900-2,000 min/month — close to the free ceiling, so heavy multibagger runs + manual refreshes may require a paid Actions plan.
+
+**Shared cached scan + manual refresh.** The scan result is **global and cached** — one latest scan serves all users; the dashboard always shows it instantly on load. `scan_state` (migration 046, a singleton row) is the source of truth: `current_status` (idle/running/failed), `latest_scan_id`, `latest_scan_completed_at`, `running_since`. The pipeline (`run_scan`) writes it on start/success/failure, so **cron and manual triggers update the same state**. The dashboard refresh control (`src/components/scan-refresh.tsx`) derives from `GET /api/scan/status`; `POST /api/scan/trigger` (authenticated) gates on two rules — a scan already `running` (shared, do nothing) or a cached scan younger than **2h** (`too_soon`) — then fires the *same* `market_scan.yml` via `workflow_dispatch` (needs `GH_DISPATCH_TOKEN` with Actions:write). A scan never runs inside a web request. A `running` state older than 70 min is treated as a crashed run so a timed-out scan can't lock the button forever.
 
 **No email. No portfolios. No positions.** All gone in migration 044 (lean rewrite). The product is login-only research; we hold no user-held data.
 

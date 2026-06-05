@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server"
 import { trackEvent } from "@/lib/track"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Reveal } from "@/components/ui/reveal"
+import { ScanRefresh, type ScanStatus } from "@/components/scan-refresh"
 
 export const metadata = { title: "Today — Fortis" }
 export const dynamic = "force-dynamic"
@@ -111,6 +112,28 @@ export default async function DashboardHomePage() {
     shortlist = (data ?? []) as ScanResult[]
   }
 
+  // ── Shared scan state (drives the manual-refresh control) ────────────
+  const { data: scanStateRow } = await supabase
+    .from("scan_state")
+    .select("latest_scan_completed_at, current_status, running_since")
+    .eq("id", 1)
+    .maybeSingle()
+  const FRESHNESS_MS = 2 * 60 * 60 * 1000
+  const ssCompleted =
+    (scanStateRow?.latest_scan_completed_at as string | null) ??
+    scan?.completed_at ??
+    null
+  const scanRefreshInitial: ScanStatus = {
+    status: ((scanStateRow?.current_status as string) ??
+      "idle") as ScanStatus["status"],
+    latest_scan_completed_at: ssCompleted,
+    running_since: (scanStateRow?.running_since as string | null) ?? null,
+    next_available_at: ssCompleted
+      ? new Date(new Date(ssCompleted).getTime() + FRESHNESS_MS).toISOString()
+      : null,
+    last_error: null,
+  }
+
   const nowMs = Date.now()
   const lastUpdated = scan?.completed_at ?? scan?.scan_timestamp ?? null
 
@@ -125,7 +148,10 @@ export default async function DashboardHomePage() {
             </p>
             <h1 className="text-h1">Top opportunities, right now.</h1>
           </div>
-          <DataFreshness lastUpdated={lastUpdated} nowMs={nowMs} scan={scan} />
+          <div className="flex flex-col items-end gap-3">
+            <DataFreshness lastUpdated={lastUpdated} nowMs={nowMs} scan={scan} />
+            <ScanRefresh initial={scanRefreshInitial} />
+          </div>
         </div>
       </Reveal>
 
@@ -134,7 +160,8 @@ export default async function DashboardHomePage() {
           <Card>
             <CardContent className="py-16 text-center text-small text-muted-foreground">
               No completed scan yet. The first run lands on the next cron
-              tick (every 2 hours, weekdays only).
+              tick (3× per trading day — pre-market, midday, post-close), or
+              use Refresh scan above.
             </CardContent>
           </Card>
         </Reveal>
