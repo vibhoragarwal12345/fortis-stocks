@@ -6,13 +6,19 @@ prior day's cron actually produced data and that the local fixtures the
 pipeline depends on aren't stale. Exits non-zero on any failure so the
 workflow's notify_failure job fires.
 
-Checks:
-  [1] market_snapshots has rows from the last 36 hours
-  [2] ranked_focus_list has rows from at least one run in the last 24 hours
-  [3] validated_signals has rows from the last 24 hours
-  [4] reports table has at least one row from the last 24 hours
-  [5] pipeline/data/ticker_master.csv mtime is younger than 30 days
-  [6] IV computation: fetch SPY ATM IV; must land in a sane band
+Checks (lean architecture -- the twice-daily two-speed funnel):
+  [1] market_scans has a status='complete' scan (>100 tickers) in the last 96h
+  [2] ranked_focus_list has rows from a run in the last 4 days
+  [3] pipeline/data/ticker_master.csv mtime is younger than 30 days
+  [4] IV computation: fetch SPY ATM IV; must land in a sane band
+
+Freshness windows are wide (96h / 4 days) on purpose: scans run Mon-Fri only
+and this check fires at 12:00 UTC, so on a Monday the most recent scan is the
+prior Friday's. A tighter window would false-alarm every weekend.
+
+Tables removed in the May-2026 lean rewrite are no longer checked
+(market_snapshots, validated_signals, and the daily reports table -- reports
+are now produced on the monthly/multibagger cadence, not daily).
 
 Usage:
     python pipeline/health_check.py
@@ -54,16 +60,28 @@ def _count_since(db, table: str, column: str, hours: int) -> int:
     return int(res.count or 0)
 
 
-def check_market_snapshots(db) -> tuple[bool, str]:
-    n = _count_since(db, "market_snapshots", "snapshot_time", 36)
-    ok = n > 100
-    return ok, f"market_snapshots rows in last 36h: {n} ({'ok' if ok else 'FAIL -- expected > 100'})"
+def check_recent_scan(db) -> tuple[bool, str]:
+    """A successful full scan completed recently (the core lean-pipeline signal)."""
+    res = (
+        db.table("market_scans")
+        .select("*", count="exact", head=True)
+        .eq("status", "complete")
+        .gt("tickers_scanned_count", 100)
+        .gte("completed_at", _hours_ago(96))
+        .execute()
+    )
+    n = int(res.count or 0)
+    ok = n > 0
+    return ok, (
+        f"complete scans (>100 tickers) in last 96h: {n} "
+        f"({'ok' if ok else 'FAIL -- no recent successful scan'})"
+    )
 
 
 def check_ranked_focus_list(db) -> tuple[bool, str]:
-    # run_date is a DATE column; compare against yesterday so we tolerate
-    # the cron firing late or in a different timezone.
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=1)).date().isoformat()
+    # run_date is a DATE column. 4-day window tolerates the Mon-Fri-only scan
+    # cadence (on Monday the latest run_date is the prior Friday).
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=4)).date().isoformat()
     res = (
         db.table("ranked_focus_list")
         .select("*", count="exact", head=True)
@@ -73,18 +91,6 @@ def check_ranked_focus_list(db) -> tuple[bool, str]:
     n = int(res.count or 0)
     ok = n > 0
     return ok, f"ranked_focus_list rows since {cutoff}: {n} ({'ok' if ok else 'FAIL'})"
-
-
-def check_validated_signals(db) -> tuple[bool, str]:
-    n = _count_since(db, "validated_signals", "snapshot_time", 24)
-    ok = n > 0
-    return ok, f"validated_signals rows in last 24h: {n} ({'ok' if ok else 'FAIL'})"
-
-
-def check_reports(db) -> tuple[bool, str]:
-    n = _count_since(db, "reports", "generated_at", 24)
-    ok = n > 0
-    return ok, f"reports rows in last 24h: {n} ({'ok' if ok else 'FAIL'})"
 
 
 def check_ticker_master() -> tuple[bool, str]:
@@ -117,10 +123,8 @@ def check_iv_computation() -> tuple[bool, str]:
 def main() -> int:
     db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
     checks = [
-        ("market_snapshots",   lambda: check_market_snapshots(db)),
+        ("recent_scan",        lambda: check_recent_scan(db)),
         ("ranked_focus_list",  lambda: check_ranked_focus_list(db)),
-        ("validated_signals",  lambda: check_validated_signals(db)),
-        ("reports",            lambda: check_reports(db)),
         ("ticker_master",      check_ticker_master),
         ("iv_smoke",           check_iv_computation),
     ]
