@@ -69,7 +69,28 @@ print(f"\nSub-Rs.10 names ({len(penny)}):")
 for n,p,w in sorted(penny, key=lambda x:x[1]):
     print(f"  {n:<26} Rs.{p:>6.2f}  weight={w}")
 
+# ── MTF (leveraged) book ──────────────────────────────────────────────────
+print("\n" + "="*70); print("MTF / LEVERAGED BOOK (read from font color)"); print("="*70)
+mtf = [(d["name"], d) for d in H.values() if d.get("mtf")]
+mtf_w = sum(d["weight"] for _, d in mtf if d.get("weight"))
+mtf_pnl = (sum(d["weight"]*d["unrealized_pnl_pct"] for _, d in mtf
+               if d.get("weight") and d.get("unrealized_pnl_pct") is not None) / mtf_w) if mtf_w else 0
+underwater = [nm for nm, d in mtf if (d.get("unrealized_pnl_pct") or 0) < 0]
+print(f"MTF names: {len(mtf)} | aggregate weight: {mtf_w:.1f}% ({mtf_w/wsum*100:.1f}% of invested)")
+print(f"MTF weight-avg unrealized P&L: {mtf_pnl:+.1f}%   <-- on leverage")
+print(f"MTF names underwater: {len(underwater)}/{len(mtf)}")
+for nm, d in sorted(mtf, key=lambda x:-(x[1].get('weight') or 0)):
+    print(f"  {nm:<26} wt={d.get('weight')}%  P&L={d.get('unrealized_pnl_pct')}%  px={d.get('price')}")
+cash_pnl = (sum(d["weight"]*d["unrealized_pnl_pct"] for d in H.values()
+                if d.get("weight") and not d.get("mtf") and d.get("unrealized_pnl_pct") is not None)
+            / sum(d["weight"] for d in H.values() if d.get("weight") and not d.get("mtf")))
+print(f"\nContrast -- CASH book weight-avg P&L: {cash_pnl:+.1f}%")
+print(f"           MTF  book weight-avg P&L: {mtf_pnl:+.1f}%   (the losers are the leveraged ones)")
+
 agg = {"sum_weights": wsum, "theme_weights": dict(theme_w),
+       "mtf_weight": round(mtf_w,1), "mtf_weighted_pnl": round(mtf_pnl,1),
+       "mtf_underwater_count": len(underwater), "mtf_count": len(mtf),
+       "cash_weighted_pnl": round(cash_pnl,1),
        "defense_cluster_weight": defense_w,
        "defense_cluster_avg_corr": round(avg_corr,2),
        "weighted_book_pnl_pct": round(num/wsum,1),

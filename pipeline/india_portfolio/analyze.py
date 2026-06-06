@@ -13,13 +13,46 @@ concall transcripts.
 from __future__ import annotations
 
 import json
+import re
+import sys
 import warnings
 from datetime import datetime, timezone
+from pathlib import Path
 
 warnings.filterwarnings("ignore")
 import numpy as np
 import pandas as pd
 import yfinance as yf
+from openpyxl import load_workbook
+
+XLSX = r"D:\SSA Portfolio.xlsx"
+
+
+def _toks(s: str) -> set[str]:
+    s = re.sub(r"\b(ltd|limited|company|corporation|corp)\b", " ", s.lower())
+    return {t for t in re.sub(r"[^a-z0-9 ]", " ", s).split() if len(t) > 2}
+
+
+def read_mtf_tickers(holdings) -> set[str]:
+    """MTF status is encoded as RED font (rgb FFFF0000) on the share name in
+    column A -- NOT a data column. Read it from formatting and map to tickers."""
+    ws = load_workbook(XLSX).active
+    red = []
+    for r in range(1, ws.max_row + 1):
+        c = ws.cell(row=r, column=1)
+        if not c.value:
+            continue
+        rgb = getattr(c.font.color, "rgb", None)
+        if isinstance(rgb, str) and rgb.upper() == "FFFF0000":
+            red.append(str(c.value).strip())
+    mtf = set()
+    for tk, name, *_ in holdings:
+        ht = _toks(name)
+        if ht and any(len(ht & _toks(rn)) / len(ht) >= 0.6 for rn in red):
+            mtf.add(tk)
+    if len(mtf) != 8:
+        raise SystemExit(f"MTF font-color read returned {len(mtf)} (expected 8): {mtf}")
+    return mtf
 
 # ── Holdings: (ticker, name, weight%, avg_cost INR, theme, weighted) ──────────
 H = [
@@ -46,7 +79,7 @@ H = [
     ("GPPL.NS", "Gujarat Pipavav Port", 0.6, 190, "Capex/Infra", True),
     ("TATATECH.NS", "Tata Technologies", 0.5, 1177, "IT", True),
     ("AVALON.NS", "Avalon Technologies", 0.4, 536, "Defense", True),
-    ("GMMPFAUDLR.NS", "GMM Pfaudler [MTF]", 0.4, 1298, "Chemicals/CapGoods", True),
+    ("GMMPFAUDLR.NS", "GMM Pfaudler", 0.4, 1298, "Chemicals/CapGoods", True),
     ("GTLINFRA.NS", "GTL Infrastructure", 0.1, 1, "Telecom/Distressed", True),
     ("AKSHAR.NS", "Akshar Spintex", 0.1, 7, "Textiles/Distressed", True),
     ("HFCL.NS", "HFCL", 0.1, 116, "Telecom", True),
@@ -167,6 +200,8 @@ def metrics(tk, close, nifty_close, info):
     return out
 
 def main():
+    mtf_tickers = read_mtf_tickers(H)
+    print("MTF (red-font) tickers read from xlsx:", sorted(mtf_tickers))
     syms = [h[0] for h in H]
     print(f"Fetching {len(syms)} holdings + Nifty 50 ...")
     data = yf.download(syms + [NIFTY], period="2y", interval="1d",
@@ -191,6 +226,7 @@ def main():
         m["unrealized_pnl_pct"] = round((px/cost - 1)*100,1) if px else None
         results[tk] = {"name": name, "weight": wt, "theme": theme,
                        "weighted": weighted, "in_defense_cluster": tk in DEFENSE_CLUSTER,
+                       "mtf": tk in mtf_tickers,
                        **m}
         pnl = m.get("unrealized_pnl_pct")
         print(f"  {name:<26} {tk:<14} px={px}  P&L={pnl}%  PE={m.get('trailing_pe')}")
