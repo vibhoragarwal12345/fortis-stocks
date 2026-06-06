@@ -1,0 +1,10 @@
+# India-market pilot dependencies (kept separate from the US pipeline's
+# requirements so the production install isn't bloated by pilot-only libs).
+# scipy / arch / numpy / pandas / yfinance already come from pipeline/requirements.txt.
+#
+#   pip install -r pipeline/india_portfolio/requirements.txt
+#
+nsepython        # NSE data: announcements, SAST/PIT insider, F&O ban, events
+reportlab        # PDF report generation (analyze -> report.py)
+openpyxl         # read the .xlsx portfolio input
+pypdf            # post-build text verification of the generated PDF
