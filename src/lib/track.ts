@@ -14,7 +14,6 @@ import { createClient } from "@/lib/supabase/server"
 export type EventType =
   // Page opens
   | "dashboard_today_opened"
-  | "track_record_opened"
   // Report viewer
   | "report_opened"
   | "pick_clicked"

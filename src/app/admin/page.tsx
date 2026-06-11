@@ -60,7 +60,12 @@ export default async function AdminHome() {
         >
           <div className="space-y-2">
             <Label htmlFor="name">Tenant name</Label>
-            <Input id="name" name="name" required placeholder="Acme Wealth" />
+            <Input
+              id="name"
+              name="name"
+              required
+              placeholder="Northpoint Wealth"
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="admin_email">Admin email</Label>
@@ -69,7 +74,7 @@ export default async function AdminHome() {
               name="admin_email"
               type="email"
               required
-              placeholder="admin@acmewealth.com"
+              placeholder="admin@northpointwealth.com"
             />
           </div>
           <div className="flex items-end">

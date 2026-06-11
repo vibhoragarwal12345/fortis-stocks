@@ -3,6 +3,7 @@ import Link from "next/link"
 import { DottedSurface } from "@/components/ui/dotted-surface"
 import { Reveal } from "@/components/ui/reveal"
 import { Section } from "@/components/ui/section"
+import { SiteFooter } from "@/components/site-footer"
 
 export const metadata = {
   title: "Fortis Stock Intelligence",
@@ -110,22 +111,7 @@ export default function Home() {
       </Section>
 
       {/* ─── Footer ───────────────────────────────────────────── */}
-      <footer className="border-t border-border">
-        <div className="mx-auto flex max-w-[1120px] flex-col gap-3 px-6 py-10 md:flex-row md:items-center md:justify-between md:px-10">
-          <p className="text-caption">
-            &copy; {new Date().getFullYear()} Fortis Stock Intelligence. For
-            licensed advisor review — not investment advice.
-          </p>
-          <p className="text-caption">
-            <Link
-              href="/login"
-              className="underline-offset-4 hover:text-foreground hover:underline"
-            >
-              Sign in
-            </Link>
-          </p>
-        </div>
-      </footer>
+      <SiteFooter />
     </main>
   )
 }
