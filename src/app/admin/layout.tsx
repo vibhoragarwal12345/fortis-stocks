@@ -53,7 +53,7 @@ export default async function AdminLayout({
             <span className="text-[14px] font-semibold tracking-tight text-foreground">
               Fortis
             </span>
-            <span className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+            <span className="text-eyebrow">
               Admin
             </span>
           </Link>

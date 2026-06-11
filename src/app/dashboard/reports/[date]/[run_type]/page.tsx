@@ -54,7 +54,7 @@ export default async function ReportPage({
       <div className="mx-auto max-w-[720px] px-6 py-14 md:px-10 md:py-16 space-y-12">
         <BackLink />
         <header className="space-y-3">
-          <p className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+          <p className="text-eyebrow">
             {RUN_TYPE_LABEL[run_type] ?? run_type}
           </p>
           <h1 className="text-h1">No report for {date}.</h1>
@@ -79,7 +79,7 @@ export default async function ReportPage({
     <div className="mx-auto max-w-[860px] space-y-12 px-6 py-14 md:space-y-16 md:px-10 md:py-16">
       <Reveal as="header" className="space-y-4">
         <BackLink />
-        <p className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+        <p className="text-eyebrow">
           {label} · {report.report_date}
         </p>
         <h1 className="text-h1">{label}.</h1>

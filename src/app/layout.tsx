@@ -1,16 +1,15 @@
 import type { Metadata } from "next";
-import { Inter, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
 import { ThemeProvider } from "@/components/theme-provider";
 
-// Inter for the full type scale. Loaded with axes for weights 400 + 500 + 600
-// (the only weights used across the design system).
-// Geist_Mono kept for tabular data + tickers.
-const inter = Inter({
-  variable: "--font-inter",
+// Geist Sans carries the entire type scale (variable font — one file, all
+// weights). Geist Mono renders every metric, price, and ticker with
+// tabular numerals.
+const geistSans = Geist({
+  variable: "--font-geist-sans",
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
   display: "swap",
 });
 
@@ -33,13 +32,13 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col font-sans text-foreground bg-background">
         <ThemeProvider
           attribute="class"
-          defaultTheme="light"
+          defaultTheme="dark"
           enableSystem={false}
           disableTransitionOnChange
         >

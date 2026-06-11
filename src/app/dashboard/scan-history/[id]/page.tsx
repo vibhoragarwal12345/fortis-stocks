@@ -94,7 +94,7 @@ export default async function ScanDetailPage({
         >
           ← Scan history
         </Link>
-        <p className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+        <p className="text-eyebrow">
           Scan #{scan.id} · {scan.scan_type}
         </p>
         <h1 className="text-h1">{fmtTime(scan.scan_timestamp)}</h1>
@@ -125,7 +125,7 @@ export default async function ScanDetailPage({
       ) : (
         <section className="space-y-6">
           <Reveal>
-            <h2 className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+            <h2 className="text-eyebrow">
               Shortlist · {shortlist.length} names
             </h2>
           </Reveal>

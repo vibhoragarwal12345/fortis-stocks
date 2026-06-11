@@ -1,8 +1,11 @@
 import Link from "next/link"
 
 import { createClient } from "@/lib/supabase/server"
+import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Reveal } from "@/components/ui/reveal"
+
+const GRADE_VARIANT = { A: "gradeA", B: "gradeB", C: "gradeC", D: "neutral" } as const
 
 export const metadata = { title: "Research — Fortis" }
 export const dynamic = "force-dynamic"
@@ -86,6 +89,8 @@ export default async function ResearchPage({
       "transaction_code,is_directional_signal,filing_date,person_name,person_title",
     )
     .eq("ticker", ticker)
+    // Server component: per-request "now" for the 90-day filing window.
+    // eslint-disable-next-line react-hooks/purity
     .gte("filing_date", new Date(Date.now() - 90 * 86_400_000).toISOString())
     .order("filing_date", { ascending: false })
     .limit(50)
@@ -113,10 +118,8 @@ export default async function ResearchPage({
       <div className="mx-auto max-w-[1120px] px-6 py-14 md:px-10 md:py-16 space-y-12">
         <BackLink />
         <header className="space-y-3">
-          <p className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
-            Research
-          </p>
-          <h1 className="font-mono text-h1 tracking-tight">{ticker}</h1>
+          <p className="text-eyebrow">Research</p>
+          <h1 className="text-data text-h1">{ticker}</h1>
         </header>
         <Card>
           <CardContent className="py-16 text-center text-small text-muted-foreground">
@@ -140,32 +143,41 @@ export default async function ResearchPage({
     <div className="mx-auto max-w-[1120px] space-y-16 px-6 py-14 md:space-y-20 md:px-10 md:py-16">
       <Reveal as="header" className="space-y-3">
         <BackLink />
-        <p className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+        <p className="text-eyebrow">
           Research · {headerRunDate} {headerRunType}
         </p>
-        <div className="flex items-baseline gap-4">
-          <h1 className="font-mono text-display tracking-tight">{ticker}</h1>
+        <div className="flex flex-wrap items-center gap-4">
+          <h1 className="text-data text-display">{ticker}</h1>
           {pick?.conviction_grade && (
-            <span className="text-caption uppercase tracking-[0.14em] text-foreground">
+            <Badge
+              variant={GRADE_VARIANT[pick.conviction_grade]}
+              className="translate-y-1 text-[12px]"
+            >
               Grade {pick.conviction_grade}
-            </span>
+            </Badge>
           )}
         </div>
         <p className="text-small text-muted-foreground">
           Composite score{" "}
-          <span className="text-foreground tabular-nums">
+          <span className="text-data text-foreground">
             {pick?.composite_score != null
               ? Number(pick.composite_score).toFixed(1)
               : "—"}
           </span>
+          {pick?.conviction_score_adjusted != null && (
+            <>
+              {" · conviction-adjusted "}
+              <span className="text-data text-foreground">
+                {Number(pick.conviction_score_adjusted).toFixed(1)}
+              </span>
+            </>
+          )}
         </p>
       </Reveal>
 
       {scan && (
         <Reveal as="section" className="space-y-5">
-          <h2 className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
-            Latest market scan · 15-min delayed
-          </h2>
+          <h2 className="text-eyebrow">Latest market scan · 15-min delayed</h2>
           <dl className="grid grid-cols-2 gap-x-8 gap-y-5 sm:grid-cols-4">
             <Stat
               label="Price"
@@ -209,9 +221,7 @@ export default async function ResearchPage({
 
       {pick?.thesis && (
         <Reveal as="section" className="space-y-5">
-          <h2 className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
-            Thesis
-          </h2>
+          <h2 className="text-eyebrow">Thesis</h2>
           <p className="text-body-lg whitespace-pre-line text-foreground/90">
             {pick.thesis}
           </p>
@@ -223,7 +233,10 @@ export default async function ResearchPage({
           <Reveal>
             <Card size="sm" className="h-full">
               <CardHeader>
-                <CardTitle className="text-[15px]">Bull case</CardTitle>
+                <CardTitle className="flex items-center gap-2 text-[15px]">
+                  <span aria-hidden className="size-1.5 rounded-full bg-gain" />
+                  Bull case
+                </CardTitle>
               </CardHeader>
               <CardContent className="text-small text-foreground/85 leading-relaxed">
                 {pick.bull_case}
@@ -235,7 +248,10 @@ export default async function ResearchPage({
           <Reveal delay={80}>
             <Card size="sm" className="h-full">
               <CardHeader>
-                <CardTitle className="text-[15px]">Bear case</CardTitle>
+                <CardTitle className="flex items-center gap-2 text-[15px]">
+                  <span aria-hidden className="size-1.5 rounded-full bg-loss" />
+                  Bear case
+                </CardTitle>
               </CardHeader>
               <CardContent className="text-small text-foreground/85 leading-relaxed">
                 {pick.bear_case}
@@ -245,9 +261,28 @@ export default async function ResearchPage({
         )}
       </section>
 
+      {(pick?.price_target_upside != null ||
+        pick?.price_target_downside != null) && (
+        <Reveal as="section" className="space-y-5">
+          <h2 className="text-eyebrow">Price targets · debate synthesis</h2>
+          <dl className="grid grid-cols-2 gap-x-8 gap-y-5 sm:grid-cols-4">
+            <Stat
+              label="Upside target"
+              value={fmtMoney(pick?.price_target_upside)}
+              tone={1}
+            />
+            <Stat
+              label="Downside target"
+              value={fmtMoney(pick?.price_target_downside)}
+              tone={-1}
+            />
+          </dl>
+        </Reveal>
+      )}
+
       {pick?.catalyst_description && (
         <Reveal as="section" className="space-y-5">
-          <h2 className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+          <h2 className="text-eyebrow">
             Catalyst · {pick.catalyst_category ?? "—"}
           </h2>
           <p className="text-body text-foreground/85 leading-relaxed">
@@ -257,9 +292,7 @@ export default async function ResearchPage({
       )}
 
       <Reveal as="section" className="space-y-5">
-        <h2 className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
-          Insider posture · last 90 days
-        </h2>
+        <h2 className="text-eyebrow">Insider posture · last 90 days</h2>
         {insider.length === 0 ? (
           <p className="text-small text-muted-foreground">
             No Form 4 events on file in the last 90 days.
@@ -283,9 +316,7 @@ export default async function ResearchPage({
 
       {pick?.position_size_guidance && (
         <Reveal as="section" className="space-y-5">
-          <h2 className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
-            Position size guidance
-          </h2>
+          <h2 className="text-eyebrow">Position size guidance</h2>
           <p className="text-body text-foreground/85 leading-relaxed">
             {pick.position_size_guidance}
           </p>
@@ -299,6 +330,14 @@ function fmtPct(v: number | null | undefined): string {
   if (v == null) return "—"
   const sign = v > 0 ? "+" : ""
   return `${sign}${v.toFixed(2)}%`
+}
+
+function fmtMoney(v: number | null | undefined): string {
+  if (v == null) return "—"
+  return `$${Number(v).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`
 }
 
 function BackLink() {
@@ -326,9 +365,9 @@ function Stat({
   const colorCls =
     tone != null
       ? tone > 0
-        ? "text-foreground"
+        ? "text-gain"
         : tone < 0
-        ? "text-destructive"
+        ? "text-loss"
         : "text-foreground"
       : muted
       ? "text-muted-foreground"
@@ -338,7 +377,7 @@ function Stat({
       <dt className="text-caption uppercase tracking-[0.14em] text-muted-foreground">
         {label}
       </dt>
-      <dd className={`text-h3 tabular-nums ${colorCls}`}>{value}</dd>
+      <dd className={`text-data text-h3 ${colorCls}`}>{value}</dd>
     </div>
   )
 }

@@ -41,7 +41,7 @@ export default async function AdminHome() {
   return (
     <div className="mx-auto max-w-[1280px] space-y-16 px-6 py-14 md:space-y-20 md:px-10 md:py-16">
       <Reveal as="header" className="space-y-3">
-        <p className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+        <p className="text-eyebrow">
           Platform admin
         </p>
         <h1 className="text-h1">Tenants.</h1>
@@ -51,7 +51,7 @@ export default async function AdminHome() {
       </Reveal>
 
       <Reveal as="section" className="space-y-5">
-        <h2 className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+        <h2 className="text-eyebrow">
           Create tenant
         </h2>
         <form
@@ -87,7 +87,7 @@ export default async function AdminHome() {
 
       <Reveal as="section" className="space-y-5">
         <div className="flex items-baseline justify-between gap-4">
-          <h2 className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+          <h2 className="text-eyebrow">
             All tenants
           </h2>
           <span className="text-caption tabular-nums">

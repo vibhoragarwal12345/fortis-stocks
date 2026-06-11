@@ -23,9 +23,10 @@ function Card({
       data-tone={tone}
       className={cn(
         "group/card flex flex-col gap-4 overflow-hidden rounded-xl bg-card py-5 text-card-foreground",
-        // Tone variants -- restraint: border by default, shadow only when asked.
-        tone === "default" && "border border-border",
-        tone === "elevated" && "shadow-[var(--shadow-md)]",
+        // Tone variants. --shadow-card carries the dark-mode 1px top
+        // light-catch; elevated blooms a diffuse shadow for hero moments.
+        tone === "default" && "border border-border shadow-[var(--shadow-card)]",
+        tone === "elevated" && "border border-border/60 shadow-[var(--shadow-md)]",
         // Sizes
         "has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0",
         "data-[size=sm]:gap-3 data-[size=sm]:py-4 data-[size=sm]:has-data-[slot=card-footer]:pb-0",

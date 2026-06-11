@@ -2,6 +2,7 @@
 
 import * as React from "react"
 
+import { useMediaQuery } from "@/hooks/use-media-query"
 import { cn } from "@/lib/utils"
 
 // Scroll reveal primitive.
@@ -35,35 +36,25 @@ export function Reveal({
   ...rest
 }: RevealProps) {
   const ref = React.useRef<HTMLElement | null>(null)
-  const [shown, setShown] = React.useState(false)
-  const [reduced, setReduced] = React.useState(false)
-
-  // Detect prefers-reduced-motion once on mount.
-  React.useEffect(() => {
-    if (typeof window === "undefined") return
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)")
-    setReduced(mq.matches)
-    const onChange = () => setReduced(mq.matches)
-    mq.addEventListener?.("change", onChange)
-    return () => mq.removeEventListener?.("change", onChange)
-  }, [])
+  const [entered, setEntered] = React.useState(false)
+  const reduced = useMediaQuery("(prefers-reduced-motion: reduce)")
 
   React.useEffect(() => {
-    if (reduced) {
-      setShown(true)
-      return
-    }
+    // Reduced motion never animates, so the observer isn't needed.
+    if (reduced || entered) return
     const node = ref.current
     if (!node) return
     if (typeof IntersectionObserver === "undefined") {
-      setShown(true)
-      return
+      // No IO support: reveal on the next tick (setState stays inside a
+      // callback, never the effect body).
+      const t = setTimeout(() => setEntered(true), 0)
+      return () => clearTimeout(t)
     }
     const io = new IntersectionObserver(
       (entries) => {
         for (const e of entries) {
           if (e.isIntersecting) {
-            setShown(true)
+            setEntered(true)
             io.disconnect()
           }
         }
@@ -72,7 +63,10 @@ export function Reveal({
     )
     io.observe(node)
     return () => io.disconnect()
-  }, [reduced, threshold])
+  }, [reduced, entered, threshold])
+
+  // Reduced motion renders final-state immediately; otherwise wait for IO.
+  const shown = reduced || entered
 
   const Tag = as as React.ElementType
   return (

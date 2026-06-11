@@ -243,9 +243,11 @@ export default async function TenantDetailPage({
                     </td>
                     <td className="px-3 py-2">
                       {i.accepted_at
-                        ? <span className="text-foreground">accepted</span>
-                        : new Date(i.expires_at).getTime() < Date.now()
-                        ? <span className="text-muted-foreground">expired</span>
+                        ? <span className="text-gain">accepted</span>
+                        : // Server component: per-request expiry check.
+                          // eslint-disable-next-line react-hooks/purity
+                          new Date(i.expires_at).getTime() < Date.now()
+                        ? <span className="text-warning">expired</span>
                         : <span className="text-muted-foreground">pending</span>}
                     </td>
                     <td className="px-3 py-2">

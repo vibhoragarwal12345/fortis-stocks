@@ -2,6 +2,8 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 
 import { createClient } from "@/lib/supabase/server"
+import { AuroraField } from "@/components/ui/aurora-field"
+import { CursorGlow } from "@/components/ui/cursor-glow"
 import { UpdatePasswordForm } from "@/components/update-password-form"
 import { SiteFooter } from "@/components/site-footer"
 
@@ -19,22 +21,22 @@ export default async function UpdatePasswordPage() {
   if (!user) redirect("/forgot-password")
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      <div className="flex flex-1 flex-col items-center px-6 py-16 md:py-24">
-        <Link
-          href="/"
-          className="flex items-center gap-2 transition-premium hover:opacity-80"
-        >
-          <span
-            aria-hidden
-            className="inline-block h-2.5 w-2.5 rounded-sm bg-foreground"
-          />
-          <span className="text-caption uppercase tracking-[0.18em] text-foreground">
-            Fortis
-          </span>
-        </Link>
+    <div className="relative flex min-h-svh flex-col items-center overflow-hidden bg-background px-6 py-10 md:py-14">
+      <CursorGlow />
+      <AuroraField />
 
-        <div className="mt-14 w-full max-w-[400px] md:mt-20">
+      <Link
+        href="/"
+        className="relative flex items-center gap-2.5 transition-premium hover:opacity-80"
+      >
+        <span aria-hidden className="size-2 rounded-[2px] bg-highlight" />
+        <span className="text-[13px] font-semibold uppercase tracking-[0.22em]">
+          Fortis
+        </span>
+      </Link>
+
+      <div className="relative mt-12 w-full max-w-[420px] md:mt-16">
+        <div className="rounded-2xl border border-border bg-card/75 p-8 shadow-[var(--shadow-lg)] backdrop-blur-xl md:p-10">
           <div className="space-y-8">
             <div className="space-y-3">
               <h1 className="text-h2">Set new password</h1>
@@ -52,7 +54,9 @@ export default async function UpdatePasswordPage() {
         </div>
       </div>
 
-      <SiteFooter />
+      <div className="relative mt-auto w-full pt-12">
+        <SiteFooter />
+      </div>
     </div>
   )
 }

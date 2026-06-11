@@ -1,7 +1,5 @@
 import Link from "next/link"
 
-import { Button } from "@/components/ui/button"
-
 export const metadata = { title: "Check your email — Fortis" }
 
 export default function CheckEmailPage() {

@@ -5,14 +5,47 @@ import { createClient } from "@/lib/supabase/server"
 import { getActiveTenantMember } from "@/lib/tenant"
 import { themeFromTenant, tenantCssVars } from "@/lib/theme"
 import { checkAccess } from "@/lib/permissions"
+import { NavLink } from "@/components/nav-link"
 import { PageTransition } from "@/components/ui/page-transition"
+import { TickerTape, type TapeItem } from "@/components/ui/ticker-tape"
 import { SiteFooter } from "@/components/site-footer"
 import { signout } from "./actions"
 
-// Top-level nav for every /dashboard route. Active-link highlighting is
-// deferred to a follow-up; a slim server-rendered nav keeps first-byte fast.
+// The live tape under the header: the current shortlist's names with real
+// prices from the latest scan, each linking into its research dossier.
+async function getTapeItems(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<TapeItem[]> {
+  const { data: state } = await supabase
+    .from("scan_state")
+    .select("latest_scan_id")
+    .eq("id", 1)
+    .maybeSingle()
+  if (!state?.latest_scan_id) return []
+  const { data } = await supabase
+    .from("scan_results")
+    .select("ticker, price, day_change_pct, rank")
+    .eq("scan_id", state.latest_scan_id)
+    .eq("advanced", true)
+    .order("rank", { ascending: true })
+    .limit(20)
+  return (data ?? [])
+    .filter((r) => r.price != null)
+    .map((r) => ({
+      ticker: r.ticker as string,
+      price: Number(r.price).toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }),
+      change: Number(r.day_change_pct ?? 0),
+      href: `/dashboard/research/${r.ticker}`,
+    }))
+}
+
+// Top-level nav for every /dashboard route. NavLink lights the active
+// section (exact match for Today, prefix for everything else).
 const navItems = [
-  { href: "/dashboard",              label: "Today" },
+  { href: "/dashboard",              label: "Today", exact: true },
   { href: "/dashboard/focus-list",   label: "Focus list" },
   { href: "/dashboard/emerging",     label: "Emerging" },
   { href: "/dashboard/scan-history", label: "Scan history" },
@@ -31,6 +64,7 @@ export default async function DashboardLayout({
   const tenant = membership?.tenant ?? null
   const theme = themeFromTenant(tenant)
   const access = checkAccess(tenant)
+  const tapeItems = access.ok ? await getTapeItems(supabase) : []
 
   if (!access.ok) {
     return (
@@ -84,14 +118,15 @@ export default async function DashboardLayout({
 
           {/* ── Primary nav (desktop) ───────────────────────────────── */}
           <nav className="hidden md:flex items-center gap-1">
-            {navItems.map((item, idx) => (
-              <Link
-                key={`${item.label}-${idx}`}
+            {navItems.map((item) => (
+              <NavLink
+                key={item.href}
                 href={item.href}
-                className="rounded-md px-3 py-1.5 text-[13.5px] text-muted-foreground transition-premium hover:text-foreground"
+                exact={item.exact}
+                className="text-[13.5px]"
               >
                 {item.label}
-              </Link>
+              </NavLink>
             ))}
           </nav>
 
@@ -117,19 +152,25 @@ export default async function DashboardLayout({
         {/* ── Mobile horizontal nav ───────────────────────────────── */}
         <nav
           aria-label="Mobile primary"
-          className="md:hidden flex overflow-x-auto border-t border-border px-4 py-2 gap-1 text-[13px] [&::-webkit-scrollbar]:hidden"
+          className="md:hidden flex overflow-x-auto border-t border-border px-4 py-1.5 gap-1 text-[13px] [&::-webkit-scrollbar]:hidden"
         >
-          {navItems.map((item, idx) => (
-            <Link
-              key={`m-${item.label}-${idx}`}
+          {navItems.map((item) => (
+            <NavLink
+              key={`m-${item.href}`}
               href={item.href}
-              className="whitespace-nowrap rounded-md px-3 py-1.5 text-muted-foreground transition-premium hover:text-foreground"
+              exact={item.exact}
+              className="py-2.5"
             >
               {item.label}
-            </Link>
+            </NavLink>
           ))}
         </nav>
       </header>
+
+      {/* Live tape — the latest shortlist on every dashboard page. */}
+      {tapeItems.length > 0 && (
+        <TickerTape items={tapeItems} className="border-t-0 bg-card/30" />
+      )}
 
       <main className="flex-1">
         <PageTransition>{children}</PageTransition>

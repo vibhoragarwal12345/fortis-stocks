@@ -5,42 +5,43 @@
 @custom-variant dark (&:is(.dark *));
 
 /* =========================================================================
- *  Design System
+ *  Fortis Design System — "Institutional Terminal"
  *  -----------------------------------------------------------------------
- *  - Restraint over decoration. Typography does the heavy lifting.
- *  - One accent: near-black (#1D1D1F light / #FFFFFF dark).
- *  - Off-white surfaces (#FBFBFD), pure white cards, soft black text.
- *  - Borders prefered over shadows for definition.
- *  - All motion uses cubic-bezier(0.16, 1, 0.3, 1); honoured by prefers-
- *    reduced-motion.
+ *  - Dark-mode-first. Deep blue-black layered surfaces: base → raised →
+ *    overlay. Light mode is the refined daytime variant, not the default.
+ *  - One accent: electric cyan. It marks signal — grades, focus, live data.
+ *    It never decorates. Gain/loss greens and reds are semantic and
+ *    deliberately distinct from the accent so grade ≠ return.
+ *  - Typography carries the premium feel: Geist, strict scale, tight
+ *    negative tracking on display sizes, mono + tabular numerals for data.
+ *  - Depth: soft diffuse shadows; dark cards catch a 1px top light edge.
+ *  - All motion rides cubic-bezier(0.16, 1, 0.3, 1), 200–500ms, and is
+ *    clamped by prefers-reduced-motion.
  *  ========================================================================= */
 
 @theme inline {
-  /* Fonts -- Inter loaded via next/font (CSS var set on <html> in layout.tsx),
-     with a system stack fallback that renders SF Pro on Apple devices. */
+  /* Fonts — Geist Sans / Geist Mono via next/font (vars set on <html>). */
   --font-sans:
-    var(--font-inter), -apple-system, BlinkMacSystemFont, "SF Pro Text",
+    var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "SF Pro Text",
     "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono:
     var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco,
     Consolas, "Liberation Mono", "Courier New", monospace;
   --font-heading: var(--font-sans);
 
-  /* Type scale -- referenced by `text-display`, `text-h1`, ... utility
-     classes defined in the @layer utilities block below. We keep these as
-     theme vars so `var(--text-h1-size)` is available anywhere. */
-  --text-display-size: 60px;
-  --text-display-leading: 1.05;
-  --text-display-tracking: -0.02em;
+  /* Type scale — consumed by the text-display/h1/h2/h3… utilities below. */
+  --text-display-size: 64px;
+  --text-display-leading: 1.03;
+  --text-display-tracking: -0.035em;
   --text-h1-size: 44px;
-  --text-h1-leading: 1.1;
-  --text-h1-tracking: -0.02em;
+  --text-h1-leading: 1.08;
+  --text-h1-tracking: -0.025em;
   --text-h2-size: 32px;
-  --text-h2-leading: 1.2;
-  --text-h2-tracking: -0.01em;
-  --text-h3-size: 22px;
+  --text-h2-leading: 1.15;
+  --text-h2-tracking: -0.02em;
+  --text-h3-size: 21px;
   --text-h3-leading: 1.3;
-  --text-h3-tracking: -0.01em;
+  --text-h3-tracking: -0.012em;
   --text-body-lg-size: 19px;
   --text-body-lg-leading: 1.6;
   --text-body-size: 16px;
@@ -50,8 +51,8 @@
   --text-caption-size: 13px;
   --text-caption-leading: 1.4;
 
-  /* Color tokens consumed by Tailwind utilities (bg-background, text-foreground,
-     border-border, etc.). Light/dark values live in :root and .dark below. */
+  /* Color tokens consumed by Tailwind utilities. Mode values live in
+     :root/.light and .dark below. */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -76,104 +77,140 @@
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
 
-  /* Radii. Cards 12-16, buttons 8-10, small 6. */
-  --radius: 0.75rem;       /* 12px -- base for cards */
-  --radius-sm: 0.375rem;   /* 6px  -- small elements */
-  --radius-md: 0.5rem;     /* 8px  -- buttons */
-  --radius-lg: 0.75rem;    /* 12px -- cards */
-  --radius-xl: 1rem;       /* 16px -- elevated cards */
-  --radius-2xl: 1.5rem;    /* 24px -- hero panels */
+  /* The one accent + semantic data colors → utilities like text-highlight,
+     bg-gain/10, border-loss/20. */
+  --color-highlight: var(--highlight);
+  --color-highlight-foreground: var(--highlight-foreground);
+  --color-gain: var(--gain);
+  --color-loss: var(--loss);
+  --color-warning: var(--warning);
 
-  /* Motion. Apple's smooth deceleration curve, kept consistent everywhere. */
+  /* Radii. Cards 12–16, buttons 8–10, small 6. */
+  --radius: 0.75rem;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+
+  /* Motion. One deceleration curve, everywhere. */
   --ease-out-quart: cubic-bezier(0.16, 1, 0.3, 1);
   --duration-fast: 200ms;
   --duration-base: 300ms;
-  --duration-slow: 400ms;
-
-  /* Soft, diffuse shadows. Prefer borders. */
-  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 4px 24px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.08);
+  --duration-slow: 450ms;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
- *  Colors -- LIGHT mode
- *  Exact hex values per the design spec. Off-white background, soft black
- *  text, near-black accent. Single accent rule: it appears only on
- *  primary CTAs, links, active states.
+ *  LIGHT mode — the refined daytime variant.
+ *  Declared on `:root, .light` so a `.light` wrapper can carve a light
+ *  island out of a dark page (used by /design-system).
  *  ───────────────────────────────────────────────────────────────────────── */
-:root {
-  --background: #FBFBFD;
-  --foreground: #1D1D1F;
-  --card: #FFFFFF;
-  --card-foreground: #1D1D1F;
-  --popover: #FFFFFF;
-  --popover-foreground: #1D1D1F;
-  --primary: #1D1D1F;
-  --primary-foreground: #FFFFFF;
-  --secondary: #F5F5F7;
-  --secondary-foreground: #1D1D1F;
-  --muted: #F5F5F7;
-  --muted-foreground: #6E6E73;
-  --accent: #F5F5F7;
-  --accent-foreground: #1D1D1F;
-  --destructive: #C7372F;
-  --border: #E8E8ED;
-  --input: #E8E8ED;
-  --ring: #1D1D1F;
-  --chart-1: #1D1D1F;
-  --chart-2: #6E6E73;
-  --chart-3: #86868B;
-  --chart-4: #C7C7CC;
-  --chart-5: #E8E8ED;
-  --sidebar: #FFFFFF;
-  --sidebar-foreground: #1D1D1F;
-  --sidebar-primary: #1D1D1F;
-  --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #F5F5F7;
-  --sidebar-accent-foreground: #1D1D1F;
-  --sidebar-border: #E8E8ED;
-  --sidebar-ring: #1D1D1F;
+:root,
+.light {
+  --background: #f6f7f9;
+  --foreground: #0f1217;
+  --card: #ffffff;
+  --card-foreground: #0f1217;
+  --popover: #ffffff;
+  --popover-foreground: #0f1217;
+  --primary: #11141a;
+  --primary-foreground: #ffffff;
+  --secondary: #edeff3;
+  --secondary-foreground: #0f1217;
+  --muted: #edeff3;
+  --muted-foreground: #5d6877;
+  --accent: #edeff3;
+  --accent-foreground: #0f1217;
+  --destructive: #c7372f;
+  --border: #e3e6eb;
+  --input: #e3e6eb;
+  --ring: #087e9d;
+
+  --highlight: #087e9d;
+  --highlight-foreground: #ffffff;
+  --gain: #0e7a4f;
+  --loss: #c7372f;
+  --warning: #b45309;
+
+  --chart-1: #087e9d;
+  --chart-2: #5d6877;
+  --chart-3: #98a2b2;
+  --chart-4: #d4d9e0;
+  --chart-5: #e9ecf0;
+
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0f1217;
+  --sidebar-primary: #11141a;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #edeff3;
+  --sidebar-accent-foreground: #0f1217;
+  --sidebar-border: #e3e6eb;
+  --sidebar-ring: #087e9d;
+
+  /* Depth — soft and diffuse, never harsh. --shadow-card is the everyday
+     card treatment (token-driven so dark mode can add its light edge). */
+  --shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.04);
+  --shadow-sm: 0 2px 8px rgba(16, 24, 40, 0.05);
+  --shadow-md: 0 8px 28px rgba(16, 24, 40, 0.07);
+  --shadow-lg: 0 16px 48px rgba(16, 24, 40, 0.1);
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
- *  Colors -- DARK mode
- *  Near-black background, elevated surfaces slightly lighter. The accent
- *  inverts to white. Borders go to a subtle white-with-alpha.
+ *  DARK mode — the hallmark. Deep blue-black, three elevation layers:
+ *  background (base) → card (raised) → popover (overlay). Borders are
+ *  white-alpha; raised surfaces catch a 1px top light edge.
  *  ───────────────────────────────────────────────────────────────────────── */
 .dark {
-  --background: #000000;
-  --foreground: #F5F5F7;
-  --card: #1D1D1F;
-  --card-foreground: #F5F5F7;
-  --popover: #1D1D1F;
-  --popover-foreground: #F5F5F7;
-  --primary: #F5F5F7;
-  --primary-foreground: #1D1D1F;
-  --secondary: #2C2C2E;
-  --secondary-foreground: #F5F5F7;
-  --muted: #1D1D1F;
-  --muted-foreground: #86868B;
-  --accent: #2C2C2E;
-  --accent-foreground: #F5F5F7;
-  --destructive: #FF453A;
-  --border: rgba(255, 255, 255, 0.10);
-  --input: rgba(255, 255, 255, 0.10);
-  --ring: #F5F5F7;
-  --chart-1: #F5F5F7;
-  --chart-2: #86868B;
-  --chart-3: #6E6E73;
-  --chart-4: #3A3A3C;
-  --chart-5: #2C2C2E;
-  --sidebar: #1D1D1F;
-  --sidebar-foreground: #F5F5F7;
-  --sidebar-primary: #F5F5F7;
-  --sidebar-primary-foreground: #1D1D1F;
-  --sidebar-accent: #2C2C2E;
-  --sidebar-accent-foreground: #F5F5F7;
-  --sidebar-border: rgba(255, 255, 255, 0.10);
-  --sidebar-ring: #F5F5F7;
+  --background: #0a0c10;
+  --foreground: #eceff4;
+  --card: #12151c;
+  --card-foreground: #eceff4;
+  --popover: #181c25;
+  --popover-foreground: #eceff4;
+  --primary: #f4f6f9;
+  --primary-foreground: #0a0c10;
+  --secondary: #1c212b;
+  --secondary-foreground: #eceff4;
+  --muted: #161a22;
+  --muted-foreground: #8b95a7;
+  --accent: #1c212b;
+  --accent-foreground: #eceff4;
+  --destructive: #ff6b6b;
+  --border: rgba(255, 255, 255, 0.08);
+  --input: rgba(255, 255, 255, 0.1);
+  --ring: #2dd4ed;
+
+  --highlight: #2dd4ed;
+  --highlight-foreground: #06222b;
+  --gain: #3ddc97;
+  --loss: #ff6b6b;
+  --warning: #f5b952;
+
+  --chart-1: #2dd4ed;
+  --chart-2: #8b95a7;
+  --chart-3: #5a6577;
+  --chart-4: #39414f;
+  --chart-5: #262c37;
+
+  --sidebar: #0e1117;
+  --sidebar-foreground: #eceff4;
+  --sidebar-primary: #f4f6f9;
+  --sidebar-primary-foreground: #0a0c10;
+  --sidebar-accent: #1c212b;
+  --sidebar-accent-foreground: #eceff4;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-ring: #2dd4ed;
+
+  /* Dark depth: deeper diffuse blacks + the 1px top light-catch on cards. */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.45);
+  --shadow-md: inset 0 1px 0 0 rgba(255, 255, 255, 0.04),
+    0 8px 28px rgba(0, 0, 0, 0.5);
+  --shadow-lg: inset 0 1px 0 0 rgba(255, 255, 255, 0.05),
+    0 16px 48px rgba(0, 0, 0, 0.55);
+  --shadow-card: inset 0 1px 0 0 rgba(255, 255, 255, 0.04),
+    0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -195,10 +232,19 @@
     background-color: var(--background);
     color: var(--foreground);
   }
-  /* Default focus -- soft ring using the accent ring. */
+  ::selection {
+    background: color-mix(in srgb, var(--highlight) 28%, transparent);
+  }
+  /* Focus — a precise cyan ring. The futuristic tell, earned not decorative. */
   *:focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
+  }
+  /* Quiet scrollbars that match the surface system. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--foreground) 18%, transparent)
+      transparent;
   }
   /* Honour the user's reduced-motion preference everywhere. */
   @media (prefers-reduced-motion: reduce) {
@@ -214,12 +260,7 @@
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
- *  Type-scale utilities. Use these to opt INTO the strict scale --
- *  Tailwind's default text-* utilities still work for body copy.
- *
- *      <h1 className="text-display">…</h1>
- *      <h2 className="text-h1">…</h2>
- *      <p  className="text-body-lg">…</p>
+ *  Utilities — the strict type scale, data text, motion helpers, surfaces.
  *  ───────────────────────────────────────────────────────────────────────── */
 @layer utilities {
   .text-display {
@@ -267,8 +308,23 @@
     font-weight: 400;
     color: var(--muted-foreground);
   }
+  /* Section eyebrow — the uppercase micro-label above every headline. */
+  .text-eyebrow {
+    font-size: 11px;
+    line-height: 1.2;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+  /* Data text — mono with tabular numerals. Every metric, price, ticker. */
+  .text-data {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
 
-  /* Apple-tier transition helper. Apply to any interactive element. */
+  /* The transition helper applied to every interactive element. */
   .transition-premium {
     transition-timing-function: var(--ease-out-quart);
     transition-duration: var(--duration-fast);
@@ -276,9 +332,32 @@
       opacity, box-shadow;
   }
 
-  /* Page transition fade. Used by <PageTransition> which remounts on
-     pathname change. Opacity-only (no transform) keeps text rendering
-     stable; cheap to composite. */
+  /* Glass — for sticky headers/overlays only, where blur earns its cost. */
+  .glass {
+    background: color-mix(in srgb, var(--background) 78%, transparent);
+    backdrop-filter: blur(16px) saturate(1.3);
+    -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  }
+
+  /* Ambient page glow — dark hero/landing surfaces opt in. A faint cyan
+     bloom at the top edge plus a deep indigo counter-bloom low-right;
+     invisible enough to never compete with text. */
+  .bg-ambient {
+    background-image:
+      radial-gradient(
+        1100px 520px at 50% -120px,
+        color-mix(in srgb, var(--highlight) 7%, transparent),
+        transparent 70%
+      ),
+      radial-gradient(
+        900px 600px at 85% 110%,
+        rgba(79, 70, 229, 0.05),
+        transparent 70%
+      );
+  }
+
+  /* Page transition fade. Used by <PageTransition>; opacity-only keeps text
+     rendering stable and is cheap to composite. */
   @keyframes pageFade {
     from {
       opacity: 0;
@@ -288,11 +367,31 @@
     }
   }
 
-  /* Responsive headline shrinks. Display is gigantic on mobile -- step it
-     down so it doesn't bleed off-screen. */
+  /* Skeleton shimmer — a slow light sweep, never a spinner. */
+  @keyframes shimmer {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -200% 0;
+    }
+  }
+  .skeleton-shimmer {
+    background: linear-gradient(
+      100deg,
+      var(--secondary) 42%,
+      color-mix(in srgb, var(--foreground) 7%, var(--secondary)) 50%,
+      var(--secondary) 58%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.8s linear infinite;
+  }
+
+  /* Responsive headline shrinks. */
   @media (max-width: 768px) {
     .text-display {
-      font-size: 44px;
+      font-size: 42px;
+      letter-spacing: -0.03em;
     }
     .text-h1 {
       font-size: 32px;
@@ -303,17 +402,16 @@
   }
 
   /* ── Long-form prose for the report viewer ────────────────────────
-     The reports table stores LLM-composed HTML that we render with
-     dangerouslySetInnerHTML. Without these styles every <h2>, <p>, and
-     <table> would inherit Tailwind's reset and look unstyled. We don't
-     install @tailwindcss/typography because we only need this one place;
-     keeping it inline keeps the bundle small. */
+     The reports table stores LLM-composed HTML rendered with
+     dangerouslySetInnerHTML; these styles keep it on-system. */
   .report-prose {
     color: var(--foreground);
     font-size: var(--text-body-size);
     line-height: var(--text-body-leading);
   }
-  .report-prose > * + * { margin-top: 1.25em; }
+  .report-prose > * + * {
+    margin-top: 1.25em;
+  }
   .report-prose h1 {
     font-size: var(--text-h2-size);
     line-height: var(--text-h2-leading);
@@ -338,7 +436,8 @@
   .report-prose p {
     color: var(--muted-foreground);
   }
-  .report-prose strong, .report-prose b {
+  .report-prose strong,
+  .report-prose b {
     color: var(--foreground);
     font-weight: 600;
   }
@@ -349,13 +448,16 @@
     transition: text-decoration-color 200ms var(--ease-out-quart);
   }
   .report-prose a:hover {
-    text-decoration-color: var(--foreground);
+    text-decoration-color: var(--highlight);
   }
-  .report-prose ul, .report-prose ol {
+  .report-prose ul,
+  .report-prose ol {
     padding-left: 1.25em;
     color: var(--muted-foreground);
   }
-  .report-prose li + li { margin-top: 0.4em; }
+  .report-prose li + li {
+    margin-top: 0.4em;
+  }
   .report-prose hr {
     border: 0;
     border-top: 1px solid var(--border);
@@ -386,7 +488,8 @@
     border-collapse: collapse;
     font-size: var(--text-small-size);
   }
-  .report-prose th, .report-prose td {
+  .report-prose th,
+  .report-prose td {
     padding: 0.65em 0.9em;
     border-bottom: 1px solid var(--border);
     text-align: left;
@@ -398,4 +501,289 @@
     text-transform: uppercase;
     letter-spacing: 0.14em;
   }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ *  Atmosphere & signature motion
+ *  -----------------------------------------------------------------------
+ *  The effects that make the surface feel engineered, not generated:
+ *
+ *    .aurora-*       drifting light field for dark heroes (<AuroraField>)
+ *    .glow-card      cursor-tracked spotlight + traced border (<GlowCard>)
+ *    .word-reveal    per-word masked rise for headlines (<WordReveal>)
+ *    .ticker-tape    seamless market tape (<TickerTape>)
+ *
+ *  All of it is transform/opacity-only (compositor-friendly), collapses
+ *  under prefers-reduced-motion via the global clamp, and the aurora
+ *  freezes on small screens where it can't earn its GPU cost.
+ *  ───────────────────────────────────────────────────────────────────────── */
+
+/* ── Aurora light field ──────────────────────────────────────────────── */
+.aurora-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+  will-change: transform;
+  pointer-events: none;
+}
+.aurora-blob-1 {
+  width: 56vw;
+  height: 56vw;
+  min-width: 480px;
+  min-height: 480px;
+  top: -28%;
+  left: -12%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--highlight) 22%, transparent),
+    transparent 65%
+  );
+  animation: aurora-drift-1 26s ease-in-out infinite alternate;
+}
+.aurora-blob-2 {
+  width: 44vw;
+  height: 44vw;
+  min-width: 420px;
+  min-height: 420px;
+  top: -10%;
+  right: -14%;
+  background: radial-gradient(
+    circle,
+    rgba(79, 70, 229, 0.2),
+    transparent 65%
+  );
+  animation: aurora-drift-2 32s ease-in-out infinite alternate;
+}
+.aurora-blob-3 {
+  width: 38vw;
+  height: 38vw;
+  min-width: 360px;
+  min-height: 360px;
+  bottom: -32%;
+  left: 28%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--highlight) 12%, rgba(61, 220, 151, 0.06)),
+    transparent 65%
+  );
+  animation: aurora-drift-3 38s ease-in-out infinite alternate;
+}
+@keyframes aurora-drift-1 {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  50%  { transform: translate3d(9vw, 7vh, 0) scale(1.12); }
+  to   { transform: translate3d(3vw, -5vh, 0) scale(0.96); }
+}
+@keyframes aurora-drift-2 {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  50%  { transform: translate3d(-10vw, 9vh, 0) scale(0.92); }
+  to   { transform: translate3d(-4vw, -6vh, 0) scale(1.1); }
+}
+@keyframes aurora-drift-3 {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  50%  { transform: translate3d(7vw, -8vh, 0) scale(1.08); }
+  to   { transform: translate3d(-6vw, 4vh, 0) scale(0.95); }
+}
+
+/* Hairline blueprint grid behind the blobs — barely-there structure. */
+.aurora-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(
+      color-mix(in srgb, var(--foreground) 3%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--foreground) 3%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 72px 72px;
+  mask-image: radial-gradient(
+    ellipse 90% 70% at 50% 30%,
+    #000 30%,
+    transparent 75%
+  );
+}
+
+/* Film grain — kills the flat "digital gradient" look. */
+.aurora-grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.6'/></svg>");
+  background-size: 160px 160px;
+}
+
+/* Small screens: keep the light, drop the drift. */
+@media (max-width: 768px) {
+  .aurora-blob {
+    animation: none;
+  }
+}
+
+/* ── Cursor spotlight card (21st.dev-style traced border) ────────────── */
+.glow-card {
+  position: relative;
+}
+/* Interior spotlight that follows the pointer. */
+.glow-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(
+    280px circle at var(--glow-x, 50%) var(--glow-y, 50%),
+    color-mix(in srgb, var(--highlight) 8%, transparent),
+    transparent 65%
+  );
+  opacity: 0;
+  transition: opacity 350ms var(--ease-out-quart);
+}
+/* 1px border segment lit under the pointer, drawn with a mask ring. */
+.glow-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  background: radial-gradient(
+    220px circle at var(--glow-x, 50%) var(--glow-y, 50%),
+    color-mix(in srgb, var(--highlight) 55%, transparent),
+    transparent 70%
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 350ms var(--ease-out-quart);
+}
+.glow-card:hover::before,
+.glow-card:hover::after {
+  opacity: 1;
+}
+/* No pointer to track on touch devices. */
+@media (hover: none) {
+  .glow-card::before,
+  .glow-card::after {
+    display: none;
+  }
+}
+
+/* ── Word reveal — Apple-style masked rise, pure CSS ─────────────────── */
+.word-reveal-mask {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+  /* Mask crops descenders mid-flight; padding keeps them once landed. */
+  padding-bottom: 0.12em;
+  margin-bottom: -0.12em;
+}
+.word-reveal {
+  display: inline-block;
+  transform: translateY(115%);
+  animation: word-rise 800ms var(--ease-out-quart) forwards;
+  will-change: transform;
+}
+@keyframes word-rise {
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* ── Ticker tape ─────────────────────────────────────────────────────── */
+.ticker-tape-mask {
+  overflow: hidden;
+  mask-image: linear-gradient(
+    90deg,
+    transparent,
+    #000 10%,
+    #000 90%,
+    transparent
+  );
+}
+.ticker-tape {
+  display: flex;
+  width: max-content;
+  animation: tape-scroll 48s linear infinite;
+}
+.ticker-tape-mask:hover .ticker-tape {
+  animation-play-state: paused;
+}
+@keyframes tape-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+/* Reduced motion: the global clamp forces one instant iteration; the tape
+   then sits still, fully readable. */
+
+/* ── Table row entrance — rows cascade in once, 30ms apart ───────────── */
+@keyframes row-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.row-in {
+  animation: row-in 450ms var(--ease-out-quart) both;
+}
+
+/* ── Bar growth — score bars / grade distribution sweep open ─────────── */
+@keyframes bar-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+.bar-grow {
+  transform-origin: left center;
+  animation: bar-grow 700ms var(--ease-out-quart) both;
+}
+
+/* ── Cursor glow — ambient light that trails the pointer ─────────────── */
+.cursor-glow {
+  position: fixed;
+  top: -260px;
+  left: -260px;
+  width: 520px;
+  height: 520px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 40;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--highlight) 9%, transparent),
+    transparent 60%
+  );
+  mix-blend-mode: screen;
+  opacity: 0;
+  transition: opacity 600ms var(--ease-out-quart);
+  will-change: transform;
+}
+.cursor-glow[data-active="true"] {
+  opacity: 1;
+}
+/* Light mode: screen-blending a glow over white does nothing — hide it. */
+.light .cursor-glow,
+:root:not(.dark) .cursor-glow {
+  display: none;
 }

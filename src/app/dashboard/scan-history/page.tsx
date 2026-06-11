@@ -61,7 +61,7 @@ export default async function ScanHistoryPage() {
   return (
     <div className="mx-auto max-w-[1280px] space-y-16 px-6 py-14 md:space-y-20 md:px-10 md:py-16">
       <Reveal as="header" className="space-y-3">
-        <p className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+        <p className="text-eyebrow">
           Scan history
         </p>
         <h1 className="text-h1">The last {scans.length} scans.</h1>

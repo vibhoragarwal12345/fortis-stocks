@@ -83,7 +83,7 @@ export default async function EmergingPage() {
   return (
     <div className="mx-auto max-w-[1280px] space-y-16 px-6 py-14 md:space-y-20 md:px-10 md:py-16">
       <Reveal as="header" className="space-y-3">
-        <p className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+        <p className="text-eyebrow">
           Emerging watchlist · long horizon
         </p>
         <h1 className="text-h1">Structured speculation.</h1>
@@ -136,7 +136,7 @@ export default async function EmergingPage() {
         .map((tier) => (
           <section key={tier} className="space-y-6">
             <Reveal>
-              <h2 className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+              <h2 className="text-eyebrow">
                 {TIER_LABEL[tier]}
               </h2>
             </Reveal>
@@ -168,10 +168,10 @@ export default async function EmergingPage() {
                             Return since added
                           </p>
                           <p
-                            className={`text-h2 tabular-nums ${
+                            className={`text-data text-h2 ${
                               (r.return_since_added ?? 0) >= 0
-                                ? "text-foreground"
-                                : "text-destructive"
+                                ? "text-gain"
+                                : "text-loss"
                             }`}
                           >
                             {pct(r.return_since_added)}

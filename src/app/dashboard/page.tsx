@@ -1,10 +1,12 @@
 import Link from "next/link"
-import { ArrowRight } from "lucide-react"
 
 import { createClient } from "@/lib/supabase/server"
 import { trackEvent } from "@/lib/track"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
+import { CountUp } from "@/components/ui/count-up"
 import { Reveal } from "@/components/ui/reveal"
+import { WordReveal } from "@/components/ui/word-reveal"
+import { ShortlistTable, type ShortlistRow } from "@/components/shortlist-table"
 
 export const metadata = { title: "Today — Fortis" }
 export const dynamic = "force-dynamic"
@@ -42,12 +44,6 @@ function num(v: unknown): number | null {
   if (v == null) return null
   const n = typeof v === "number" ? v : Number(v)
   return Number.isFinite(n) ? n : null
-}
-
-function pct(v: number | null, digits = 2): string {
-  if (v == null) return "—"
-  const sign = v > 0 ? "+" : ""
-  return `${sign}${v.toFixed(digits)}%`
 }
 
 function timeAgo(iso: string | null | undefined, now: number): string {
@@ -111,6 +107,8 @@ export default async function DashboardHomePage() {
     shortlist = (data ?? []) as ScanResult[]
   }
 
+  // Server component: rendered once per request, so "now" is stable here.
+  // eslint-disable-next-line react-hooks/purity
   const nowMs = Date.now()
   const lastUpdated = scan?.completed_at ?? scan?.scan_timestamp ?? null
 
@@ -120,7 +118,7 @@ export default async function DashboardHomePage() {
       <Reveal as="header">
         <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3">
           <div className="space-y-2">
-            <p className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+            <p className="text-eyebrow">
               Market scan · {scan?.scan_type ?? "—"}
             </p>
             <h1 className="text-h1">Top opportunities, right now.</h1>
@@ -153,36 +151,166 @@ export default async function DashboardHomePage() {
         </Reveal>
       )}
 
-      {/* ── Shortlist ───────────────────────────────────────────────── */}
+      {/* ── The Wire — what this scan actually said ─────────────────── */}
+      {scan && shortlist.length > 0 && (
+        <ScanWire rows={shortlist.map(toShortlistRow)} />
+      )}
+
+      {/* ── Shortlist — the terminal core ───────────────────────────── */}
       {scan && shortlist.length > 0 && (
         <section className="space-y-6">
           <Reveal>
             <div className="flex items-baseline justify-between gap-4">
-              <h2 className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
+              <h2 className="text-eyebrow">
                 Shortlist · top {shortlist.length} by composite score
               </h2>
-              <p className="text-caption tabular-nums">
+              <p className="text-caption text-data">
                 {scan.tickers_scanned_count ?? 0} tickers scanned
               </p>
             </div>
           </Reveal>
 
-          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {shortlist.map((r, idx) => (
-              <Reveal key={r.ticker} delay={Math.min(idx, 8) * 50}>
-                <Link
-                  href={`/dashboard/research/${r.ticker}`}
-                  className="group block h-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-xl"
-                >
-                  <ScanCard r={r} />
-                </Link>
-              </Reveal>
-            ))}
-          </div>
+          <Reveal delay={80}>
+            <ShortlistTable rows={shortlist.map(toShortlistRow)} />
+          </Reveal>
         </section>
       )}
     </div>
   )
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+//  The Wire — headlines derived from the scan itself. No LLM, no hype:
+//  every number on screen is a row in scan_results.
+// ─────────────────────────────────────────────────────────────────────────
+
+function ScanWire({ rows }: { rows: ShortlistRow[] }) {
+  const withChange = rows.filter((r) => r.dayChangePct != null)
+  if (withChange.length === 0) return null
+
+  const topMover = [...withChange].sort(
+    (a, b) => Math.abs(b.dayChangePct!) - Math.abs(a.dayChangePct!),
+  )[0]
+  const volLeader = [...rows]
+    .filter((r) => r.relVol != null)
+    .sort((a, b) => b.relVol! - a.relVol!)[0]
+  const breakouts = rows.filter((r) => r.breakout).length
+  const topScore = [...rows]
+    .filter((r) => r.score != null)
+    .sort((a, b) => b.score! - a.score!)[0]
+
+  const moverPct = topMover.dayChangePct!
+  const lead =
+    Math.abs(moverPct) >= 1
+      ? `${topMover.ticker} leads the tape — ${moverPct >= 0 ? "up" : "down"} ${Math.abs(moverPct).toFixed(1)}% ${
+          topMover.relVol != null && topMover.relVol >= 1.5
+            ? `on ${topMover.relVol.toFixed(1)}× volume`
+            : "this session"
+        }.`
+      : `A quiet tape — ${topMover.ticker} is the biggest mover at ${moverPct >= 0 ? "+" : ""}${moverPct.toFixed(2)}%.`
+
+  const cards = [
+    topMover && {
+      href: `/dashboard/research/${topMover.ticker}`,
+      label: `Top mover · ${topMover.ticker}`,
+      value: (
+        <CountUp
+          value={moverPct}
+          signed
+          decimals={2}
+          suffix="%"
+          className={moverPct >= 0 ? "text-gain" : "text-loss"}
+        />
+      ),
+    },
+    volLeader &&
+      volLeader.relVol != null && {
+        href: `/dashboard/research/${volLeader.ticker}`,
+        label: `Volume leader · ${volLeader.ticker}`,
+        value: (
+          <CountUp
+            value={volLeader.relVol}
+            decimals={2}
+            suffix="× avg"
+            className="text-highlight"
+          />
+        ),
+      },
+    {
+      href: null,
+      label: "Breakouts flagged",
+      value: <CountUp value={breakouts} className={breakouts > 0 ? "text-gain" : undefined} />,
+    },
+    topScore && {
+      href: `/dashboard/research/${topScore.ticker}`,
+      label: `Top composite · ${topScore.ticker}`,
+      value: <CountUp value={topScore.score!} decimals={1} />,
+    },
+  ].filter(Boolean) as {
+    href: string | null
+    label: string
+    value: React.ReactNode
+  }[]
+
+  return (
+    <section className="space-y-6">
+      <Reveal>
+        <h2 className="text-eyebrow flex items-center gap-2.5">
+          <span aria-hidden className="relative flex size-1.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-highlight opacity-60" />
+            <span className="relative inline-flex size-1.5 rounded-full bg-highlight" />
+          </span>
+          The wire · derived from this scan
+        </h2>
+      </Reveal>
+      <WordReveal as="p" className="text-h2 max-w-[760px]" text={lead} step={50} />
+      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border lg:grid-cols-4">
+        {cards.map((c, i) => {
+          const inner = (
+            <>
+              <p className="text-data text-h3">{c.value}</p>
+              <p className="mt-1 text-caption">{c.label}</p>
+            </>
+          )
+          return c.href ? (
+            <Link
+              key={c.label}
+              href={c.href}
+              className="row-in block bg-card px-5 py-4 transition-premium hover:bg-secondary/60"
+              style={{ animationDelay: `${i * 70}ms` }}
+            >
+              {inner}
+            </Link>
+          ) : (
+            <div
+              key={c.label}
+              className="row-in bg-card px-5 py-4"
+              style={{ animationDelay: `${i * 70}ms` }}
+            >
+              {inner}
+            </div>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
+function toShortlistRow(r: ScanResult): ShortlistRow {
+  return {
+    ticker: r.ticker,
+    rank: num(r.rank),
+    score: num(r.composite_score),
+    price: num(r.price),
+    dayChangePct: num(r.day_change_pct),
+    gapPct: num(r.gap_pct),
+    ret20Pct: num(r.return_20d_pct),
+    relVol: num(r.relative_volume),
+    rsi: num(r.rsi_14),
+    fromHighPct: num(r.pct_from_52w_high),
+    breakout: !!r.is_breakout,
+    breakdown: !!r.is_breakdown,
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -198,17 +326,32 @@ function DataFreshness({
   nowMs: number
   scan: ScanRow | null
 }) {
+  // Fresh = younger than the 2h manual-refresh window.
+  const fresh =
+    lastUpdated != null &&
+    nowMs - new Date(lastUpdated).getTime() < 2 * 60 * 60 * 1000
+
   return (
-    <div className="rounded-md border border-border bg-card px-4 py-3 text-small">
-      <p className="font-medium text-foreground">
+    <div className="rounded-lg border border-border bg-card px-4 py-3 text-small shadow-[var(--shadow-card)]">
+      <p className="flex items-center gap-2 font-medium text-foreground">
+        <span aria-hidden className="relative flex size-1.5">
+          {fresh && (
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-highlight opacity-60" />
+          )}
+          <span
+            className={`relative inline-flex size-1.5 rounded-full ${
+              fresh ? "bg-highlight" : "bg-muted-foreground"
+            }`}
+          />
+        </span>
         Last updated {timeAgo(lastUpdated, nowMs)}
       </p>
-      <p className="text-caption tabular-nums">
+      <p className="text-caption text-data">
         {fmtTimestamp(lastUpdated)}{" · "}
         <span className="text-muted-foreground">15-min delayed price data</span>
       </p>
       {scan && (
-        <p className="mt-1 text-caption text-muted-foreground tabular-nums">
+        <p className="mt-1 text-caption text-data text-muted-foreground">
           {scan.tickers_scanned_count ?? 0} scanned ·{" "}
           {scan.shortlist_count ?? 0} shortlisted
           {scan.graded_count != null && scan.graded_count > 0 && (
@@ -217,127 +360,5 @@ function DataFreshness({
         </p>
       )}
     </div>
-  )
-}
-
-function ScanCard({ r }: { r: ScanResult }) {
-  const score = num(r.composite_score) ?? 0
-  const price = num(r.price)
-  const dchg = num(r.day_change_pct)
-  const gap = num(r.gap_pct)
-  const ret20 = num(r.return_20d_pct)
-  const relVol = num(r.relative_volume)
-  const rsi = num(r.rsi_14)
-  const fromHigh = num(r.pct_from_52w_high)
-
-  return (
-    <Card
-      size="sm"
-      className="h-full transition-premium duration-300 group-hover:-translate-y-0.5 group-hover:shadow-[var(--shadow-md)]"
-    >
-      <CardHeader>
-        <div className="flex items-baseline justify-between">
-          <CardTitle className="flex items-baseline gap-2">
-            <span className="font-mono text-[20px] tracking-tight">
-              {r.ticker}
-            </span>
-            <span className="text-caption tabular-nums text-muted-foreground">
-              #{r.rank ?? "—"}
-            </span>
-          </CardTitle>
-          <span className="text-caption uppercase tracking-[0.14em] text-foreground tabular-nums">
-            {score.toFixed(0)}
-          </span>
-        </div>
-        <p className="text-caption tabular-nums">
-          {price != null ? `$${price.toFixed(2)}` : "—"}
-          {dchg != null && (
-            <>
-              {" · "}
-              <span
-                className={dchg >= 0 ? "text-foreground" : "text-destructive"}
-              >
-                {pct(dchg)}
-              </span>
-            </>
-          )}
-          {gap != null && Math.abs(gap) >= 0.5 && (
-            <>
-              {" · gap "}
-              <span
-                className={gap >= 0 ? "text-foreground" : "text-destructive"}
-              >
-                {pct(gap)}
-              </span>
-            </>
-          )}
-        </p>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <dl className="grid grid-cols-3 gap-x-3 gap-y-2 text-caption">
-          <Metric
-            label="20d ret"
-            value={pct(ret20)}
-            good={ret20 != null && ret20 > 0}
-          />
-          <Metric
-            label="rel vol"
-            value={relVol != null ? `${relVol.toFixed(2)}×` : "—"}
-            good={relVol != null && relVol > 1.2}
-          />
-          <Metric label="RSI" value={rsi != null ? rsi.toFixed(0) : "—"} />
-          <Metric label="52w hi" value={pct(fromHigh)} />
-          <div className="col-span-2">
-            <BadgeRow r={r} />
-          </div>
-        </dl>
-        <p className="flex items-center gap-1 text-caption transition-premium group-hover:text-foreground">
-          Open research <ArrowRight className="size-3" />
-        </p>
-      </CardContent>
-    </Card>
-  )
-}
-
-function Metric({
-  label,
-  value,
-  good,
-}: {
-  label: string
-  value: string
-  good?: boolean
-}) {
-  return (
-    <div className="space-y-0.5">
-      <dt className="text-muted-foreground uppercase tracking-[0.10em]">
-        {label}
-      </dt>
-      <dd className={`tabular-nums ${good ? "text-foreground" : ""}`}>
-        {value}
-      </dd>
-    </div>
-  )
-}
-
-function BadgeRow({ r }: { r: ScanResult }) {
-  const flags: string[] = []
-  if (r.is_breakout) flags.push("breakout")
-  if (r.is_breakdown) flags.push("breakdown")
-  if (r.relative_volume != null && r.relative_volume >= 2) flags.push("vol surge")
-  if (r.rsi_14 != null && r.rsi_14 <= 30) flags.push("oversold")
-  if (r.rsi_14 != null && r.rsi_14 >= 70) flags.push("overbought")
-  if (flags.length === 0) return null
-  return (
-    <ul className="flex flex-wrap gap-1.5">
-      {flags.map((f) => (
-        <li
-          key={f}
-          className="rounded border border-border px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-foreground/80"
-        >
-          {f}
-        </li>
-      ))}
-    </ul>
   )
 }
