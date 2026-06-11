@@ -25,10 +25,9 @@ export default function TermsPage() {
 
       <h2>Eligibility and access</h2>
       <p>
-        The Service is offered on an invite-only basis to investment
-        professionals and other authorized users. Access is personal to you
-        and may not be shared. We may suspend or revoke access at our
-        discretion.
+        The Service is offered to investment professionals and other users
+        who register for an account. Access is personal to you and may not
+        be shared. We may suspend or revoke access at our discretion.
       </p>
 
       <h2>Your account</h2>

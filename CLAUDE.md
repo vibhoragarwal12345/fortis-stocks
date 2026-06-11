@@ -150,7 +150,7 @@ Migration `041_multi_tenancy.sql` introduces tenant-scoped data isolation. The p
 
 **Access control — NO BILLING.** Tier gating is replaced by `tenant.access_status` + `tenant.feature_flags`. There is no Stripe, no pricing, no subscription tier, no checkout, no trial-expiration logic. Billing is deliberately deferred until the product is validated. `src/lib/permissions.ts` (`checkAccess`, `canAccessFeature`) is the single source of truth.
 
-**Signup is invite-only.** `/signup` requires `?token=…`; the token is validated via `lookup_invite()`, the email field is locked to the invite address, and on success the new user is linked to the tenant via `tenant_members` and the invite is marked accepted. Bare `/signup` and invalid tokens render an "access is invite-only" card.
+**Signup is open** (invite gate removed June 2026 for the friends-and-family launch). `/signup` is a plain email+password form; on success the new user is linked to the Fortis tenant via `tenant_members` as `member` (service role, before email confirmation). Admin-panel invites (`tenant_invites` + `lookup_invite()`) still exist for onboarding other tenants but are no longer required to sign up.
 
 **Root `/` is a login gateway, not a marketing/pricing page.** Serious dark-green + ivory. Product name, "Sign in" button, and a single "Access is currently invite-only" line. No pricing or feature grid.
 

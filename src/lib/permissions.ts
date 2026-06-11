@@ -10,7 +10,7 @@ export function checkAccess(tenant: Tenant | null | undefined): AccessVerdict {
       ok: false,
       reason: "no_tenant",
       message:
-        "Your account is not linked to a tenant. Contact vibhora030@gmail.com to be invited.",
+        "Your account is not linked to a workspace. Contact vibhora030@gmail.com for access.",
     }
   }
   if (tenant.access_status === "suspended") {

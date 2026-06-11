@@ -22,8 +22,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
       {error === "email_confirmation_failed" && (
         <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3.5 py-3 text-small text-destructive">
-          Email confirmation failed. Try signing up again or request a new
-          invite.
+          Email confirmation failed. Try signing up again.
         </div>
       )}
 

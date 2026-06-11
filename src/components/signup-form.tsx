@@ -30,18 +30,12 @@ const schema = z
 
 type FormValues = z.infer<typeof schema>
 
-export function SignupForm({
-  token,
-  inviteEmail,
-}: {
-  token: string
-  inviteEmail: string
-}) {
+export function SignupForm() {
   const [serverError, setServerError] = useState<string | null>(null)
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { email: inviteEmail, password: "", confirmPassword: "" },
+    defaultValues: { email: "", password: "", confirmPassword: "" },
   })
 
   async function onSubmit(values: FormValues) {
@@ -49,7 +43,6 @@ export function SignupForm({
     const result = await signup({
       email: values.email,
       password: values.password,
-      token,
     })
     if (result?.error) {
       setServerError(result.error)
@@ -73,8 +66,8 @@ export function SignupForm({
               <FormControl>
                 <Input
                   type="email"
+                  placeholder="you@example.com"
                   autoComplete="email"
-                  readOnly
                   {...field}
                 />
               </FormControl>

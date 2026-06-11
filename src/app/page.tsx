@@ -120,12 +120,18 @@ export default async function Home() {
                   </p>
                 </Reveal>
                 <Reveal delay={820}>
-                  <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-2">
-                    <Link href="/login" className={buttonVariants({ size: "xl" })}>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-3 pt-2">
+                    <Link href="/signup" className={buttonVariants({ size: "xl" })}>
+                      Get started
+                    </Link>
+                    <Link
+                      href="/login"
+                      className={buttonVariants({ variant: "ghost", size: "xl" })}
+                    >
                       Sign in
                     </Link>
                     <span className="text-small text-muted-foreground">
-                      Access is currently invite-only.
+                      Free while in early access.
                     </span>
                   </div>
                 </Reveal>

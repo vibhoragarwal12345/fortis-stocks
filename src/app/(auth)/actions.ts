@@ -3,6 +3,7 @@
 import { headers } from "next/headers"
 import { createClient } from "@/lib/supabase/server"
 import { createServiceClient } from "@/lib/supabase/service"
+import { FORTIS_TENANT_ID } from "@/lib/tenant"
 import { redirect } from "next/navigation"
 
 async function siteOrigin(): Promise<string> {
@@ -30,44 +31,13 @@ export async function login(formData: { email: string; password: string }) {
 }
 
 /**
- * Invite-only signup. Validates `token` against tenant_invites (anonymously,
- * via lookup_invite RPC), creates the auth user, and atomically links them
- * to the tenant. Email must match the invite (case-insensitive).
+ * Open signup. Anyone can create an account; new users join the Fortis
+ * tenant as members. (The invite-token gate was removed for the
+ * friends-and-family launch — admin-panel invites still work for other
+ * tenants, they're just no longer required.)
  */
-export async function signup(formData: {
-  email: string
-  password: string
-  token: string
-}) {
-  const token = formData.token?.trim()
-  if (!token) {
-    return { error: "Signup is invite-only. An invite link is required." }
-  }
-
-  type InviteRow = {
-    tenant_id: string
-    tenant_name: string
-    email: string
-    role: "admin" | "member"
-    expires_at: string
-    is_valid: boolean
-  }
-
+export async function signup(formData: { email: string; password: string }) {
   const supabase = await createClient()
-  const { data: invite, error: lookupErr } = await supabase
-    .rpc("lookup_invite", { p_token: token })
-    .maybeSingle<InviteRow>()
-
-  if (lookupErr) return { error: lookupErr.message }
-  if (!invite || !invite.is_valid) {
-    return { error: "This invite link is invalid or has expired." }
-  }
-  if (
-    formData.email.trim().toLowerCase() !==
-    String(invite.email).trim().toLowerCase()
-  ) {
-    return { error: "Email must match the address the invite was sent to." }
-  }
 
   const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
     email: formData.email,
@@ -81,31 +51,23 @@ export async function signup(formData: {
     return { error: "Sign-up succeeded but no user id was returned." }
   }
 
-  // Service role: link the new user to the tenant and mark invite consumed.
-  // We do this server-side regardless of whether email confirmation has
-  // completed -- otherwise the user would land in /login with no tenant.
+  // Service role: link the new user to the default tenant. Done server-side
+  // before email confirmation completes -- otherwise the user would land in
+  // /login with no tenant.
   const service = createServiceClient()
   const { error: memberErr } = await service
     .from("tenant_members")
     .upsert(
       {
-        tenant_id: invite.tenant_id as string,
+        tenant_id: FORTIS_TENANT_ID,
         user_id: newUserId,
-        role: invite.role as "admin" | "member",
+        role: "member",
         invited_by: null,
         accepted_at: new Date().toISOString(),
       },
       { onConflict: "tenant_id,user_id" },
     )
   if (memberErr) return { error: memberErr.message }
-
-  await service
-    .from("tenant_invites")
-    .update({
-      accepted_at: new Date().toISOString(),
-      accepted_by_user_id: newUserId,
-    })
-    .eq("token", token)
 
   redirect("/check-email")
 }

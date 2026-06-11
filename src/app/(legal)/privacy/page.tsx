@@ -21,7 +21,7 @@ export default function PrivacyPage() {
         This Privacy Policy explains how Fortis Stock Intelligence
         (&ldquo;Fortis,&rdquo; &ldquo;we,&rdquo; &ldquo;us&rdquo;), operated by
         The Fortis Agency, collects, uses, and protects personal information
-        when you access our invite-only stock-research platform (the
+        when you access our stock-research platform (the
         &ldquo;Service&rdquo;). By using the Service you agree to the practices
         described here.
       </p>
