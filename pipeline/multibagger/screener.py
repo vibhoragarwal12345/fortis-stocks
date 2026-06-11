@@ -413,8 +413,8 @@ def _form4_insider_map(db) -> dict[str, dict]:
         cutoff = (datetime.now(timezone.utc) - timedelta(days=180)).isoformat()
         rows = (
             db.table("form4_transactions")
-              .select("ticker, transaction_code, is_directional_signal, transaction_shares")
-              .gte("filing_date", cutoff)
+              .select("ticker, transaction_code, is_directional_signal")
+              .gte("transaction_date", cutoff)
               .execute()
               .data or []
         )

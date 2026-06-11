@@ -108,7 +108,7 @@ def _fetch_sec_filings(db, ticker: str, limit: int = 5) -> list[dict]:
     try:
         rows = (
             db.table("sec_filings")
-              .select("form_type, filing_date, filing_url, title")
+              .select("form_type, filing_date, filing_url, description")
               .eq("ticker", ticker)
               .order("filing_date", desc=True)
               .limit(limit)
@@ -125,9 +125,9 @@ def _fetch_form4_posture(db, ticker: str, lookback_days: int = 180) -> dict | No
         cutoff = (datetime.now(timezone.utc) - timedelta(days=lookback_days)).isoformat()
         rows = (
             db.table("form4_transactions")
-              .select("transaction_code, is_directional_signal, transaction_shares, transaction_price, person_title")
+              .select("transaction_code, is_directional_signal, shares, price_per_share, role")
               .eq("ticker", ticker)
-              .gte("filing_date", cutoff)
+              .gte("transaction_date", cutoff)
               .execute()
               .data or []
         )
@@ -149,7 +149,7 @@ def _fetch_latest_transcript_verdict(db, ticker: str) -> dict | None:
     try:
         rows = (
             db.table("earnings_transcripts")
-              .select("year, quarter, quality_tier, sentiment_score, fetched_at")
+              .select("fiscal_year, fiscal_quarter, quality_grade, fetched_at")
               .eq("ticker", ticker)
               .order("fetched_at", desc=True)
               .limit(1)
@@ -223,10 +223,9 @@ def build_data_section(db, candidate: dict) -> dict:
 
         tx = _fetch_latest_transcript_verdict(db, ticker)
         if tx:
-            data["latest_earnings_year"]    = tx.get("year")
-            data["latest_earnings_quarter"] = tx.get("quarter")
-            data["latest_earnings_quality"] = tx.get("quality_tier")
-            data["latest_earnings_sentiment"] = tx.get("sentiment_score")
+            data["latest_earnings_year"]    = tx.get("fiscal_year")
+            data["latest_earnings_quarter"] = tx.get("fiscal_quarter")
+            data["latest_earnings_quality"] = tx.get("quality_grade")
 
     # Drop None values -- the LLM should see only what we actually know.
     return {k: v for k, v in data.items() if v not in (None, "")}
