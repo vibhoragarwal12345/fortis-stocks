@@ -232,7 +232,17 @@ export function ShortlistTable({ rows }: { rows: ShortlistRow[] }) {
                   {r.rsi != null ? r.rsi.toFixed(0) : "—"}
                 </TableCell>
                 <TableCell numeric className="hidden xl:table-cell pr-5 text-muted-foreground">
-                  {pct(r.fromHighPct)}
+                  {r.fromHighPct == null ? (
+                    "—"
+                  ) : r.fromHighPct >= -0.05 ? (
+                    // Closed at (or within 5bps of) a fresh 52-week high —
+                    // a signal, not a zero.
+                    <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-gain">
+                      at high
+                    </span>
+                  ) : (
+                    pct(r.fromHighPct)
+                  )}
                 </TableCell>
               </TableRow>
             ))}
