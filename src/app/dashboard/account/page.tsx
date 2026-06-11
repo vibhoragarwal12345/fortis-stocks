@@ -17,9 +17,7 @@ export default async function AccountPage() {
   return (
     <div className="mx-auto max-w-[560px] space-y-16 px-6 py-14 md:space-y-20 md:px-10 md:py-16">
       <Reveal as="header" className="space-y-3">
-        <p className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
-          Account
-        </p>
+        <p className="text-eyebrow">Account</p>
         <h1 className="text-h1">Your account.</h1>
         <p className="text-body-lg text-muted-foreground">
           Signed in as{" "}

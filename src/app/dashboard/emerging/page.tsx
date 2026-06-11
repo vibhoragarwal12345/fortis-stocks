@@ -95,10 +95,8 @@ export default async function EmergingPage() {
       </Reveal>
 
       <Reveal>
-        <div className="rounded-md border border-border bg-secondary/40 p-5">
-          <p className="text-caption uppercase tracking-[0.18em] text-foreground">
-            Risk framing
-          </p>
+        <div className="rounded-lg border border-warning/25 bg-warning/5 p-5">
+          <p className="text-eyebrow text-warning">Risk framing</p>
           <p className="mt-2 text-small text-muted-foreground leading-relaxed">
             Emerging candidates are speculative, long-horizon, high-risk
             positions. Most will not become multibaggers. Position sizing

@@ -72,7 +72,7 @@ export function ChangePasswordForm() {
           </div>
         )}
         {success && (
-          <div className="rounded-md border border-border bg-secondary/50 px-3.5 py-3 text-small text-foreground">
+          <div className="rounded-md border border-gain/25 bg-gain/10 px-3.5 py-3 text-small text-gain">
             Password updated. Use your new password next time you sign in.
           </div>
         )}

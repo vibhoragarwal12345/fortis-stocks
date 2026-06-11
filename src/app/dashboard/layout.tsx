@@ -107,7 +107,7 @@ export default async function DashboardLayout({
             ) : (
               <span
                 aria-hidden
-                className="inline-block h-2.5 w-2.5 rounded-sm"
+                className="inline-block size-2 rounded-[2px]"
                 style={{ backgroundColor: theme.primaryColor }}
               />
             )}

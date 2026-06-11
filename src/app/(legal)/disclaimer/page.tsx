@@ -11,9 +11,7 @@ const EFFECTIVE_DATE = "June 11, 2026"
 export default function DisclaimerPage() {
   return (
     <div className="report-prose">
-      <p className="text-caption uppercase tracking-[0.18em] text-muted-foreground">
-        Legal
-      </p>
+      <p className="text-eyebrow">Legal</p>
       <h1 className="mt-2 text-h1">Disclaimer</h1>
       <p className="mt-3 text-small text-muted-foreground">
         Effective {EFFECTIVE_DATE}

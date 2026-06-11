@@ -46,11 +46,8 @@ export default async function AdminLayout({
             href="/admin"
             className="flex shrink-0 items-center gap-2 transition-premium hover:opacity-80"
           >
-            <span
-              aria-hidden
-              className="inline-block h-2.5 w-2.5 rounded-sm bg-foreground"
-            />
-            <span className="text-[14px] font-semibold tracking-tight text-foreground">
+            <span aria-hidden className="size-2 rounded-[2px] bg-highlight" />
+            <span className="text-[13px] font-semibold uppercase tracking-[0.22em]">
               Fortis
             </span>
             <span className="text-eyebrow">
