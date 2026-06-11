@@ -1,5 +1,7 @@
 import Link from "next/link"
 
+import { AuroraField } from "@/components/ui/aurora-field"
+import { CursorGlow } from "@/components/ui/cursor-glow"
 import { SiteFooter } from "@/components/site-footer"
 
 // Shared chrome for the public legal pages (/privacy, /terms, /disclaimer):
@@ -10,7 +12,12 @@ export default function LegalLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="relative flex min-h-screen flex-col">
+      <CursorGlow />
+      <div aria-hidden className="pointer-events-none fixed inset-0 -z-10">
+        <AuroraField />
+      </div>
+
       <header className="border-b border-border">
         <div className="mx-auto flex h-14 max-w-[760px] items-center px-6">
           <Link

@@ -3,6 +3,8 @@ import { redirect } from "next/navigation"
 
 import { createClient } from "@/lib/supabase/server"
 import { isPlatformAdmin } from "@/lib/tenant"
+import { AuroraField } from "@/components/ui/aurora-field"
+import { CursorGlow } from "@/components/ui/cursor-glow"
 import { PageTransition } from "@/components/ui/page-transition"
 import { SiteFooter } from "@/components/site-footer"
 import { signout } from "@/app/dashboard/actions"
@@ -39,7 +41,12 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="relative flex min-h-screen flex-col">
+      <CursorGlow />
+      <div aria-hidden className="pointer-events-none fixed inset-0 -z-10">
+        <AuroraField />
+      </div>
+
       <header className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur-md backdrop-saturate-150">
         <div className="mx-auto flex h-14 max-w-[1280px] items-center justify-between gap-6 px-6 md:px-10">
           <Link
