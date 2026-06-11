@@ -4,8 +4,8 @@ import { SignupForm } from "@/components/signup-form"
 
 export const metadata = { title: "Create account — Fortis" }
 
-// Open signup — anyone can create an account. New users join the Fortis
-// workspace as members and confirm their email before first sign-in.
+// Open signup — anyone can create an account and is signed in instantly
+// (accounts are created pre-confirmed; no confirmation email).
 
 export default function SignupPage() {
   return (
@@ -13,8 +13,8 @@ export default function SignupPage() {
       <div className="space-y-3">
         <h1 className="text-h2">Create account</h1>
         <p className="text-small text-muted-foreground">
-          Free while in early access. You&rsquo;ll confirm your email before
-          your first sign-in.
+          Free while in early access. You&rsquo;ll be in the terminal in
+          seconds.
         </p>
       </div>
 

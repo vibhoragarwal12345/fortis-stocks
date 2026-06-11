@@ -31,30 +31,36 @@ export async function login(formData: { email: string; password: string }) {
 }
 
 /**
- * Open signup. Anyone can create an account; new users join the Fortis
- * tenant as members. (The invite-token gate was removed for the
- * friends-and-family launch — admin-panel invites still work for other
- * tenants, they're just no longer required.)
+ * Open signup, instant access. The account is created pre-confirmed via
+ * the admin API (no confirmation email at all), linked to the Fortis
+ * tenant, and signed in immediately — signup lands straight in the
+ * dashboard. (Invite gate removed for the friends-and-family launch;
+ * admin-panel invites remain for other tenants.)
  */
 export async function signup(formData: { email: string; password: string }) {
-  const supabase = await createClient()
+  const email = formData.email.trim().toLowerCase()
+  const service = createServiceClient()
 
-  const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
-    email: formData.email,
-    password: formData.password,
-  })
+  const { data: created, error: createErr } =
+    await service.auth.admin.createUser({
+      email,
+      password: formData.password,
+      email_confirm: true,
+    })
 
-  if (signUpErr) return { error: signUpErr.message }
+  if (createErr) {
+    const msg = /already|registered|exists/i.test(createErr.message)
+      ? "An account with this email already exists — sign in instead."
+      : createErr.message
+    return { error: msg }
+  }
 
-  const newUserId = signUpData.user?.id
+  const newUserId = created.user?.id
   if (!newUserId) {
     return { error: "Sign-up succeeded but no user id was returned." }
   }
 
-  // Service role: link the new user to the default tenant. Done server-side
-  // before email confirmation completes -- otherwise the user would land in
-  // /login with no tenant.
-  const service = createServiceClient()
+  // Link to the default tenant before the first request hits the dashboard.
   const { error: memberErr } = await service
     .from("tenant_members")
     .upsert(
@@ -69,7 +75,18 @@ export async function signup(formData: { email: string; password: string }) {
     )
   if (memberErr) return { error: memberErr.message }
 
-  redirect("/check-email")
+  // Establish the session on the user's cookies — straight to the product.
+  const supabase = await createClient()
+  const { error: signInErr } = await supabase.auth.signInWithPassword({
+    email,
+    password: formData.password,
+  })
+  if (signInErr) {
+    // Account exists and is confirmed; worst case they sign in manually.
+    redirect("/login")
+  }
+
+  redirect("/dashboard")
 }
 
 /**
