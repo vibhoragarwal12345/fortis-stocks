@@ -2,7 +2,8 @@ import Link from "next/link"
 
 import { AuroraField } from "@/components/ui/aurora-field"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
+import { SiteFooter } from "@/components/site-footer"
 import { GlowCard } from "@/components/ui/glow-card"
 import { TickerTape, type TapeItem } from "@/components/ui/ticker-tape"
 import { WordReveal } from "@/components/ui/word-reveal"
@@ -225,8 +226,31 @@ function SectionHeader({
 
 export default function DesignSystemPage() {
   return (
-    <main className="min-h-screen bg-background bg-ambient text-foreground">
+    <main className="relative min-h-screen bg-background bg-ambient text-foreground">
       <CursorGlow />
+
+      {/* ── Top bar — same mark as landing/auth/admin ────────────── */}
+      <header className="absolute inset-x-0 top-0 z-10">
+        <div className="mx-auto flex h-16 max-w-[1120px] items-center justify-between px-6 md:px-10">
+          <Link
+            href="/"
+            className="flex items-center gap-2.5 transition-premium hover:opacity-80"
+          >
+            <span aria-hidden className="size-2 rounded-[2px] bg-highlight" />
+            <span className="text-[13px] font-semibold uppercase tracking-[0.22em]">
+              Fortis
+            </span>
+            <span className="text-eyebrow">Design system</span>
+          </Link>
+          <Link
+            href="/dashboard"
+            className={buttonVariants({ variant: "ghost", size: "sm" })}
+          >
+            Back to product
+          </Link>
+        </div>
+      </header>
+
       {/* ── Hero ─────────────────────────────────────────────────── */}
       <div className="relative overflow-hidden">
         <AuroraField />
@@ -257,12 +281,6 @@ export default function DesignSystemPage() {
                 <Button size="lg">Primary action</Button>
                 <Button size="lg" variant="outline">Secondary</Button>
                 <Button size="lg" variant="ghost">Ghost</Button>
-                <Link
-                  href="/dashboard"
-                  className="self-center text-small text-muted-foreground underline-offset-4 transition-premium hover:text-foreground hover:underline"
-                >
-                  Back to product →
-                </Link>
               </div>
             </Reveal>
           </div>
@@ -671,16 +689,56 @@ export default function DesignSystemPage() {
           </p>
         </div>
 
-        <div className="mt-10 rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-          <p className="text-eyebrow mb-2">Count-up</p>
-          <p className="text-data text-h1">
-            <CountUp value={94.2} decimals={1} />
-            <span className="text-muted-foreground"> / 100 composite</span>
-          </p>
-          <p className="mt-2 text-caption">
-            Fires once on first viewport entry. Reduced motion renders the
-            final value immediately.
-          </p>
+        <div className="mt-10 grid gap-6 md:grid-cols-2">
+          <div className="rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+            <p className="text-eyebrow mb-2">Count-up</p>
+            <p className="text-data text-h1">
+              <CountUp value={94.2} decimals={1} />
+              <span className="text-muted-foreground"> / 100 composite</span>
+            </p>
+            <p className="mt-2 text-caption">
+              Fires once on first viewport entry. Reduced motion renders the
+              final value immediately.
+            </p>
+          </div>
+
+          {/* Kinetics — the table entrance language: rows cascade in
+              30ms apart, score bars sweep open from zero. */}
+          <div className="rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+            <p className="text-eyebrow mb-4">Kinetics · cascade + bar sweep</p>
+            <ul className="space-y-3">
+              {FOCUS_ROWS.slice(0, 4).map((r, i) => (
+                <li
+                  key={r.ticker}
+                  className="row-in flex items-center justify-between gap-4"
+                  style={{ animationDelay: `${i * 90}ms` }}
+                >
+                  <span className="text-data text-small font-medium">
+                    {r.ticker}
+                  </span>
+                  <span className="flex items-center gap-3">
+                    <span
+                      aria-hidden
+                      className="block h-0.5 w-24 overflow-hidden rounded-full bg-secondary"
+                    >
+                      <span
+                        className="bar-grow block h-full rounded-full bg-highlight/80"
+                        style={{
+                          width: `${Number(r.score)}%`,
+                          animationDelay: `${i * 90 + 250}ms`,
+                        }}
+                      />
+                    </span>
+                    <span className="text-data text-small">{r.score}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-4 text-caption">
+              Reload to replay. Used by the shortlist table and grade
+              distribution bars.
+            </p>
+          </div>
         </div>
       </Section>
 
@@ -731,10 +789,12 @@ export default function DesignSystemPage() {
       <Section spacing="compact" width="default">
         <p className="text-caption">
           End of design-system preview. Tokens live in src/app/globals.css;
-          primitives in src/components/ui. Refine here before applying to
-          product surfaces.
+          primitives in src/components/ui. Internal reference — gate or
+          remove before public launch.
         </p>
       </Section>
+
+      <SiteFooter />
     </main>
   )
 }
