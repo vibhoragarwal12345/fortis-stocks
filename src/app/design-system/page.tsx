@@ -1,5 +1,7 @@
 import Link from "next/link"
+import { redirect } from "next/navigation"
 
+import { createClient } from "@/lib/supabase/server"
 import { AuroraField } from "@/components/ui/aurora-field"
 import { Badge } from "@/components/ui/badge"
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -32,11 +34,12 @@ import {
 } from "@/components/ui/table"
 
 export const metadata = { title: "Design system — Fortis" }
-export const dynamic = "force-static"
+export const dynamic = "force-dynamic"
 
-// Preview surface for the "Institutional Terminal" design system. Lives
-// outside the dashboard layout so the raw tokens shine without tenant
-// theming. Gate or delete before public launch.
+// Internal preview surface for the "Institutional Terminal" design system.
+// Lives outside the dashboard layout so the raw tokens shine without tenant
+// theming. Auth-gated at launch: signup is invite-only, so this is
+// team-visible without being public.
 
 const TYPE_SAMPLES = [
   {
@@ -224,7 +227,13 @@ function SectionHeader({
   )
 }
 
-export default function DesignSystemPage() {
+export default async function DesignSystemPage() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) redirect("/login")
+
   return (
     <main className="relative min-h-screen bg-background bg-ambient text-foreground">
       <CursorGlow />

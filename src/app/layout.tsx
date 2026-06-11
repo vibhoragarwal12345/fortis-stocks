@@ -19,9 +19,36 @@ const geistMono = Geist_Mono({
   display: "swap",
 });
 
+// Set NEXT_PUBLIC_SITE_URL in production so OG/sitemap URLs are absolute.
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"
+
 export const metadata: Metadata = {
-  title: "Fortis Stock Intelligence",
-  description: "Institutional-grade stock intelligence for The Fortis Agency.",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "Fortis Stock Intelligence",
+    template: "%s — Fortis",
+  },
+  description:
+    "Institutional research for wealth advisors. The full liquid US market scanned through every trading day — every claim traced to its source.",
+  openGraph: {
+    title: "Fortis Stock Intelligence",
+    description:
+      "Three thousand stocks. Thirty convictions. Institutional research for wealth advisors — every claim traced to its source.",
+    url: siteUrl,
+    siteName: "Fortis Stock Intelligence",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "Fortis Stock Intelligence",
+    description:
+      "Three thousand stocks. Thirty convictions. Institutional research for wealth advisors.",
+  },
+}
+
+export const viewport = {
+  themeColor: "#0a0c10",
 };
 
 export default function RootLayout({
