@@ -4,7 +4,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 // Badges are pills built entirely from system tokens so they render
-// correctly in dark mode, light mode, and the /design-system light island.
+// correctly in dark mode and light mode.
 //
 // Semantic rules:
 //   accent / gradeA   the one cyan accent — signal, top conviction

@@ -19,12 +19,10 @@ const geistMono = Geist_Mono({
   display: "swap",
 });
 
-// Set NEXT_PUBLIC_SITE_URL in production so OG/sitemap URLs are absolute.
-const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"
+import { SITE_URL } from "@/lib/site"
 
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
+  metadataBase: new URL(SITE_URL),
   title: {
     default: "Fortis Stock Intelligence",
     template: "%s — Fortis",
@@ -35,7 +33,7 @@ export const metadata: Metadata = {
     title: "Fortis Stock Intelligence",
     description:
       "Three thousand stocks. Thirty convictions. Institutional research for wealth advisors — every claim traced to its source.",
-    url: siteUrl,
+    url: SITE_URL,
     siteName: "Fortis Stock Intelligence",
     type: "website",
   },

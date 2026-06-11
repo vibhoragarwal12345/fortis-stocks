@@ -103,7 +103,7 @@
 /* ─────────────────────────────────────────────────────────────────────────
  *  LIGHT mode — the refined daytime variant.
  *  Declared on `:root, .light` so a `.light` wrapper can carve a light
- *  island out of a dark page (used by /design-system).
+ *  island out of a dark page.
  *  ───────────────────────────────────────────────────────────────────────── */
 :root,
 .light {
