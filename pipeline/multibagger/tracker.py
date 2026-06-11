@@ -107,7 +107,7 @@ def refresh(throttle_ms: int = 1100) -> int:
               .select("milestones")
               .eq("ticker", ticker)
               .eq("added_date", added)
-              .maybeSingle()
+              .maybe_single()
               .execute()
         )
         ms: dict = {}
