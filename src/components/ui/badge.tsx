@@ -7,23 +7,16 @@ const badgeVariants = cva(
   "inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide transition-colors",
   {
     variants: {
+      // Monochrome system only — status/sentiment is expressed with the
+      // design tokens (foreground / muted / destructive), never raw Tailwind
+      // color ramps.
       variant: {
-        default:
-          "border-transparent bg-primary text-primary-foreground",
-        secondary:
-          "border-transparent bg-secondary text-secondary-foreground",
-        outline:
-          "border-border bg-background text-foreground",
-        success:
-          "border-emerald-300/50 bg-emerald-50 text-emerald-800 dark:border-emerald-800/40 dark:bg-emerald-950/40 dark:text-emerald-200",
-        warning:
-          "border-amber-300/50 bg-amber-50 text-amber-800 dark:border-amber-800/40 dark:bg-amber-950/40 dark:text-amber-200",
+        default: "border-transparent bg-primary text-primary-foreground",
+        secondary: "border-transparent bg-secondary text-secondary-foreground",
+        outline: "border-border bg-background text-foreground",
+        muted: "border-transparent bg-secondary text-muted-foreground",
         destructive:
-          "border-red-300/50 bg-red-50 text-red-800 dark:border-red-800/40 dark:bg-red-950/40 dark:text-red-200",
-        neutral:
-          "border-stone-300/50 bg-stone-50 text-stone-700 dark:border-stone-700/40 dark:bg-stone-900/40 dark:text-stone-200",
-        info:
-          "border-sky-300/50 bg-sky-50 text-sky-800 dark:border-sky-800/40 dark:bg-sky-950/40 dark:text-sky-200",
+          "border-destructive/30 bg-destructive/5 text-destructive",
       },
     },
     defaultVariants: { variant: "default" },

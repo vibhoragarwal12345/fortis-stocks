@@ -4,6 +4,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { isPlatformAdmin } from "@/lib/tenant"
 import { PageTransition } from "@/components/ui/page-transition"
+import { SiteFooter } from "@/components/site-footer"
 import { signout } from "@/app/dashboard/actions"
 
 export const metadata = { title: "Admin — Fortis" }
@@ -77,6 +78,7 @@ export default async function AdminLayout({
       <main className="flex-1">
         <PageTransition>{children}</PageTransition>
       </main>
+      <SiteFooter />
     </div>
   )
 }

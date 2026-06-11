@@ -6,6 +6,7 @@ import { getActiveTenantMember } from "@/lib/tenant"
 import { themeFromTenant, tenantCssVars } from "@/lib/theme"
 import { checkAccess } from "@/lib/permissions"
 import { PageTransition } from "@/components/ui/page-transition"
+import { SiteFooter } from "@/components/site-footer"
 import { signout } from "./actions"
 
 // Top-level nav for every /dashboard route. Active-link highlighting is
@@ -13,7 +14,6 @@ import { signout } from "./actions"
 const navItems = [
   { href: "/dashboard",              label: "Today" },
   { href: "/dashboard/focus-list",   label: "Focus list" },
-  { href: "/dashboard/track-record", label: "Track record" },
   { href: "/dashboard/emerging",     label: "Emerging" },
   { href: "/dashboard/scan-history", label: "Scan history" },
 ]
@@ -98,10 +98,10 @@ export default async function DashboardLayout({
           {/* ── Account ─────────────────────────────────────────────── */}
           <div className="flex shrink-0 items-center gap-1">
             <Link
-              href="/dashboard/settings/branding"
+              href="/dashboard/account"
               className="hidden rounded-md px-3 py-1.5 text-[13.5px] text-muted-foreground transition-premium hover:text-foreground sm:inline-block"
             >
-              Settings
+              Account
             </Link>
             <form action={signout}>
               <button
@@ -135,20 +135,7 @@ export default async function DashboardLayout({
         <PageTransition>{children}</PageTransition>
       </main>
 
-      <footer className="border-t border-border">
-        <div className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-3 px-6 py-6 md:px-10">
-          <p className="text-caption">
-            &copy; {new Date().getFullYear()} {theme.name} · For licensed
-            advisor review — not investment advice.
-          </p>
-          <Link
-            href="/dashboard/emerging"
-            className="text-caption underline-offset-4 hover:text-foreground hover:underline"
-          >
-            Emerging watchlist →
-          </Link>
-        </div>
-      </footer>
+      <SiteFooter brandName={theme.name} />
     </div>
   )
 }

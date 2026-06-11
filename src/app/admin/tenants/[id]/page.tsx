@@ -243,9 +243,9 @@ export default async function TenantDetailPage({
                     </td>
                     <td className="px-3 py-2">
                       {i.accepted_at
-                        ? <span className="text-emerald-700">accepted</span>
+                        ? <span className="text-foreground">accepted</span>
                         : new Date(i.expires_at).getTime() < Date.now()
-                        ? <span className="text-amber-700">expired</span>
+                        ? <span className="text-muted-foreground">expired</span>
                         : <span className="text-muted-foreground">pending</span>}
                     </td>
                     <td className="px-3 py-2">
