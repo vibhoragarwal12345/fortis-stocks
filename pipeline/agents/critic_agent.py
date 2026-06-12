@@ -33,7 +33,6 @@ import logging
 import re
 import sys
 import time
-from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -189,6 +188,38 @@ def _parse(text: str) -> dict:
 # Entry point
 # ══════════════════════════════════════════════════════════════════════════════
 
+def _persist_one(db, r: dict, scan_id: int | None, run_date) -> bool:
+    """Write one ticker's critique the moment it survives factcheck. A
+    stage-end batch write loses every completed critique when the CI job is
+    killed at the workflow timeout (June 12 2026: two scans died mid-critic
+    and 0/20 critiques survived despite ~16 finishing)."""
+    payload = {
+        "critic_weaknesses":          r["critic_weaknesses"],
+        "critic_disconfirming_data":  r["critic_disconfirming_data"],
+        "critic_precedent_failures":  r["critic_precedent_failures"],
+        "critic_hidden_risks":        r["critic_hidden_risks"],
+        "critic_objection_level":     r["critic_objection_level"],
+        "critic_rewritten_bear_case": r["critic_rewritten_bear_case"],
+        # Dossier verification = min(thesis factcheck, critique factcheck).
+        "dossier_verification_score": r["_dossier_score"],
+        "dossier_quality_grade":      ("VERIFIED" if r["_dossier_score"] >= 0.95
+                                       else "PARTIALLY_VERIFIED"
+                                       if r["_dossier_score"] >= 0.85
+                                       else "UNVERIFIED"),
+    }
+    if r["critic_rewritten_bear_case"]:
+        payload["bear_case"] = r["critic_rewritten_bear_case"]
+    try:
+        q = db.table("ranked_focus_list").update(payload)
+        q = (q.eq("scan_id", scan_id) if scan_id is not None
+             else q.eq("run_date", run_date))
+        q.eq("ticker", r["ticker"]).execute()
+        return True
+    except Exception as exc:
+        log.debug("update %s failed: %s", r["ticker"], exc)
+        return False
+
+
 def run(limit: int = DEFAULT_N, scan_id: int | None = None) -> None:
     db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
     log.info("Critic Agent -- top %d, LLM waterfall: %s",
@@ -261,6 +292,7 @@ def run(limit: int = DEFAULT_N, scan_id: int | None = None) -> None:
     # shot instead of leaving the dossier incomplete.
     results: list[dict] = []
     failed: list[dict] = []
+    updated = 0
     queue = rows
     for attempt in (1, 2):
         if attempt == 2:
@@ -322,6 +354,8 @@ def run(limit: int = DEFAULT_N, scan_id: int | None = None) -> None:
                         if parsed["critic_objection_level"] == "NONE":
                             parsed["critic_objection_level"] = "MODERATE"
                 results.append(parsed)
+                if _persist_one(db, parsed, scan_id, run_date):
+                    updated += 1
                 log.info("%s: %s objection (via %s, factcheck %s %.2f)",
                          r["ticker"], parsed["critic_objection_level"], method,
                          fc["quality_grade"], fc["verification_score"])
@@ -334,34 +368,6 @@ def run(limit: int = DEFAULT_N, scan_id: int | None = None) -> None:
         log.warning("%d ticker(s) STILL missing critiques after retry: %s",
                     len(failed), ", ".join(r["ticker"] for r in failed))
 
-    # Persist -- the rewritten bear case also replaces the original bear_case.
-    now = datetime.now(timezone.utc).isoformat()
-    updated = 0
-    for r in results:
-        payload = {
-            "critic_weaknesses":          r["critic_weaknesses"],
-            "critic_disconfirming_data":  r["critic_disconfirming_data"],
-            "critic_precedent_failures":  r["critic_precedent_failures"],
-            "critic_hidden_risks":        r["critic_hidden_risks"],
-            "critic_objection_level":     r["critic_objection_level"],
-            "critic_rewritten_bear_case": r["critic_rewritten_bear_case"],
-            # Dossier verification = min(thesis factcheck, critique factcheck).
-            "dossier_verification_score": r["_dossier_score"],
-            "dossier_quality_grade":      ("VERIFIED" if r["_dossier_score"] >= 0.95
-                                           else "PARTIALLY_VERIFIED"
-                                           if r["_dossier_score"] >= 0.85
-                                           else "UNVERIFIED"),
-        }
-        if r["critic_rewritten_bear_case"]:
-            payload["bear_case"] = r["critic_rewritten_bear_case"]
-        try:
-            q = db.table("ranked_focus_list").update(payload)
-            q = (q.eq("scan_id", scan_id) if scan_id is not None
-                 else q.eq("run_date", run_date))
-            q.eq("ticker", r["ticker"]).execute()
-            updated += 1
-        except Exception as exc:
-            log.debug("update %s failed: %s", r["ticker"], exc)
     log.info("ranked_focus_list: critique written for %d/%d tickers",
              updated, len(results))
     if updated == 0 and results:

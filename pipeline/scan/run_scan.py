@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import subprocess
 import sys
 import time
@@ -57,12 +58,23 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 PY = sys.executable
 STEP_TIMEOUT_SEC = 1800  # 30 min per step ceiling
 
-# Per-scan dossier budget. Groq (~1K req / ~100K tokens per day) + Gemini
-# (~250 req/day on 2.5-flash free) across 3 daily scans reliably cover ~20
-# full dossiers per scan at 4 LLM calls each (catalyst + smart-money +
-# thesis + critic, plus retries). Layer 2 must cut to exactly what Layer 3
-# can fully cover -- a longer list just ships bare names.
-DEFAULT_TOP_N = 20
+# Whole-scan soft deadline. The CI workflow hard-kills the job at its
+# timeout-minutes and a hard kill loses the dossier gate + finalize (both
+# scans on June 12 2026 died mid-critic: market_scans stuck 'running',
+# scan_state stuck, dashboard stale). The orchestrator therefore stops
+# STARTING enrichment steps once this budget is spent and goes straight to
+# gate + finalize -- a degraded-but-finalized scan instead of a dead one.
+# Keep comfortably below the workflow timeout (55 min).
+SOFT_DEADLINE_SEC = int(os.environ.get("SCAN_SOFT_DEADLINE_SEC", 46 * 60))
+
+# Per-scan dossier budget. Groq (~1K req / ~100K tokens per day) + Cerebras
+# (~1M tokens/day) + Gemini (~250 req/day on 2.5-flash free) across 3 daily
+# scans cover ~25 full dossiers per scan at 4 LLM calls each (catalyst +
+# smart-money + thesis + critic, plus retries) now that slow providers no
+# longer carry load (llm.py speed ranking). Layer 2 must cut to what Layer 3
+# can fully cover -- a longer list just ships bare names; the dossier gate
+# trims any shortfall, so the displayed list lands at 20-25.
+DEFAULT_TOP_N = 25
 
 
 def _now() -> str:
@@ -85,12 +97,13 @@ def _set_scan_state(db, **fields) -> None:
         log.warning("scan_state update failed (%s): %s", fields, exc)
 
 
-def _run_step(name: str, cmd: list[str]) -> tuple[bool, str]:
+def _run_step(name: str, cmd: list[str],
+              timeout_sec: int = STEP_TIMEOUT_SEC) -> tuple[bool, str]:
     """Run an external Python step. Returns (ok, summary)."""
     log.info("→ %s", name)
     t0 = time.time()
     try:
-        proc = subprocess.run(cmd, cwd=str(ROOT), timeout=STEP_TIMEOUT_SEC)
+        proc = subprocess.run(cmd, cwd=str(ROOT), timeout=timeout_sec)
         ok = proc.returncode == 0
         elapsed = time.time() - t0
         msg = f"{name}: rc={proc.returncode} in {elapsed:.0f}s"
@@ -100,7 +113,7 @@ def _run_step(name: str, cmd: list[str]) -> tuple[bool, str]:
             log.warning("  ✗ %s", msg)
         return ok, msg
     except subprocess.TimeoutExpired:
-        msg = f"{name}: TIMEOUT after {STEP_TIMEOUT_SEC}s"
+        msg = f"{name}: TIMEOUT after {timeout_sec}s"
         log.warning("  ✗ %s", msg)
         return False, msg
     except Exception as exc:
@@ -209,6 +222,22 @@ def run(
     }).eq("id", scan_id).execute()
     log.info("Layer 2 done: shortlist=%d", shortlist)
 
+    # Enrichment steps run against the soft deadline: once the budget is
+    # spent we stop STARTING steps and fall through to gate + finalize.
+    # Each started step is also capped to the time actually left.
+    def _remaining_sec() -> int:
+        return int(SOFT_DEADLINE_SEC - (time.time() - t_total))
+
+    def _deadline_reached(name: str) -> bool:
+        if _remaining_sec() >= 120:
+            return False
+        nonlocal soft_failures
+        soft_failures += 1
+        notes.append(f"[non-fatal] {name}: skipped -- soft deadline "
+                     f"({SOFT_DEADLINE_SEC // 60}m) reached; finalizing scan")
+        log.warning("  ⏱ %s skipped -- soft deadline reached", name)
+        return True
+
     # ── Layer 3 (expensive, can be skipped on quick refreshes) ──────────
     if not skip_layer3 and shortlist > 0:
         # Agents that write dossier sections get --scan-id for precise
@@ -228,7 +257,11 @@ def run(
              [PY, "pipeline/agents/critic_agent.py", str(top_n),
               "--scan-id", str(scan_id)]),
         ]:
-            ok, msg = _run_step(f"Layer 3: {name}", cmd)
+            if _deadline_reached(f"Layer 3: {name}"):
+                continue
+            ok, msg = _run_step(f"Layer 3: {name}", cmd,
+                                timeout_sec=min(STEP_TIMEOUT_SEC,
+                                                max(120, _remaining_sec())))
             if not ok:
                 soft_failures += 1
                 notes.append(f"[non-fatal] {msg}")
@@ -237,10 +270,11 @@ def run(
         }).eq("id", scan_id).execute()
 
     # ── Layer 4 ─────────────────────────────────────────────────────────
-    if not skip_layer4 and shortlist > 0:
+    if not skip_layer4 and shortlist > 0 and not _deadline_reached("Layer 4 conviction_grader"):
         ok, msg = _run_step(
             "Layer 4 conviction_grader",
             [PY, "pipeline/agents/conviction_grader.py", "scan"],
+            timeout_sec=min(STEP_TIMEOUT_SEC, max(120, _remaining_sec())),
         )
         if not ok:
             soft_failures += 1

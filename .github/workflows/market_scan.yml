@@ -12,12 +12,15 @@ name: Market scan · 3x per trading day
 #     22:00 UTC  =  17:00 ET (EST)  / 18:00 ET (EDT)   post-close
 #
 # Budget: Layer 1 scores the full ~3,300-name universe; the slow LLM
-# agents (Layer 3) + grader (Layer 4) run on the top 20 only -- sized so
-# the free-LLM daily budget reliably covers a FULL fact-checked dossier
-# for every shortlisted name across all 3 daily scans (measured June 2026:
-# 30-name lists shipped only 19-27 dossiers). The dossier gate then hides
-# any name that still lacks one. 3 runs/weekday is ~1,900-2,000
-# Actions-min/month -- close to the
+# agents (Layer 3) + grader (Layer 4) run on the top 25 only -- sized so
+# the free-LLM daily budget covers a FULL fact-checked dossier for every
+# shortlisted name across all 3 daily scans now that llm.py stopped
+# routing load to slow providers (June 12 2026: NVIDIA at 60-90 s/call
+# carried ~45% of calls and blew the job timeout). The dossier gate hides
+# any name that still lacks a dossier, so the displayed list is 20-25.
+# run_scan.py enforces a 46-min soft deadline internally so the gate and
+# finalize ALWAYS run; timeout-minutes is the hard backstop above it.
+# 3 runs/weekday is ~1,900-2,000 Actions-min/month -- close to the
 # free 2,000-min ceiling, so the other heavy workflows (multibagger) plus
 # manual refreshes may tip it over; a paid plan or trimming is the lever
 # if minutes run out. The /api/scan manual refresh reuses this same
@@ -68,7 +71,7 @@ jobs:
   scan:
     name: "Run two-speed funnel"
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    timeout-minutes: 55
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-pipeline
@@ -95,5 +98,5 @@ jobs:
           fi
           python -m pipeline.scan.run_scan \
             --scan-type ${{ steps.derive.outputs.scan_type }} \
-            --top-n 20 \
+            --top-n 25 \
             $SAMPLE_ARG

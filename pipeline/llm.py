@@ -78,6 +78,11 @@ class _Provider:
     tier: int = 0        # 0 = llama-class primary, 1 = gemini, 2 = overflow
     rpd: int = 1000      # free-tier requests/day budget
     tpd: int | None = None  # free-tier tokens/day budget (None = not token-capped)
+    speed: int = 0       # 0 = fast (1-3 s/call); 1 = slow -- only used when
+                         # every fast same-tier peer is exhausted. Budget
+                         # balancing alone routed ~45% of calls to NVIDIA at
+                         # 60-90 s/call and pushed scans past the CI timeout
+                         # (June 12 2026).
 
 
 def _providers() -> list[_Provider]:
@@ -102,7 +107,7 @@ def _providers() -> list[_Provider]:
                   tier=0, rpd=2000, tpd=1_000_000),
         _Provider("nvidia", "openai", NVIDIA_API_KEY,
                   "meta/llama-3.3-70b-instruct", "https://integrate.api.nvidia.com/v1",
-                  tier=0, rpd=500),
+                  tier=0, rpd=500, speed=1),
         # Gemini sits behind the llama-class primaries: different model
         # family (voice drift) and its 2.5-flash free tier is ~250 req/day
         # (the older 1,500/day figure applied to 1.5-flash).
@@ -264,12 +269,13 @@ def _call_gemini(p: _Provider, prompt: str, system: str | None,
 
 
 def _eligible_providers() -> list[_Provider]:
-    """Configured providers with daily budget left, ordered: tier first, then
-    largest remaining budget fraction (balances load across the tier-0
-    primaries instead of draining them serially)."""
+    """Configured providers with daily budget left, ordered: tier first, fast
+    before slow within a tier, then largest remaining budget fraction
+    (balances load across the FAST tier-0 primaries; slow providers are
+    same-tier fallbacks, not load-bearing -- see _Provider.speed)."""
     ps = [p for p in _providers()
           if p.name not in _exhausted and _remaining_fraction(p) > 0.0]
-    return sorted(ps, key=lambda p: (p.tier, -_remaining_fraction(p)))
+    return sorted(ps, key=lambda p: (p.tier, p.speed, -_remaining_fraction(p)))
 
 
 def complete(
