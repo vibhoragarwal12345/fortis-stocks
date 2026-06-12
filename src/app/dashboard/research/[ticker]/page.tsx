@@ -36,20 +36,42 @@ export default async function ResearchPage({
   const ticker = rawTicker.toUpperCase()
   const supabase = await createClient()
 
-  // Latest deep-analysis row (from a recent scan that ran Layer 3+4 on
-  // this ticker). Tickers outside the latest shortlist will be null.
-  const { data: latestPickRow } = await supabase
+  // The dossier: the most recent row that actually carries deep analysis.
+  // Two bugs hid targets before this:
+  //   1. Ordering by run_date+run_type is ambiguous — 3 scans/day share a
+  //      run_date and the same run_type, so ties resolved arbitrarily.
+  //      scan_id is the true lineage key.
+  //   2. The newest shortlist row often has NO deep analysis (the deep
+  //      agents process the ranking top-down until the run budget is
+  //      spent), which blanked the bull/bear/targets even when a complete
+  //      dossier existed from an earlier scan.
+  const PICK_SELECT =
+    "ticker,run_date,run_type,conviction_grade,composite_score,conviction_score_adjusted,thesis,catalyst_category,catalyst_description,bull_case,bear_case,price_target_upside,price_target_downside,position_size_guidance"
+
+  const { data: deepRow } = await supabase
     .from("ranked_focus_list")
-    .select(
-      "ticker,run_date,run_type,conviction_grade,composite_score,conviction_score_adjusted,thesis,catalyst_category,catalyst_description,bull_case,bear_case,price_target_upside,price_target_downside,position_size_guidance",
-    )
+    .select(PICK_SELECT)
     .eq("ticker", ticker)
-    .order("run_date", { ascending: false })
-    .order("run_type", { ascending: false })
+    .not("bull_case", "is", null)
+    .order("scan_id", { ascending: false, nullsFirst: false })
     .limit(1)
     .maybeSingle()
 
-  const pick = latestPickRow as Pick | null
+  let pick = deepRow as Pick | null
+  if (!pick) {
+    // No dossier anywhere — fall back to the newest shallow row so the
+    // grade/score header still renders.
+    const { data: anyRow } = await supabase
+      .from("ranked_focus_list")
+      .select(PICK_SELECT)
+      .eq("ticker", ticker)
+      .order("scan_id", { ascending: false, nullsFirst: false })
+      .limit(1)
+      .maybeSingle()
+    pick = anyRow as Pick | null
+  }
+  // Shortlisted but never deep-analyzed: say so instead of rendering blanks.
+  const deepPending = pick != null && !pick.bull_case
 
   // Latest Layer-1 scan metrics for the ticker -- this is what gives the
   // page real-time market context even when the ticker is NOT on the
@@ -218,6 +240,22 @@ export default async function ResearchPage({
               }
             />
           </dl>
+        </Reveal>
+      )}
+
+      {deepPending && (
+        <Reveal as="section">
+          <div className="rounded-lg border border-warning/25 bg-warning/5 p-5">
+            <p className="text-eyebrow text-warning">Deep analysis pending</p>
+            <p className="mt-2 text-small text-muted-foreground leading-relaxed">
+              {ticker} advanced past the composite ranking, but the deep
+              agents (catalyst, debate, critic) haven&rsquo;t produced a
+              dossier for it yet — each scan analyzes the ranking top-down
+              until its run budget is spent. The market metrics above are
+              current; bull / bear cases and price targets will appear once
+              a scan reaches it.
+            </p>
+          </div>
         </Reveal>
       )}
 
