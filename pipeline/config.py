@@ -38,6 +38,9 @@ FRED_API_KEY: str = os.environ.get("FRED_API_KEY", "")  # St. Louis Fed — econ
 FMP_API_KEY: str  = os.environ.get("FMP_API_KEY", "")   # Financial Modeling Prep — analyst peers, financials
 TIINGO_API_KEY: str = os.environ.get("TIINGO_API_KEY", "")  # Tiingo — historical fundamentals, prices, news
 API_NINJAS_KEY: str = os.environ.get("API_NINJAS_KEY", "")  # API Ninjas — earnings call transcripts (free tier)
+# Commodities pipeline (pipeline/commodities/) — both free, instant signup
+EIA_API_KEY: str = os.environ.get("EIA_API_KEY", "")            # eia.gov/opendata/register.php — energy inventories
+USDA_NASS_API_KEY: str = os.environ.get("USDA_NASS_API_KEY", "")  # quickstats.nass.usda.gov/api — ag production/stocks
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 TICKER_UNIVERSE_PATH: Path = PIPELINE_DIR / "data" / "tickers.csv"

@@ -70,3 +70,6 @@ next-env.d.ts
 /pipeline/vendor/                          # cloned + built whisper.cpp (and ffmpeg shim)
 /pipeline/data/audio_cache/                # downloaded earnings-call audio (transcripts kept long-term, audio is not)
 /pipeline/data/audio_discovery_cache.json  # audio-URL discovery result cache (one lookup per company per quarter)
+
+# Commodities pipeline: generated smoke-test dumps + manual USGS imports stay local
+/pipeline/commodities/data/
