@@ -1,0 +1,52 @@
+name: Commodity scan · 1x per trading day
+
+# Commodities pipeline Part C. Once per weekday, after the stock post-close
+# scan window: the commodity model's fundamental inputs are weekly (EIA Wed,
+# COT Fri) or monthly (WASDE, IMF/FRED metals), so a daily run is already
+# generous — 3x/day would re-publish identical fundamentals and press the
+# Actions-minutes ceiling the stock scan sits near. Tactical technicals
+# refresh on this cadence too, which matches their days-to-weeks horizon.
+#
+#     22:45 UTC = 17:45 ET (EST) / 18:45 ET (EDT) — after US futures settle.
+#
+# Required secrets beyond the stock scan's set: FRED_API_KEY, EIA_API_KEY,
+# USDA_NASS_API_KEY (all free-tier keys, already in .env.local locally).
+
+on:
+  schedule:
+    - cron: "45 22 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      commodities:
+        description: "Space-separated registry keys (blank = all)"
+        required: false
+        default: ""
+
+concurrency:
+  group: commodity-scan
+  cancel-in-progress: false
+
+env:
+  NEXT_PUBLIC_SUPABASE_URL:  ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  GROQ_API_KEY:              ${{ secrets.GROQ_API_KEY }}
+  GEMINI_API_KEY:            ${{ secrets.GEMINI_API_KEY }}
+  CEREBRAS_API_KEY:          ${{ secrets.CEREBRAS_API_KEY }}
+  NVIDIA_API_KEY:            ${{ secrets.NVIDIA_API_KEY }}
+  OPENROUTER_API_KEY:        ${{ secrets.OPENROUTER_API_KEY }}
+  FRED_API_KEY:              ${{ secrets.FRED_API_KEY }}
+  EIA_API_KEY:               ${{ secrets.EIA_API_KEY }}
+  USDA_NASS_API_KEY:         ${{ secrets.USDA_NASS_API_KEY }}
+
+jobs:
+  scan:
+    name: "Run commodity model (all layers)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-pipeline
+
+      - name: Run commodity scan
+        run: |
+          python -m pipeline.commodities.scan ${{ github.event.inputs.commodities }}

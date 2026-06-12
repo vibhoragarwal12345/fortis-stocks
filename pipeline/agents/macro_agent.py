@@ -655,6 +655,18 @@ def _data_digest(snap: dict) -> str:
         f"{d['name']} {d['close']} ({_fmt_pct(d['change_24h_pct'])})"
         for d in cry.values()) or "unavailable"))
 
+    cs = snap.get("commodity_signals")
+    if cs and cs.get("signals"):
+        tag = " (STALE — treat as background only)" if cs.get("stale") else ""
+        lines.append(f"COMMODITY CROSS-SIGNALS{tag} (structural trend reads "
+                     "from the commodities pipeline):")
+        for name, s in cs["signals"].items():
+            if s.get("status") == "OK":
+                lines.append(f"  {name}: {s['read']} "
+                             f"({s['commodity']} {s['trend_state']}) -- {s['why']}")
+            else:
+                lines.append(f"  {name}: unavailable")
+
     fed = snap["fed_calendar"]
     eco = snap["economic_calendar"]
     ern = snap["earnings_calendar"]
@@ -838,10 +850,26 @@ def run() -> None:
         "sector_performance":  fetch_sector_performance(),
     }
 
+    # Commodity cross-link (copper -> growth, gold -> risk, oil -> inflation).
+    # Strictly additive context: it colors the reasoning and the narrative
+    # digest but never overrides the regime thresholds. Missing/stale scans
+    # degrade to "no commodity layer", not to neutral evidence.
+    try:
+        from commodities.cross_link import latest_signals, summarize as cs_summary
+        commodity_signals = latest_signals()
+    except Exception as exc:  # noqa: BLE001
+        log.warning("commodity cross-link unavailable: %s", exc)
+        commodity_signals, cs_summary = None, None
+    snap["commodity_signals"] = commodity_signals
+
     regime, reasoning = classify_regime(
         snap["economic_indicators"], snap["yield_curve"],
         snap["sector_performance"], vix_fallback=fetch_vix(),
     )
+    if commodity_signals and commodity_signals.get("signals"):
+        tag = "stale commodity cross-read (background only)" \
+            if commodity_signals.get("stale") else "Commodity cross-read"
+        reasoning += f" {tag}: {cs_summary(commodity_signals)}."
     log.info("Regime classified: %s", regime.upper())
 
     narrative, method = build_narrative(snap, regime, reasoning)
@@ -860,6 +888,7 @@ def run() -> None:
         "global_indices":        snap["global_indices"],
         "crypto_snapshot":       snap["crypto_snapshot"],
         "sector_performance":    snap["sector_performance"],
+        "commodity_signals":     commodity_signals,
         "regime_classification": regime,
         "narrative_summary":     narrative,
     }

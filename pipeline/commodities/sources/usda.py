@@ -77,6 +77,31 @@ def _latest_stat(commodity: str, statisticcat: str, short_desc_contains: str) ->
     }
 
 
+def _same_period_prior_year(commodity: str, latest: dict) -> dict | None:
+    """The same reference-period stocks observation one year earlier — gives
+    supply_demand.py a clean YoY comparison (e.g. Mar-1 vs Mar-1 stocks)."""
+    prior_year = int(latest["year"]) - 1
+    rows = _nass_query({
+        "commodity_desc": commodity,
+        "statisticcat_desc": "STOCKS",
+        "year": str(prior_year),
+        "reference_period_desc": latest["period"],
+    })
+    if not rows:
+        return None
+    rows = [r for r in rows if "STOCKS, MEASURED IN BU" in r.get("short_desc", "")
+            and r.get("short_desc") == latest.get("short_desc")]
+    if not rows:
+        return None
+    raw_val = (rows[0].get("Value") or "").replace(",", "").strip()
+    try:
+        value = float(raw_val)
+    except ValueError:
+        return None
+    return {"value": value, "unit": rows[0].get("unit_desc"), "year": str(prior_year),
+            "period": latest["period"], "verification": verified("USDA NASS Quick Stats")}
+
+
 def fetch_nass() -> dict:
     out: dict = {"fetched_at": utcnow_iso(), "commodities": {}}
     if not USDA_NASS_API_KEY:
@@ -102,8 +127,10 @@ def fetch_nass() -> dict:
         prod = _latest_stat(nass, "PRODUCTION", "PRODUCTION, MEASURED IN BU")
         stocks = _latest_stat(nass, "STOCKS", "STOCKS, MEASURED IN BU")
         yield_ = _latest_stat(nass, "YIELD", "YIELD, MEASURED IN BU")
+        stocks_prior = _same_period_prior_year(nass, stocks) if stocks else None
         entry = {"status": "OK" if (prod or stocks) else "FETCH_FAILED",
-                 "production": prod, "grain_stocks": stocks, "yield": yield_}
+                 "production": prod, "grain_stocks": stocks,
+                 "grain_stocks_prior_year": stocks_prior, "yield": yield_}
         if not (prod or stocks):
             entry["verification"] = UNVERIFIED
         out["commodities"][key] = entry

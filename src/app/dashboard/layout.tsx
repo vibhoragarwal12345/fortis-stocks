@@ -50,6 +50,7 @@ const navItems = [
   { href: "/dashboard",              label: "Today", exact: true },
   { href: "/dashboard/focus-list",   label: "Focus list" },
   { href: "/dashboard/emerging",     label: "Emerging" },
+  { href: "/dashboard/commodities",  label: "Commodities" },
   { href: "/dashboard/scan-history", label: "Scan history" },
 ]
 
