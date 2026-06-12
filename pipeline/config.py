@@ -32,6 +32,7 @@ GEMINI_API_KEY: str = os.environ.get("GEMINI_API_KEY", "")
 # a missing key just drops that provider from the chain.
 CEREBRAS_API_KEY: str = os.environ.get("CEREBRAS_API_KEY", "")  # Cerebras Cloud — fast, generous free tier
 NVIDIA_API_KEY: str = os.environ.get("NVIDIA_API_KEY", "")      # NVIDIA NIM (build.nvidia.com)
+OPENROUTER_API_KEY: str = os.environ.get("OPENROUTER_API_KEY", "")  # OpenRouter — free-model overflow router (last resort)
 FINNHUB_API_KEY: str = os.environ.get("FINNHUB_API_KEY", "")
 FRED_API_KEY: str = os.environ.get("FRED_API_KEY", "")  # St. Louis Fed — economic data
 FMP_API_KEY: str  = os.environ.get("FMP_API_KEY", "")   # Financial Modeling Prep — analyst peers, financials

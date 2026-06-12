@@ -22,6 +22,7 @@ import json
 import logging
 import re
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -30,13 +31,14 @@ import pandas_ta as ta  # noqa: F401  -- registers df.ta accessor
 import yfinance as yf
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from agents.factcheck_agent import factcheck, strip_data_refs  # noqa: E402
 from config import (  # noqa: E402
     GEMINI_API_KEY, GROQ_API_KEY, SUPABASE_SERVICE_KEY, SUPABASE_URL,
 )
 from supabase import create_client  # noqa: E402
 from llm import complete  # noqa: E402 -- shared provider-waterfall gateway
 
-DEFAULT_N    = 30
+DEFAULT_N    = 20              # matches run_scan.DEFAULT_TOP_N (LLM budget)
 RANK_SOURCE  = "midday"        # which ranked_focus_list run to read
 GROQ_MODEL   = "llama-3.3-70b-versatile"
 GEMINI_MODEL = "gemini-2.5-flash"
@@ -247,7 +249,23 @@ def _assemble(ticker: str, rfl: dict, tech: dict, news, sec, options,
 
 _SYSTEM = ("You are a senior portfolio manager at a $5B fundamentals-driven "
            "equity fund. You write institutional-grade investment theses. Be "
-           "specific. Cite numbers. Name catalysts. Avoid generic language.")
+           "specific. Cite numbers. Name catalysts. Avoid generic language. "
+           "CLOSED CONTEXT: you may ONLY cite facts that appear in the data "
+           "provided in the prompt -- never from memory. In BULL_CASE and "
+           "BEAR_CASE, every numeric or specific claim MUST be immediately "
+           "followed by a [DATA REF: key] tag naming the data key it came "
+           "from (the allowed keys are listed in the prompt). If the data "
+           "does not support a claim, do not make it.")
+
+# Keys of the context dict that are legal [DATA REF] targets (everything the
+# prompt shows the model). factcheck_agent verifies each tagged claim points
+# at one of these and, for scalar keys, that the number matches.
+_DATA_KEYS = [
+    "price", "low_52w", "high_52w", "day_change", "catalyst", "rsi",
+    "rsi_state", "macd", "vs_sma50", "vs_sma200", "support", "resistance",
+    "news_summary", "sec_summary", "options_summary", "pattern_summary",
+    "crowd_summary", "validated_summary", "smart_money_summary",
+]
 
 
 def _build_prompt(c: dict) -> str:
@@ -281,19 +299,25 @@ CROSS-VALIDATION: {c['validated_summary']}
 
 SMART MONEY SIGNALS: {c['smart_money_summary']}
 
+DATA KEYS for [DATA REF] tags (each prompt section above, in order):
+{", ".join(_DATA_KEYS)}
+
 OUTPUT (use exactly these headers):
 
 BULL_CASE:
 Two specific paragraphs (3-4 sentences each) arguing the long thesis. Cite
 specific numbers, dates, and catalysts. Address why now. EXPLICITLY address
 whether the smart-money signals (earnings, insider, short, revisions) support
-or contradict the thesis -- name the supporting signals.
+or contradict the thesis -- name the supporting signals. Every numeric or
+specific claim MUST be immediately followed by [DATA REF: key] using one of
+the data keys above (e.g. "RSI at 62 [DATA REF: rsi]").
 
 BEAR_CASE:
 Two specific paragraphs arguing the short thesis. What could go wrong. Name the
 risk factors specifically. EXPLICITLY address whether any smart-money signal
 contradicts the bull thesis (e.g. discretionary insider selling, building short
-interest, downgrade cluster).
+interest, downgrade cluster). Apply the same [DATA REF: key] rule to every
+numeric or specific claim.
 
 PRICE_TARGET:
 Reasonable 3-month upside target with reasoning, and the downside risk level.
@@ -376,25 +400,48 @@ def _parse_thesis(text: str) -> dict:
 # Entry point
 # ══════════════════════════════════════════════════════════════════════════════
 
-def run(limit: int = DEFAULT_N) -> None:
+def run(limit: int = DEFAULT_N, scan_id: int | None = None) -> int:
+    """Returns the number of picks still missing a thesis (0 = full cover)."""
     db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
     log.info("Debate Synthesizer -- top %d, model=%s",
              limit, GROQ_MODEL if GROQ_API_KEY else GEMINI_MODEL)
 
-    recent = (db.table("ranked_focus_list").select("run_date")
-              .order("run_date", desc=True).limit(1).execute().data)
-    if not recent:
-        log.warning("ranked_focus_list empty -- run ranking_engine first.")
-        return
-    run_date = recent[0]["run_date"]
+    if scan_id is not None:
+        # Precise lineage: exactly this scan's shortlist. (run_date-based
+        # selection mixes the day's scans -- 3 share run_date + run_type.)
+        ranked = (db.table("ranked_focus_list").select("*")
+                  .eq("scan_id", scan_id)
+                  .order("rank").limit(limit).execute().data or [])
+        if not ranked:
+            log.warning("no ranked_focus_list rows for scan_id=%s", scan_id)
+            return 0
+        run_date = ranked[0]["run_date"]
+        log.info("Loaded %d picks for scan_id=%s", len(ranked), scan_id)
+    else:
+        recent = (db.table("ranked_focus_list").select("run_date")
+                  .order("run_date", desc=True).limit(1).execute().data)
+        if not recent:
+            log.warning("ranked_focus_list empty -- run ranking_engine first.")
+            return 0
+        run_date = recent[0]["run_date"]
 
-    ranked = (db.table("ranked_focus_list").select("*")
-              .eq("run_date", run_date).eq("run_type", RANK_SOURCE)
-              .order("rank").limit(limit).execute().data or [])
+        ranked = (db.table("ranked_focus_list").select("*")
+                  .eq("run_date", run_date).eq("run_type", RANK_SOURCE)
+                  .order("rank").limit(limit).execute().data or [])
+        log.info("Loaded top %d from %s/%s", len(ranked), run_date, RANK_SOURCE)
     tickers = [r["ticker"] for r in ranked]
-    log.info("Loaded top %d from %s/%s", len(tickers), run_date, RANK_SOURCE)
     if not tickers:
-        return
+        return 0
+
+    # Idempotent re-runs: rows that already carry a thesis are skipped, so
+    # a partial run can be completed by simply running the agent again.
+    already = [r["ticker"] for r in ranked if r.get("bull_case")]
+    todo = [r for r in ranked if not r.get("bull_case")]
+    if already:
+        log.info("%d pick(s) already have theses (%s); processing %d",
+                 len(already), ", ".join(already), len(todo))
+    if not todo:
+        return 0
 
     # Shared context sources.
     since30 = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
@@ -448,29 +495,67 @@ def run(limit: int = DEFAULT_N) -> None:
     except Exception as exc:
         log.debug("smart_money_intel preload failed: %s", exc)
 
-    # Synthesize per ticker.
+    # Synthesize per ticker. Failures (provider quota, transient rate
+    # limits) get one retry pass after a cooldown instead of being
+    # silently dropped -- partial coverage is what hid price targets from
+    # the dashboard.
     results: list[dict] = []
-    for rfl in ranked:
-        t = rfl["ticker"]
-        ctx = _assemble(t, rfl, tech, news, sec, options, patterns, debates,
-                         validated, smart_money)
-        text, method = _generate(_build_prompt(ctx))
-        if not text:
-            log.warning("%s: no thesis generated (Groq + Gemini both failed)", t)
-            continue
-        parsed = _parse_thesis(text)
-        parsed["ticker"] = t
-        parsed["_method"] = method
-        parsed["_price"] = ctx["price"]
-        results.append(parsed)
-        log.info("%s: thesis generated via %s", t, method)
+    failed: list[dict] = []
+    queue = todo
+    for attempt in (1, 2):
+        if attempt == 2:
+            if not failed:
+                break
+            queue, failed = failed, []
+            log.info("retry pass: %d ticker(s) after 30s cooldown",
+                     len(queue))
+            time.sleep(30)
+        for rfl in queue:
+            t = rfl["ticker"]
+            ctx = _assemble(t, rfl, tech, news, sec, options, patterns,
+                            debates, validated, smart_money)
+            text, method = _generate(_build_prompt(ctx))
+            if not text:
+                log.warning("%s: no thesis generated (attempt %d)", t, attempt)
+                failed.append(rfl)
+                continue
+            parsed = _parse_thesis(text)
+            # Factcheck the narrative sections against the exact data the
+            # prompt provided (closed context). UNVERIFIED = too many claims
+            # without a valid [DATA REF] -- treat like a generation failure
+            # so the retry pass gets another shot; an unverified thesis must
+            # never reach the displayed shortlist (dossier gate enforces).
+            fc_data = {k: ctx[k] for k in _DATA_KEYS if k in ctx}
+            fc = factcheck("\n\n".join(
+                s for s in (parsed["bull_case"], parsed["bear_case"]) if s),
+                fc_data)
+            if fc["quality_grade"] == "UNVERIFIED":
+                log.warning("%s: thesis factcheck UNVERIFIED (%.2f, attempt %d)"
+                            " -- discarding", t, fc["verification_score"], attempt)
+                failed.append(rfl)
+                continue
+            # Strip the [DATA REF] tags for clean display; verification
+            # already ran on the tagged text.
+            for k in ("bull_case", "bear_case", "position_size_guidance"):
+                if parsed.get(k):
+                    parsed[k] = strip_data_refs(parsed[k])
+            if parsed.get("what_to_watch"):
+                parsed["what_to_watch"] = [strip_data_refs(w)
+                                           for w in parsed["what_to_watch"]]
+            parsed["ticker"] = t
+            parsed["_method"] = method
+            parsed["_price"] = ctx["price"]
+            parsed["_fc"] = fc
+            results.append(parsed)
+            log.info("%s: thesis generated via %s (factcheck %s %.2f)",
+                     t, method, fc["quality_grade"], fc["verification_score"])
 
     # Persist.
     now = datetime.now(timezone.utc).isoformat()
     updated = 0
     for r in results:
         try:
-            db.table("ranked_focus_list").update({
+            q = db.table("ranked_focus_list").update({
                 "bull_case":             r["bull_case"],
                 "bear_case":             r["bear_case"],
                 "price_target_upside":   r["price_target_upside"],
@@ -478,7 +563,16 @@ def run(limit: int = DEFAULT_N) -> None:
                 "position_size_guidance": r["position_size_guidance"],
                 "what_to_watch":         r["what_to_watch"],
                 "thesis_generated_at":   now,
-            }).eq("run_date", run_date).eq("ticker", r["ticker"]).execute()
+                # Dossier provenance (migration 048): which provider served
+                # this dossier + its factcheck verdict. The critic may later
+                # lower the score (min of thesis/critique verification).
+                "dossier_provider":           r["_method"],
+                "dossier_verification_score": r["_fc"]["verification_score"],
+                "dossier_quality_grade":      r["_fc"]["quality_grade"],
+            })
+            q = (q.eq("scan_id", scan_id) if scan_id is not None
+                 else q.eq("run_date", run_date))
+            q.eq("ticker", r["ticker"]).execute()
             updated += 1
         except Exception as exc:
             log.debug("update %s failed: %s", r["ticker"], exc)
@@ -489,6 +583,12 @@ def run(limit: int = DEFAULT_N) -> None:
                     "011_thesis_columns.sql, then re-run.")
 
     _report(results)
+
+    if failed:
+        log.warning("%d/%d pick(s) STILL missing theses after retry: %s",
+                    len(failed), len(tickers),
+                    ", ".join(r["ticker"] for r in failed))
+    return len(failed)
 
 
 def _report(results: list[dict]) -> None:
@@ -509,10 +609,16 @@ def _report(results: list[dict]) -> None:
 
 
 if __name__ == "__main__":
+    from scan_target import argv_scan_id, strip_scan_id  # noqa: E402
+
+    _scan_id = argv_scan_id()
+    _args = strip_scan_id(sys.argv[1:])
     n = DEFAULT_N
-    if len(sys.argv) > 1:
+    if _args:
         try:
-            n = int(sys.argv[1])
+            n = int(_args[0])
         except ValueError:
-            log.warning("Invalid N '%s' -- using %d", sys.argv[1], DEFAULT_N)
-    run(n)
+            log.warning("Invalid N '%s' -- using %d", _args[0], DEFAULT_N)
+    # Non-zero exit when coverage is incomplete so the orchestrator records
+    # it in the scan notes instead of the gap passing silently.
+    sys.exit(1 if run(n, scan_id=_scan_id) else 0)

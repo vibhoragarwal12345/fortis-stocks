@@ -67,6 +67,8 @@ export async function getLandingMarketData(): Promise<LandingMarketData | null> 
         .from("ranked_focus_list")
         .select("ticker, rank, conviction_grade, composite_score")
         .eq("scan_id", scanId)
+        // Invariant: only names with a completed, fact-checked dossier display.
+        .eq("dossier_complete", true)
         .order("rank", { ascending: true })
         .limit(5),
     ])

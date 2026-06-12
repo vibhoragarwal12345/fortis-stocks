@@ -452,22 +452,35 @@ def describe(ticker: str, cat: dict) -> str:
 # Entry point
 # ══════════════════════════════════════════════════════════════════════════════
 
-def run() -> None:
+def run(scan_id: int | None = None) -> None:
     db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
     log.info("Catalyst Agent -- backend: %s", "groq" if GROQ_API_KEY else "template")
 
-    # Latest ranked_focus_list run.
-    recent = (db.table("ranked_focus_list").select("run_date")
-              .order("run_date", desc=True).limit(1).execute().data)
-    if not recent:
-        log.warning("ranked_focus_list is empty -- run ranking_engine first.")
-        return
-    run_date = recent[0]["run_date"]
-    rows = _fetch_all(lambda: db.table("ranked_focus_list")
-                      .select("id,ticker,run_type,rank").eq("run_date", run_date))
-    tickers = sorted({r["ticker"] for r in rows})
-    log.info("ranked_focus_list %s -- %d rows, %d distinct tickers",
-             run_date, len(rows), len(tickers))
+    if scan_id is not None:
+        # Precise lineage (3 scans/day share run_date + run_type).
+        rows = _fetch_all(lambda: db.table("ranked_focus_list")
+                          .select("id,ticker,run_type,rank")
+                          .eq("scan_id", scan_id))
+        if not rows:
+            log.warning("no ranked_focus_list rows for scan_id=%s", scan_id)
+            return
+        run_date = None  # persistence filters by scan_id below
+        tickers = sorted({r["ticker"] for r in rows})
+        log.info("ranked_focus_list scan_id=%s -- %d rows, %d distinct tickers",
+                 scan_id, len(rows), len(tickers))
+    else:
+        # Latest ranked_focus_list run.
+        recent = (db.table("ranked_focus_list").select("run_date")
+                  .order("run_date", desc=True).limit(1).execute().data)
+        if not recent:
+            log.warning("ranked_focus_list is empty -- run ranking_engine first.")
+            return
+        run_date = recent[0]["run_date"]
+        rows = _fetch_all(lambda: db.table("ranked_focus_list")
+                          .select("id,ticker,run_type,rank").eq("run_date", run_date))
+        tickers = sorted({r["ticker"] for r in rows})
+        log.info("ranked_focus_list %s -- %d rows, %d distinct tickers",
+                 run_date, len(rows), len(tickers))
 
     # Load every shared source once.
     src = {
@@ -542,12 +555,15 @@ def run() -> None:
     def _update(ticker):
         cat = catalysts[ticker]
         try:
-            db.table("ranked_focus_list").update({
+            q = db.table("ranked_focus_list").update({
                 "catalyst_category":        cat["category"],
                 "catalyst_description":     cat["description"],
                 "catalyst_confidence":      cat["confidence"],
                 "catalyst_supporting_data": cat["data"],
-            }).eq("run_date", run_date).eq("ticker", ticker).execute()
+            })
+            q = (q.eq("scan_id", scan_id) if scan_id is not None
+                 else q.eq("run_date", run_date))
+            q.eq("ticker", ticker).execute()
             return True
         except Exception as exc:
             log.debug("update %s failed: %s", ticker, exc)
@@ -594,4 +610,6 @@ def _report(catalysts: dict[str, dict], by_cat: dict[str, int]) -> None:
 
 
 if __name__ == "__main__":
-    run()
+    from scan_target import argv_scan_id  # noqa: E402
+
+    run(scan_id=argv_scan_id())

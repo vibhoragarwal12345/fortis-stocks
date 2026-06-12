@@ -143,6 +143,8 @@ export default async function FocusListPage() {
         "ticker,rank,conviction_grade,composite_score,conviction_score_adjusted,catalyst_category,catalyst_description,thesis,bull_case,run_date,run_type",
       )
       .eq("scan_id", latestScanRow.id)
+      // Invariant: only names with a completed, fact-checked dossier display.
+      .eq("dossier_complete", true)
       .order("rank", { ascending: true })
       .limit(80),
     supabase

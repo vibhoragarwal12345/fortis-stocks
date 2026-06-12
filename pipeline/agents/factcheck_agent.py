@@ -197,11 +197,20 @@ def factcheck(text: str, data: dict[str, Any]) -> dict:
     }
 
 
+# Display stripping is deliberately MORE permissive than REF_PATTERN: models
+# sometimes emit malformed tags (e.g. multi-key "[DATA REF: a, b]") that fail
+# verification but must still never reach the rendered dossier.
+_STRIP_PATTERN = re.compile(r"\[DATA\s*REF:[^\]]*\]", re.IGNORECASE)
+
+
 def strip_data_refs(text: str) -> str:
     """Remove [DATA REF: x] tags for clean display in reports."""
     if not text:
         return ""
-    return REF_PATTERN.sub("", text).replace("  ", " ").strip()
+    out = _STRIP_PATTERN.sub("", text)
+    out = re.sub(r"[ \t]+([,.;:!?])", r"\1", out)   # no orphan space before punctuation
+    out = re.sub(r"[ \t]{2,}", " ", out)
+    return out.strip()
 
 
 # ══════════════════════════════════════════════════════════════════════════════

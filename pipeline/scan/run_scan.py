@@ -8,6 +8,15 @@ Single entry point for an end-to-end market scan. Sequenced as:
     Layer 2   layer2_rank      -- score + shortlist top N -> ranked_focus_list
     Layer 3   deep agents      -- catalyst, smart_money, debate, critic on top N
     Layer 4   conviction grade -- conviction_grader on the top N
+    Gate      dossier_gate     -- only names with a complete, fact-checked
+                                  dossier stay on the displayed shortlist
+
+The shortlist N is sized to what the free-LLM budget reliably covers per
+scan (DEFAULT_TOP_N = 20): 4 LLM calls per dossier x 3 scans/day across
+Groq + Gemini (+ Cerebras/NVIDIA/OpenRouter overflow) -- measured June 2026,
+when 30-name shortlists shipped only 19-27 dossiers on strained days. Every
+displayed name must carry a full dossier; a shorter list when budget runs
+out is correct behavior.
 
 Persists scan progress into the `market_scans` row created at start. If any
 layer fails the row gets status='failed' with a notes column explaining what
@@ -47,6 +56,13 @@ log = logging.getLogger(__name__)
 ROOT = Path(__file__).resolve().parent.parent.parent
 PY = sys.executable
 STEP_TIMEOUT_SEC = 1800  # 30 min per step ceiling
+
+# Per-scan dossier budget. Groq (~1K req / ~100K tokens per day) + Gemini
+# (~250 req/day on 2.5-flash free) across 3 daily scans reliably cover ~20
+# full dossiers per scan at 4 LLM calls each (catalyst + smart-money +
+# thesis + critic, plus retries). Layer 2 must cut to exactly what Layer 3
+# can fully cover -- a longer list just ships bare names.
+DEFAULT_TOP_N = 20
 
 
 def _now() -> str:
@@ -99,7 +115,7 @@ def _run_step(name: str, cmd: list[str]) -> tuple[bool, str]:
 
 def run(
     scan_type: str,
-    top_n: int = 80,
+    top_n: int = DEFAULT_TOP_N,
     sample: int | None = None,
     skip_layer3: bool = False,
     skip_layer4: bool = False,
@@ -195,19 +211,22 @@ def run(
 
     # ── Layer 3 (expensive, can be skipped on quick refreshes) ──────────
     if not skip_layer3 and shortlist > 0:
-        # Each subprocess hits ranked_focus_list filtered by run_type=
-        # 'midday' (the existing module-level constant in debate +
-        # critic). Layer 2 wrote the shortlist under that same run_type,
-        # so the agents see exactly the names we want them to analyse.
+        # Agents that write dossier sections get --scan-id for precise
+        # lineage (3 scans/day share run_date + run_type, so date-based
+        # selection mixes scans). smart_money_intel is keyed per ticker,
+        # not per scan, and keeps its positional (run_type, limit) form.
         for name, cmd in [
             ("catalyst_agent",
-             [PY, "pipeline/agents/catalyst_agent.py"]),
+             [PY, "pipeline/agents/catalyst_agent.py",
+              "--scan-id", str(scan_id)]),
             ("smart_money_intel",
              [PY, "pipeline/agents/smart_money_intel.py", "midday", str(top_n)]),
             ("debate_synthesizer",
-             [PY, "pipeline/agents/debate_synthesizer.py", str(top_n)]),
+             [PY, "pipeline/agents/debate_synthesizer.py", str(top_n),
+              "--scan-id", str(scan_id)]),
             ("critic_agent",
-             [PY, "pipeline/agents/critic_agent.py", str(top_n)]),
+             [PY, "pipeline/agents/critic_agent.py", str(top_n),
+              "--scan-id", str(scan_id)]),
         ]:
             ok, msg = _run_step(f"Layer 3: {name}", cmd)
             if not ok:
@@ -226,6 +245,39 @@ def run(
         if not ok:
             soft_failures += 1
             notes.append(f"[non-fatal] {msg}")
+
+    # ── Dossier gate: only fully-dossiered names stay displayed ─────────
+    # Hard invariant: a name appears on the displayed shortlist ONLY with a
+    # completed, fact-checked dossier. Budget exhausted = shorter list, not
+    # bare names. The gate itself never fails the scan; a gate-step CRASH is
+    # critical because the invariant would be unenforced.
+    if not skip_layer3 and shortlist > 0:
+        ok, msg = _run_step(
+            "Dossier gate",
+            [PY, "-m", "pipeline.scan.dossier_gate", "--scan-id", str(scan_id)],
+        )
+        if not ok:
+            critical_failures += 1
+            notes.append(msg)
+        # Re-count what actually displays and surface coverage in the notes.
+        cnt = (
+            db.table("ranked_focus_list")
+              .select("ticker", count="exact")
+              .eq("scan_id", scan_id)
+              .eq("dossier_complete", True)
+              .limit(1)
+              .execute()
+        )
+        displayed = int(getattr(cnt, "count", 0) or 0)
+        if displayed < shortlist:
+            notes.append(f"dossier coverage {displayed}/{shortlist}: "
+                         f"{shortlist - displayed} name(s) hidden (no complete "
+                         "fact-checked dossier -- LLM budget)")
+        db.table("market_scans").update({
+            "shortlist_count": displayed,
+        }).eq("id", scan_id).execute()
+        log.info("Dossier gate: %d/%d shortlisted names display", displayed, shortlist)
+        shortlist = displayed
 
     # Count final graded rows.
     cnt = (
@@ -293,7 +345,7 @@ def main() -> int:
         choices=["premarket", "intraday", "postclose", "manual"],
         default="manual",
     )
-    ap.add_argument("--top-n",       type=int, default=80)
+    ap.add_argument("--top-n",       type=int, default=DEFAULT_TOP_N)
     ap.add_argument("--sample",      type=int, default=None,
                     help="Layer-1 ticker cap (dev mode only).")
     ap.add_argument("--skip-layer3", action="store_true",
