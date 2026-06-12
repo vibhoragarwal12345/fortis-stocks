@@ -27,7 +27,7 @@ export type ShortlistRow = {
   ret20Pct: number | null
   relVol: number | null
   rsi: number | null
-  fromHighPct: number | null
+  ret52wPct: number | null
   breakout: boolean
   breakdown: boolean
 }
@@ -154,7 +154,7 @@ export function ShortlistTable({ rows }: { rows: ShortlistRow[] }) {
               <TableHead numeric className="hidden md:table-cell">20D</TableHead>
               <TableHead numeric className="hidden lg:table-cell">Rel vol</TableHead>
               <TableHead numeric className="hidden lg:table-cell">RSI</TableHead>
-              <TableHead numeric className="hidden xl:table-cell pr-5">52W hi</TableHead>
+              <TableHead numeric className="hidden xl:table-cell pr-5">52W</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -231,9 +231,10 @@ export function ShortlistTable({ rows }: { rows: ShortlistRow[] }) {
                 <TableCell numeric className="hidden lg:table-cell">
                   {r.rsi != null ? r.rsi.toFixed(0) : "—"}
                 </TableCell>
-                <TableCell numeric className="hidden xl:table-cell pr-5 text-muted-foreground">
-                  {pct(r.fromHighPct)}
-                </TableCell>
+                <DeltaCell
+                  value={r.ret52wPct}
+                  className="hidden xl:table-cell pr-5"
+                />
               </TableRow>
             ))}
           </TableBody>

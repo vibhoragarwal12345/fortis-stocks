@@ -57,7 +57,7 @@ export default async function ResearchPage({
   const { data: latestScanRow } = await supabase
     .from("scan_results")
     .select(
-      "scan_id,price,day_change_pct,gap_pct,return_5d_pct,return_20d_pct,relative_volume,rsi_14,pct_from_52w_high,pct_from_52w_low,is_breakout,is_breakdown,composite_score,rank,data_as_of",
+      "scan_id,price,day_change_pct,gap_pct,return_5d_pct,return_20d_pct,relative_volume,rsi_14,return_52w_pct,is_breakout,is_breakdown,composite_score,rank,data_as_of",
     )
     .eq("ticker", ticker)
     .order("scan_id", { ascending: false })
@@ -73,8 +73,7 @@ export default async function ResearchPage({
     return_20d_pct: number | null
     relative_volume: number | null
     rsi_14: number | null
-    pct_from_52w_high: number | null
-    pct_from_52w_low: number | null
+    return_52w_pct: number | null
     is_breakout: boolean | null
     is_breakdown: boolean | null
     composite_score: number | null
@@ -205,8 +204,11 @@ export default async function ResearchPage({
               label="RSI(14)"
               value={scan.rsi_14 != null ? scan.rsi_14.toFixed(0) : "—"}
             />
-            <Stat label="From 52w high" value={fmtPct(scan.pct_from_52w_high)} />
-            <Stat label="From 52w low" value={fmtPct(scan.pct_from_52w_low)} />
+            <Stat
+              label="52w change"
+              value={fmtPct(scan.return_52w_pct)}
+              tone={scan.return_52w_pct ?? 0}
+            />
             <Stat
               label="Composite"
               value={

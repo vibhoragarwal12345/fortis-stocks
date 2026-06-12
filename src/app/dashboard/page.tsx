@@ -31,8 +31,7 @@ type ScanResult = {
   return_20d_pct: number | null
   relative_volume: number | null
   rsi_14: number | null
-  pct_from_52w_high: number | null
-  pct_from_52w_low: number | null
+  return_52w_pct: number | null
   is_breakout: boolean | null
   is_breakdown: boolean | null
   composite_score: number | null
@@ -98,7 +97,7 @@ export default async function DashboardHomePage() {
     const { data } = await supabase
       .from("scan_results")
       .select(
-        "ticker,price,day_change_pct,gap_pct,return_5d_pct,return_20d_pct,relative_volume,rsi_14,pct_from_52w_high,pct_from_52w_low,is_breakout,is_breakdown,composite_score,rank,data_as_of",
+        "ticker,price,day_change_pct,gap_pct,return_5d_pct,return_20d_pct,relative_volume,rsi_14,return_52w_pct,is_breakout,is_breakdown,composite_score,rank,data_as_of",
       )
       .eq("scan_id", scan.id)
       .eq("advanced", true)
@@ -307,7 +306,7 @@ function toShortlistRow(r: ScanResult): ShortlistRow {
     ret20Pct: num(r.return_20d_pct),
     relVol: num(r.relative_volume),
     rsi: num(r.rsi_14),
-    fromHighPct: num(r.pct_from_52w_high),
+    ret52wPct: num(r.return_52w_pct),
     breakout: !!r.is_breakout,
     breakdown: !!r.is_breakdown,
   }

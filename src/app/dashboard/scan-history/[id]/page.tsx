@@ -28,7 +28,6 @@ type ScanResult = {
   return_20d_pct: number | null
   relative_volume: number | null
   rsi_14: number | null
-  pct_from_52w_high: number | null
   is_breakout: boolean | null
   is_breakdown: boolean | null
   composite_score: number | null
@@ -77,7 +76,7 @@ export default async function ScanDetailPage({
   const { data: rows } = await supabase
     .from("scan_results")
     .select(
-      "ticker,price,day_change_pct,gap_pct,return_20d_pct,relative_volume,rsi_14,pct_from_52w_high,is_breakout,is_breakdown,composite_score,rank",
+      "ticker,price,day_change_pct,gap_pct,return_20d_pct,relative_volume,rsi_14,is_breakout,is_breakdown,composite_score,rank",
     )
     .eq("scan_id", id)
     .eq("advanced", true)

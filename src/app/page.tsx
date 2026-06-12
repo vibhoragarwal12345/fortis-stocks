@@ -358,7 +358,7 @@ const FEATURES = [
     index: "01",
     eyebrow: "Full-market sweep",
     title: "Pure math on everything.",
-    body: "Every liquid US common stock with $1M+ in average daily dollar volume — price action, RSI, relative volume, 52-week proximity, breakout flags. Minutes, not hours.",
+    body: "Every liquid US common stock with $1M+ in average daily dollar volume — price action, RSI, relative volume, 52-week change, breakout flags. Minutes, not hours.",
   },
   {
     index: "02",

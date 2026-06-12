@@ -137,6 +137,13 @@ def _per_ticker_metrics(close: pd.Series, volume: pd.Series, open_px: pd.Series)
             out["pct_from_52w_low"] = round(
                 (out["price"] / lo - 1) * 100, 3
             )
+        # Trailing 52-week return (vs the start of the window) -- the one
+        # simple number the dashboard displays.
+        base = float(window.iloc[0])
+        if base > 0:
+            out["return_52w_pct"] = round(
+                (out["price"] / base - 1) * 100, 3
+            )
 
         # Breakout = closed above the prior 20d high (excluding today)
         if len(close) >= 21:
@@ -258,6 +265,7 @@ def persist(rows: list[dict], scan_id: int) -> int:
             "rsi_14":            r.get("rsi_14"),
             "pct_from_52w_high": r.get("pct_from_52w_high"),
             "pct_from_52w_low":  r.get("pct_from_52w_low"),
+            "return_52w_pct":    r.get("return_52w_pct"),
             "is_breakout":       r.get("is_breakout"),
             "is_breakdown":      r.get("is_breakdown"),
             "data_as_of":        r.get("data_as_of"),
