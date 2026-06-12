@@ -205,17 +205,7 @@ export default async function ResearchPage({
               label="RSI(14)"
               value={scan.rsi_14 != null ? scan.rsi_14.toFixed(0) : "—"}
             />
-            <Stat
-              label="From 52w high"
-              value={
-                scan.pct_from_52w_high != null &&
-                scan.pct_from_52w_high >= -0.05 ? (
-                  <span className="text-gain">At high</span>
-                ) : (
-                  fmtPct(scan.pct_from_52w_high)
-                )
-              }
-            />
+            <Stat label="From 52w high" value={fmtPct(scan.pct_from_52w_high)} />
             <Stat label="From 52w low" value={fmtPct(scan.pct_from_52w_low)} />
             <Stat
               label="Composite"
