@@ -92,9 +92,10 @@ export default async function DashboardLayout({
       className="relative flex min-h-screen flex-col"
       style={tenantCssVars(theme)}
     >
-      {/* Wall St signpost, dimmed to a whisper behind the data. Cursor glow is
-          mounted globally in the root layout. */}
-      <AtmosphereBackdrop variant="whisper" />
+      {/* Wall St signpost behind the data — kept at the same presence as the
+          landing/login (atmosphere), per request. Glass cards + the header keep
+          tables legible over it. Cursor glow is mounted globally in root. */}
+      <AtmosphereBackdrop variant="atmosphere" />
 
       <header className="sticky top-0 z-30 border-b border-border/70 bg-background/55 backdrop-blur-xl backdrop-saturate-150">
         <div className="mx-auto flex h-14 max-w-[1280px] items-center justify-between gap-6 px-6 md:px-10">
