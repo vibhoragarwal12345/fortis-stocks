@@ -42,7 +42,12 @@ jobs:
   scan:
     name: "Run commodity model (all layers)"
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # The narrative layer (11 commodities x 2 horizons x up-to-3 attempts,
+    # each gated by factcheck + critic) runs against rate-limited free LLM
+    # providers; observed wall time is ~28 min, and the scan persists ONLY at
+    # the end, so a kill loses the whole run. 50 min gives that single persist
+    # comfortable headroom above the slowest observed run.
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-pipeline
