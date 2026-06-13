@@ -18,6 +18,7 @@ type Row = {
   catalyst_description: string | null
   thesis: string | null
   bull_case: string | null
+  dossier_complete: boolean | null
   run_date: string
   run_type: string
 }
@@ -90,6 +91,18 @@ function stripMd(s: string): string {
 
 /** The card body: thesis → bull case → derived signal line. */
 function cardBody(r: Row, m: Metrics | undefined): { label: string | null; text: string } {
+  // Picks whose dossier is still assembling display, but we withhold their
+  // unverified prose — grade + metrics only, with an honest note.
+  if (!r.dossier_complete) {
+    const bits: string[] = []
+    if (m?.relative_volume != null && m.relative_volume >= 1.5)
+      bits.push(`${m.relative_volume.toFixed(1)}× average volume`)
+    if (m?.is_breakout) bits.push("breakout flag")
+    return {
+      label: "Dossier completing",
+      text: `Graded on composite strength${bits.length ? ` — ${bits.join(", ")}` : ""}. The full fact-checked thesis is still being assembled.`,
+    }
+  }
   if (r.thesis && r.thesis.length > 50) {
     return { label: null, text: stripMd(r.thesis) }
   }
@@ -140,13 +153,14 @@ export default async function FocusListPage() {
     supabase
       .from("ranked_focus_list")
       .select(
-        "ticker,rank,conviction_grade,composite_score,conviction_score_adjusted,catalyst_category,catalyst_description,thesis,bull_case,run_date,run_type",
+        "ticker,rank,conviction_grade,composite_score,conviction_score_adjusted,catalyst_category,catalyst_description,thesis,bull_case,dossier_complete,run_date,run_type",
       )
       .eq("scan_id", latestScanRow.id)
-      // Invariant: only names with a completed, fact-checked dossier display.
-      .eq("dossier_complete", true)
+      // The whole picked shortlist (20-25) displays; dossier_complete is a
+      // label, not a filter. Names still assembling show "dossier completing"
+      // and withhold their unverified prose (see cardBody).
       .order("rank", { ascending: true })
-      .limit(80),
+      .limit(25),
     supabase
       .from("scan_results")
       .select("ticker,price,day_change_pct,relative_volume,is_breakout")
@@ -265,6 +279,9 @@ export default async function FocusListPage() {
                               </Badge>
                               {catalyst && (
                                 <Badge variant="accent">{catalyst}</Badge>
+                              )}
+                              {!r.dossier_complete && (
+                                <Badge variant="neutral">Dossier completing</Badge>
                               )}
                             </CardTitle>
                           </div>

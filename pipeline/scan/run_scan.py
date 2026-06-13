@@ -280,20 +280,21 @@ def run(
             soft_failures += 1
             notes.append(f"[non-fatal] {msg}")
 
-    # ── Dossier gate: only fully-dossiered names stay displayed ─────────
-    # Hard invariant: a name appears on the displayed shortlist ONLY with a
-    # completed, fact-checked dossier. Budget exhausted = shorter list, not
-    # bare names. The gate itself never fails the scan; a gate-step CRASH is
-    # critical because the invariant would be unenforced.
+    # ── Dossier gate: label dossier completeness across the picks ───────
+    # The full picked shortlist (20-25) displays; this flags which picks carry
+    # a complete fact-checked dossier vs. which the UI shows as "dossier
+    # completing". shortlist_count stays the PICK count (what's displayed), so
+    # every surface agrees. A gate-step crash is non-fatal here (it only sets a
+    # label) but recorded.
     if not skip_layer3 and shortlist > 0:
         ok, msg = _run_step(
             "Dossier gate",
             [PY, "-m", "pipeline.scan.dossier_gate", "--scan-id", str(scan_id)],
         )
         if not ok:
-            critical_failures += 1
-            notes.append(msg)
-        # Re-count what actually displays and surface coverage in the notes.
+            soft_failures += 1
+            notes.append(f"[non-fatal] {msg}")
+        # Coverage is informational now (not a hide-count); record it.
         cnt = (
             db.table("ranked_focus_list")
               .select("ticker", count="exact")
@@ -302,16 +303,12 @@ def run(
               .limit(1)
               .execute()
         )
-        displayed = int(getattr(cnt, "count", 0) or 0)
-        if displayed < shortlist:
-            notes.append(f"dossier coverage {displayed}/{shortlist}: "
-                         f"{shortlist - displayed} name(s) hidden (no complete "
-                         "fact-checked dossier -- LLM budget)")
-        db.table("market_scans").update({
-            "shortlist_count": displayed,
-        }).eq("id", scan_id).execute()
-        log.info("Dossier gate: %d/%d shortlisted names display", displayed, shortlist)
-        shortlist = displayed
+        complete = int(getattr(cnt, "count", 0) or 0)
+        if complete < shortlist:
+            notes.append(f"dossier coverage {complete}/{shortlist}: "
+                         f"{shortlist - complete} pick(s) shown as 'dossier "
+                         "completing' (full fact-check still assembling)")
+        log.info("Dossier gate: %d/%d picks carry a complete dossier", complete, shortlist)
 
     # Count final graded rows.
     cnt = (

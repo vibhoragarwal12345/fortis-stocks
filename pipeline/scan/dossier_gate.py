@@ -1,9 +1,12 @@
 """
-Dossier Gate -- the displayed-shortlist invariant.
+Dossier Gate -- the dossier-completeness LABEL.
 ==================================================
 
-A name may only appear on the displayed shortlist if it carries a COMPLETED,
-FACT-CHECKED dossier. Runs after Layer 4 and, for the given scan:
+The full picked shortlist (20-25 names) displays. This step flags which of
+those picks carry a COMPLETED, FACT-CHECKED dossier vs. which are still being
+assembled, so the UI can label the latter "dossier completing" and withhold
+their unverified prose (rather than hiding the name and dropping below the
+20-name floor). Runs after Layer 4 and, for the given scan:
 
   1. Marks ranked_focus_list.dossier_complete = true for rows that have the
      full dossier:
@@ -92,30 +95,25 @@ def gate(scan_id: int) -> tuple[int, int]:
     bare = [r["ticker"] for r in rows if not _is_complete(r)]
     now = datetime.now(timezone.utc).isoformat()
 
+    # The whole picked shortlist (20-25 names) DISPLAYS — that's the product
+    # rule. `dossier_complete` is now a QUALITY LABEL, not a hide-filter: names
+    # with the full fact-checked dossier are marked complete; the rest display
+    # too but the UI labels them "dossier completing" and withholds their
+    # unverified prose. So we no longer touch scan_results.advanced.
     if complete:
         (db.table("ranked_focus_list")
            .update({"dossier_complete": True, "dossier_completed_at": now})
-           .eq("scan_id", scan_id).in_("ticker", complete).execute())
-        # Self-healing: a name demoted on an earlier gate pass re-displays
-        # once its dossier was completed (agents re-run, gate re-run).
-        (db.table("scan_results")
-           .update({"advanced": True})
            .eq("scan_id", scan_id).in_("ticker", complete).execute())
     if bare:
         (db.table("ranked_focus_list")
            .update({"dossier_complete": False})
            .eq("scan_id", scan_id).in_("ticker", bare).execute())
-        # Hide bare names from every scan_results-driven display surface.
-        (db.table("scan_results")
-           .update({"advanced": False})
-           .eq("scan_id", scan_id).in_("ticker", bare).execute())
 
-    log.info("dossier gate scan_id=%d: %d/%d names display (complete dossier)",
+    log.info("dossier gate scan_id=%d: %d/%d picks carry a complete dossier",
              scan_id, len(complete), len(rows))
     if bare:
-        # Shorter list = correct behavior; logged so budget tuning has data.
-        log.warning("dossier gate: %d name(s) hidden without a complete "
-                    "fact-checked dossier: %s", len(bare), ", ".join(bare))
+        log.info("dossier gate: %d name(s) shown as 'dossier completing': %s",
+                 len(bare), ", ".join(bare))
     return len(complete), len(rows)
 
 
