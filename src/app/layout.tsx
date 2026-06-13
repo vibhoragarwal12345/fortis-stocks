@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { DM_Serif_Display, Fraunces, Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
+import { CursorGlow } from "@/components/ui/cursor-glow";
 import { ThemeProvider } from "@/components/theme-provider";
 
-// Geist Sans carries the entire type scale (variable font — one file, all
-// weights). Geist Mono renders every metric, price, and ticker with
-// tabular numerals.
+// Split type system:
+//   Fraunces (display/titles) · DM Serif Display (body copy) ·
+//   Geist (UI chrome/labels) · Geist Mono (data, tabular numerals).
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -15,6 +16,19 @@ const geistSans = Geist({
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
+  subsets: ["latin"],
+  display: "swap",
+});
+
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
+  subsets: ["latin"],
+  display: "swap",
+});
+
+const dmSerif = DM_Serif_Display({
+  variable: "--font-dmserif",
+  weight: "400",
   subsets: ["latin"],
   display: "swap",
 });
@@ -57,7 +71,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} ${dmSerif.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col font-sans text-foreground bg-background">
@@ -67,6 +81,8 @@ export default function RootLayout({
           enableSystem={false}
           disableTransitionOnChange
         >
+          {/* the small light behind the pointer — global, all pages */}
+          <CursorGlow />
           {children}
         </ThemeProvider>
       </body>

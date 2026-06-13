@@ -1,10 +1,10 @@
 import Link from "next/link"
 
+import { AtmosphereBackdrop } from "@/components/atmosphere-backdrop"
 import { AuroraField } from "@/components/ui/aurora-field"
 import { Badge } from "@/components/ui/badge"
 import { buttonVariants } from "@/components/ui/button"
 import { CountUp } from "@/components/ui/count-up"
-import { CursorGlow } from "@/components/ui/cursor-glow"
 import { GlowCard } from "@/components/ui/glow-card"
 import { Parallax } from "@/components/ui/parallax"
 import { Reveal } from "@/components/ui/reveal"
@@ -51,8 +51,10 @@ export default async function Home() {
     : "Last updated 09:21 ET · 15-min delayed"
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <CursorGlow />
+    <main className="relative min-h-screen text-foreground">
+      {/* Wall St signpost, dimmed, behind the whole gateway. Cursor glow is
+          mounted globally in the root layout. */}
+      <AtmosphereBackdrop variant="atmosphere" />
       {/* ─── Top bar ──────────────────────────────────────────── */}
       <header className="absolute inset-x-0 top-0 z-10">
         <div className="mx-auto flex h-16 max-w-[1120px] items-center justify-between px-6 md:px-10">

@@ -5,8 +5,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getActiveTenantMember } from "@/lib/tenant"
 import { themeFromTenant, tenantCssVars } from "@/lib/theme"
 import { checkAccess } from "@/lib/permissions"
-import { AuroraField } from "@/components/ui/aurora-field"
-import { CursorGlow } from "@/components/ui/cursor-glow"
+import { AtmosphereBackdrop } from "@/components/atmosphere-backdrop"
 import { NavLink } from "@/components/nav-link"
 import { PageTransition } from "@/components/ui/page-transition"
 import { TickerTape, type TapeItem } from "@/components/ui/ticker-tape"
@@ -93,15 +92,11 @@ export default async function DashboardLayout({
       className="relative flex min-h-screen flex-col"
       style={tenantCssVars(theme)}
     >
-      <CursorGlow />
-      {/* Aurora pinned to the viewport — the gateway's light field rides
-          along while scrolling. Data sits on solid cards, so legibility
-          holds; the glass header blurs it as you scroll under. */}
-      <div aria-hidden className="pointer-events-none fixed inset-0 -z-10">
-        <AuroraField />
-      </div>
+      {/* Wall St signpost, dimmed to a whisper behind the data. Cursor glow is
+          mounted globally in the root layout. */}
+      <AtmosphereBackdrop variant="whisper" />
 
-      <header className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur-md backdrop-saturate-150">
+      <header className="sticky top-0 z-30 border-b border-border/70 bg-background/55 backdrop-blur-xl backdrop-saturate-150">
         <div className="mx-auto flex h-14 max-w-[1280px] items-center justify-between gap-6 px-6 md:px-10">
           {/* ── Wordmark ─────────────────────────────────────────────── */}
           <Link

@@ -68,7 +68,13 @@ export function Reveal({
   // Reduced motion renders final-state immediately; otherwise wait for IO.
   const shown = reduced || entered
 
-  const Tag = as as React.ElementType
+  // NB: type `Tag` as a single concrete DOM tag, not React.ElementType.
+  // @react-three/fiber v9 adds three.js elements to React.JSX.IntrinsicElements
+  // globally, which widens React.ElementType and makes a polymorphic tag's
+  // children resolve to `never`. The runtime value is still the real `as` tag;
+  // this cast only keeps TS on DOM-element typing. All supported `as` tags share
+  // HTMLElement semantics, so the ref/children/attrs resolve correctly.
+  const Tag = as as "div"
   return (
     <Tag
       ref={ref as React.Ref<HTMLDivElement>}

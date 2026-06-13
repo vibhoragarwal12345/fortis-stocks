@@ -27,7 +27,11 @@
   --font-mono:
     var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco,
     Consolas, "Liberation Mono", "Courier New", monospace;
-  --font-heading: var(--font-sans);
+  /* Split type system: Fraunces (display/titles) · DM Serif Display (body copy)
+     · Geist (UI chrome/labels) · Geist Mono (data). */
+  --font-display: var(--font-fraunces), Georgia, "Times New Roman", serif;
+  --font-serif: var(--font-dmserif), Georgia, "Times New Roman", serif;
+  --font-heading: var(--font-display);
 
   /* Type scale — consumed by the text-display/h1/h2/h3… utilities below. */
   --text-display-size: 64px;
@@ -107,45 +111,47 @@
  *  ───────────────────────────────────────────────────────────────────────── */
 :root,
 .light {
-  --background: #f6f7f9;
-  --foreground: #0f1217;
+  /* Ultraviolet — light counterpart. Accent darkened to a readable violet
+     (AA on white); semantic green/red/amber stay conventional and darkened. */
+  --background: #f6f5fb;
+  --foreground: #16131f;
   --card: #ffffff;
-  --card-foreground: #0f1217;
+  --card-foreground: #16131f;
   --popover: #ffffff;
-  --popover-foreground: #0f1217;
-  --primary: #11141a;
+  --popover-foreground: #16131f;
+  --primary: #1a1726;
   --primary-foreground: #ffffff;
-  --secondary: #edeff3;
-  --secondary-foreground: #0f1217;
-  --muted: #edeff3;
-  --muted-foreground: #5d6877;
-  --accent: #edeff3;
-  --accent-foreground: #0f1217;
+  --secondary: #eeebf6;
+  --secondary-foreground: #16131f;
+  --muted: #eeebf6;
+  --muted-foreground: #5c5670;
+  --accent: #eeebf6;
+  --accent-foreground: #16131f;
   --destructive: #c7372f;
-  --border: #e3e6eb;
-  --input: #e3e6eb;
-  --ring: #087e9d;
+  --border: #e6e2f0;
+  --input: #e6e2f0;
+  --ring: #6d28d9;
 
-  --highlight: #087e9d;
+  --highlight: #6d28d9;
   --highlight-foreground: #ffffff;
   --gain: #0e7a4f;
   --loss: #c7372f;
   --warning: #b45309;
 
-  --chart-1: #087e9d;
-  --chart-2: #5d6877;
-  --chart-3: #98a2b2;
-  --chart-4: #d4d9e0;
-  --chart-5: #e9ecf0;
+  --chart-1: #6d28d9;
+  --chart-2: #b83fa0;
+  --chart-3: #8b84a0;
+  --chart-4: #d6d0e6;
+  --chart-5: #ece8f5;
 
   --sidebar: #ffffff;
-  --sidebar-foreground: #0f1217;
-  --sidebar-primary: #11141a;
+  --sidebar-foreground: #16131f;
+  --sidebar-primary: #1a1726;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #edeff3;
-  --sidebar-accent-foreground: #0f1217;
-  --sidebar-border: #e3e6eb;
-  --sidebar-ring: #087e9d;
+  --sidebar-accent: #eeebf6;
+  --sidebar-accent-foreground: #16131f;
+  --sidebar-border: #e6e2f0;
+  --sidebar-ring: #6d28d9;
 
   /* Depth — soft and diffuse, never harsh. --shadow-card is the everyday
      card treatment (token-driven so dark mode can add its light edge). */
@@ -162,45 +168,46 @@
  *  white-alpha; raised surfaces catch a 1px top light edge.
  *  ───────────────────────────────────────────────────────────────────────── */
 .dark {
-  --background: #0a0c10;
-  --foreground: #eceff4;
-  --card: #12151c;
-  --card-foreground: #eceff4;
-  --popover: #181c25;
-  --popover-foreground: #eceff4;
-  --primary: #f4f6f9;
-  --primary-foreground: #0a0c10;
-  --secondary: #1c212b;
-  --secondary-foreground: #eceff4;
-  --muted: #161a22;
-  --muted-foreground: #8b95a7;
-  --accent: #1c212b;
-  --accent-foreground: #eceff4;
-  --destructive: #ff6b6b;
-  --border: rgba(255, 255, 255, 0.08);
-  --input: rgba(255, 255, 255, 0.1);
-  --ring: #2dd4ed;
+  /* Ultraviolet Terminal — violet accent on a violet-black base. */
+  --background: #0b0a12;
+  --foreground: #ece9f5;
+  --card: #15131f;
+  --card-foreground: #ece9f5;
+  --popover: #1c1930;
+  --popover-foreground: #ece9f5;
+  --primary: #ece9f5;
+  --primary-foreground: #0b0a12;
+  --secondary: #1c1930;
+  --secondary-foreground: #ece9f5;
+  --muted: #15131f;
+  --muted-foreground: #9a93b5;
+  --accent: #1c1930;
+  --accent-foreground: #ece9f5;
+  --destructive: #fb7185;
+  --border: rgba(255, 255, 255, 0.09);
+  --input: rgba(255, 255, 255, 0.11);
+  --ring: #a78bfa;
 
-  --highlight: #2dd4ed;
-  --highlight-foreground: #06222b;
-  --gain: #3ddc97;
-  --loss: #ff6b6b;
-  --warning: #f5b952;
+  --highlight: #a78bfa;
+  --highlight-foreground: #0b0a12;
+  --gain: #34d399;
+  --loss: #fb7185;
+  --warning: #fbbf24;
 
-  --chart-1: #2dd4ed;
-  --chart-2: #8b95a7;
-  --chart-3: #5a6577;
-  --chart-4: #39414f;
-  --chart-5: #262c37;
+  --chart-1: #a78bfa;
+  --chart-2: #f472d0;
+  --chart-3: #9a93b5;
+  --chart-4: #4b4763;
+  --chart-5: #2a2640;
 
-  --sidebar: #0e1117;
-  --sidebar-foreground: #eceff4;
-  --sidebar-primary: #f4f6f9;
-  --sidebar-primary-foreground: #0a0c10;
-  --sidebar-accent: #1c212b;
-  --sidebar-accent-foreground: #eceff4;
-  --sidebar-border: rgba(255, 255, 255, 0.08);
-  --sidebar-ring: #2dd4ed;
+  --sidebar: #0e0c16;
+  --sidebar-foreground: #ece9f5;
+  --sidebar-primary: #ece9f5;
+  --sidebar-primary-foreground: #0b0a12;
+  --sidebar-accent: #1c1930;
+  --sidebar-accent-foreground: #ece9f5;
+  --sidebar-border: rgba(255, 255, 255, 0.09);
+  --sidebar-ring: #a78bfa;
 
   /* Dark depth: deeper diffuse blacks + the 1px top light-catch on cards. */
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.5);
@@ -264,35 +271,43 @@
  *  ───────────────────────────────────────────────────────────────────────── */
 @layer utilities {
   .text-display {
+    font-family: var(--font-heading);
     font-size: var(--text-display-size);
     line-height: var(--text-display-leading);
     letter-spacing: var(--text-display-tracking);
     font-weight: 600;
   }
   .text-h1 {
+    font-family: var(--font-heading);
     font-size: var(--text-h1-size);
     line-height: var(--text-h1-leading);
     letter-spacing: var(--text-h1-tracking);
     font-weight: 600;
   }
   .text-h2 {
+    font-family: var(--font-heading);
     font-size: var(--text-h2-size);
     line-height: var(--text-h2-leading);
     letter-spacing: var(--text-h2-tracking);
     font-weight: 600;
   }
   .text-h3 {
+    font-family: var(--font-heading);
     font-size: var(--text-h3-size);
     line-height: var(--text-h3-leading);
     letter-spacing: var(--text-h3-tracking);
     font-weight: 600;
   }
+  /* Body copy carries the editorial serif (DM Serif Display). UI chrome —
+     small/caption/eyebrow/buttons/nav — stays on the clean sans. */
   .text-body-lg {
+    font-family: var(--font-serif);
     font-size: var(--text-body-lg-size);
     line-height: var(--text-body-lg-leading);
     font-weight: 400;
   }
   .text-body {
+    font-family: var(--font-serif);
     font-size: var(--text-body-size);
     line-height: var(--text-body-leading);
     font-weight: 400;
@@ -337,6 +352,20 @@
     background: color-mix(in srgb, var(--background) 78%, transparent);
     backdrop-filter: blur(16px) saturate(1.3);
     -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  }
+
+  /* Glass card — translucent "bubble" surface (Apple/Tesla style): the backdrop
+     shows through, but a heavy dark tint + blur keep text and numbers fully
+     legible (AA holds). Use over the atmosphere backdrop; the tint is the
+     legibility guarantee, not the image. */
+  .glass-card {
+    background: color-mix(in srgb, var(--card) 62%, transparent);
+    backdrop-filter: blur(22px) saturate(1.25);
+    -webkit-backdrop-filter: blur(22px) saturate(1.25);
+    border: 1px solid color-mix(in srgb, var(--foreground) 12%, transparent);
+    box-shadow:
+      var(--shadow-card),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
   }
 
   /* Ambient page glow — dark hero/landing surfaces opt in. A faint cyan
@@ -786,4 +815,81 @@
 .light .cursor-glow,
 :root:not(.dark) .cursor-glow {
   display: none;
+}
+
+/* ── Exchange collage backdrop (B&W, full-bleed, static) ────────────────
+ *  One mosaic of NYSE/NASDAQ photos tiles the whole viewport — no slideshow,
+ *  no crop dilemma (a collage fills by tessellation). Images are baked to true
+ *  grayscale. Thin dark gaps read as an editorial contact sheet. Two layouts:
+ *  a desktop mosaic and a phone mosaic. The colour comes from the aurora above. */
+.exchange-collage {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  height: 100%;
+  grid-template-columns: 1.15fr 1fr 1fr;
+  grid-template-rows: 1.25fr 1fr 1fr;
+  grid-template-areas:
+    "nasdaq  building building"
+    "nasdaq  corner   angle"
+    "facade  flags    angle";
+}
+.exchange-collage > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+@media (max-width: 820px) {
+  .exchange-collage {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1.2fr 1fr 1fr;
+    grid-template-areas:
+      "building building"
+      "nasdaq   facade"
+      "corner   flags";
+  }
+  /* the angled shot is dropped on the phone layout (6 areas → 5 used) */
+  .exchange-collage > .tile-angle { display: none; }
+}
+/* Four gentle Ken Burns directions (contain-safe: scale <= 1.045, drift <= 1.2%)
+ *  so consecutive slides never drift the same way. Cycle longer than the dwell
+ *  so a slide is always mid-drift, never parked. Clamped off by reduced motion. */
+.floor-kenburns {
+  will-change: transform;
+}
+@keyframes floor-drift-1 { from { transform: translate3d(-1.2%, 0.6%, 0) scale(1); } to { transform: translate3d(0.6%, -0.8%, 0) scale(1.045); } }
+@keyframes floor-drift-2 { from { transform: translate3d(1.2%, 0.6%, 0) scale(1); } to { transform: translate3d(-0.6%, -0.8%, 0) scale(1.045); } }
+@keyframes floor-drift-3 { from { transform: translate3d(-1%, -0.8%, 0) scale(1.01); } to { transform: translate3d(0.8%, 0.8%, 0) scale(1.045); } }
+@keyframes floor-drift-4 { from { transform: translate3d(1%, -0.6%, 0) scale(1.01); } to { transform: translate3d(-0.8%, 0.8%, 0) scale(1.045); } }
+.floor-kenburns-1 { animation: floor-drift-1 24s ease-in-out infinite alternate; }
+.floor-kenburns-2 { animation: floor-drift-2 26s ease-in-out infinite alternate; }
+.floor-kenburns-3 { animation: floor-drift-3 25s ease-in-out infinite alternate; }
+.floor-kenburns-4 { animation: floor-drift-4 27s ease-in-out infinite alternate; }
+
+/* Aurora reads as LIGHT on the architecture here, not paint: softer blobs, no
+ *  blueprint grid, and the aurora's own grain suppressed (the photo + floor-grain
+ *  is enough — double grain looks like compression noise). */
+.exchange-stage .aurora-blob { filter: blur(120px); }
+.exchange-stage .aurora-grain { display: none; }
+/* Static film grain — a touch of texture so the photo doesn't look flat. */
+.floor-grain {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  background-size: 160px 160px;
+  mix-blend-mode: overlay;
+}
+/* Location-stamp reveal — the little secret uncovered on each section change. */
+@keyframes placard-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+.placard-in {
+  animation: placard-in 900ms var(--ease-out-quart) both;
 }
