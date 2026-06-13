@@ -359,13 +359,21 @@
      legible (AA holds). Use over the atmosphere backdrop; the tint is the
      legibility guarantee, not the image. */
   .glass-card {
-    background: color-mix(in srgb, var(--card) 62%, transparent);
-    backdrop-filter: blur(22px) saturate(1.25);
-    -webkit-backdrop-filter: blur(22px) saturate(1.25);
-    border: 1px solid color-mix(in srgb, var(--foreground) 12%, transparent);
+    background: color-mix(in srgb, var(--card) 58%, transparent);
+    backdrop-filter: blur(26px) saturate(1.35);
+    -webkit-backdrop-filter: blur(26px) saturate(1.35);
+    /* violet-tinted edge + a soft accent glow around the bubble */
+    border: 1px solid color-mix(in srgb, var(--highlight) 16%, var(--border));
     box-shadow:
-      var(--shadow-card),
-      inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.06),
+      0 14px 48px -20px color-mix(in srgb, var(--highlight) 50%, transparent),
+      0 2px 10px rgba(0, 0, 0, 0.4);
+  }
+  /* Opaque fallback where backdrop-filter is unsupported. */
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .glass-card {
+      background: var(--card);
+    }
   }
 
   /* Ambient page glow — dark hero/landing surfaces opt in. A faint cyan
@@ -564,7 +572,7 @@
   left: -12%;
   background: radial-gradient(
     circle,
-    color-mix(in srgb, var(--highlight) 22%, transparent),
+    color-mix(in srgb, var(--highlight) 12%, transparent),
     transparent 65%
   );
   animation: aurora-drift-1 26s ease-in-out infinite alternate;
@@ -578,7 +586,7 @@
   right: -14%;
   background: radial-gradient(
     circle,
-    rgba(79, 70, 229, 0.2),
+    rgba(79, 70, 229, 0.1),
     transparent 65%
   );
   animation: aurora-drift-2 32s ease-in-out infinite alternate;
@@ -592,7 +600,7 @@
   left: 28%;
   background: radial-gradient(
     circle,
-    color-mix(in srgb, var(--highlight) 12%, rgba(61, 220, 151, 0.06)),
+    color-mix(in srgb, var(--highlight) 8%, transparent),
     transparent 65%
   );
   animation: aurora-drift-3 38s ease-in-out infinite alternate;

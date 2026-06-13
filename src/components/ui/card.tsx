@@ -22,16 +22,13 @@ function Card({
       data-size={size}
       data-tone={tone}
       className={cn(
-        "group/card relative flex flex-col gap-4 overflow-hidden rounded-xl py-5 text-card-foreground",
-        // Translucent "glass bubble" — the dimmed backdrop shows through, but
-        // the ~74% tint + blur keep data fully legible. Opaque fallback where
-        // backdrop-filter is unsupported. Transitions for the hover lift.
-        "bg-card transition-premium duration-300",
-        "supports-[backdrop-filter]:bg-[color-mix(in_srgb,var(--card)_74%,transparent)] supports-[backdrop-filter]:backdrop-blur-xl",
-        // Tone variants. --shadow-card carries the dark-mode 1px top
-        // light-catch; elevated blooms a diffuse shadow for hero moments.
-        tone === "default" && "border border-border shadow-[var(--shadow-card)] hover:border-highlight/25 hover:shadow-[var(--shadow-md)]",
-        tone === "elevated" && "border border-border/60 shadow-[var(--shadow-md)] hover:border-highlight/25",
+        "group/card relative flex flex-col gap-4 overflow-hidden rounded-xl py-5 text-card-foreground transition-premium duration-300",
+        // Translucent "bubble": the dimmed backdrop shows through; a strong blur
+        // + violet accent edge & glow keep it legible and on-brand. The
+        // .glass-card utility (globals) carries the tint/blur/border/shadow.
+        tone === "default" && "glass-card hover:border-highlight/35",
+        tone === "elevated" && "glass-card hover:border-highlight/35",
+        tone === "flat" && "bg-[color-mix(in_srgb,var(--card)_55%,transparent)] supports-[backdrop-filter]:backdrop-blur-xl",
         // Sizes
         "has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0",
         "data-[size=sm]:gap-3 data-[size=sm]:py-4 data-[size=sm]:has-data-[slot=card-footer]:pb-0",
