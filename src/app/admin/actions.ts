@@ -29,11 +29,7 @@ const DEFAULT_FLAGS = {
   premarket_report: true,
   midday_report: true,
   close_report: true,
-  multiple_portfolios: true,
   white_label: true,
-  custom_email: true,
-  max_portfolios: 50,
-  max_holdings: 500,
 }
 
 export async function createTenant(formData: FormData): Promise<void> {

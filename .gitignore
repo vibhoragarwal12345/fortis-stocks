@@ -65,6 +65,8 @@ next-env.d.ts
 
 # Ad-hoc error logs
 *.err
+# Transient local scan log (was accidentally tracked)
+scan_test.log
 
 # Tier-4 audio transcription
 /pipeline/vendor/                          # cloned + built whisper.cpp (and ffmpeg shim)

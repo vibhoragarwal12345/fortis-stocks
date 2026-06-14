@@ -131,9 +131,9 @@ export default async function ResearchPage({
     .eq("ticker", ticker)
     // Server component: per-request "now" for the 90-day window. (Columns are
     // transaction_date/insider/role on form4_transactions — NOT filing_date.)
-    // eslint-disable-next-line react-hooks/purity
     .gte(
       "transaction_date",
+      // eslint-disable-next-line react-hooks/purity
       new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10),
     )
     .order("transaction_date", { ascending: false })

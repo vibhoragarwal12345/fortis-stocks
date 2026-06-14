@@ -42,24 +42,3 @@ export function checkAccess(tenant: Tenant | null | undefined): AccessVerdict {
   }
   return { ok: true }
 }
-
-export function canAccessFeature(
-  tenant: Tenant | null | undefined,
-  feature: string,
-): boolean {
-  if (!tenant) return false
-  if (checkAccess(tenant).ok === false) return false
-  const flag = tenant.feature_flags?.[feature]
-  if (typeof flag === "boolean") return flag
-  if (typeof flag === "number") return flag > 0
-  return false
-}
-
-export function featureLimit(
-  tenant: Tenant | null | undefined,
-  feature: string,
-): number {
-  if (!tenant) return 0
-  const flag = tenant.feature_flags?.[feature]
-  return typeof flag === "number" ? flag : 0
-}

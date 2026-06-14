@@ -6,11 +6,7 @@ export type FeatureFlags = {
   premarket_report: boolean
   midday_report: boolean
   close_report: boolean
-  multiple_portfolios: boolean
   white_label: boolean
-  custom_email: boolean
-  max_portfolios: number
-  max_holdings: number
   [key: string]: boolean | number
 }
 
@@ -32,35 +28,6 @@ export type TenantMember = {
   tenant_id: string
   user_id: string
   role: "admin" | "member"
-}
-
-/**
- * Returns the tenant the current authenticated user belongs to. If the user
- * belongs to more than one, returns the most recently joined. Returns null
- * for anonymous callers or users not in any tenant.
- */
-export async function getActiveTenant(): Promise<Tenant | null> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return null
-
-  const { data: member } = await supabase
-    .from("tenant_members")
-    .select("tenant_id, role, invited_at")
-    .eq("user_id", user.id)
-    .order("invited_at", { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  if (!member) return null
-
-  const { data: tenant } = await supabase
-    .from("tenants")
-    .select("*")
-    .eq("id", member.tenant_id)
-    .maybeSingle()
-  return (tenant as Tenant) ?? null
 }
 
 export async function getActiveTenantMember(): Promise<{
