@@ -10,6 +10,17 @@ const GRADE_VARIANT = { A: "gradeA", B: "gradeB", C: "gradeC", D: "neutral" } as
 export const metadata = { title: "Research — Fortis" }
 export const dynamic = "force-dynamic"
 
+type PriceRef = {
+  low: number | null
+  mid: number | null
+  high: number | null
+  basis: number | null
+  horizon_days: number | null
+  method: string | null
+  distribution: string | null
+  calibration: number | null
+}
+
 type Pick = {
   ticker: string
   run_date: string
@@ -22,8 +33,7 @@ type Pick = {
   catalyst_description: string | null
   bull_case: string | null
   bear_case: string | null
-  price_target_upside: number | null
-  price_target_downside: number | null
+  price_reference: PriceRef | null
   position_size_guidance: string | null
 }
 
@@ -46,13 +56,16 @@ export default async function ResearchPage({
   //      spent), which blanked the bull/bear/targets even when a complete
   //      dossier existed from an earlier scan.
   const PICK_SELECT =
-    "ticker,run_date,run_type,conviction_grade,composite_score,conviction_score_adjusted,thesis,catalyst_category,catalyst_description,bull_case,bear_case,price_target_upside,price_target_downside,position_size_guidance"
+    "ticker,run_date,run_type,conviction_grade,composite_score,conviction_score_adjusted,thesis,catalyst_category,catalyst_description,bull_case,bear_case,price_reference,position_size_guidance"
 
+  // Only a COMPLETE, fact-checked dossier shows prose — that's the product
+  // rule (dossier_gate). An incomplete name falls through to market-metrics
+  // only, below.
   const { data: deepRow } = await supabase
     .from("ranked_focus_list")
     .select(PICK_SELECT)
     .eq("ticker", ticker)
-    .not("bull_case", "is", null)
+    .eq("dossier_complete", true)
     .order("scan_id", { ascending: false, nullsFirst: false })
     .limit(1)
     .maybeSingle()
@@ -246,14 +259,13 @@ export default async function ResearchPage({
       {deepPending && (
         <Reveal as="section">
           <div className="rounded-lg border border-warning/25 bg-warning/5 p-5">
-            <p className="text-eyebrow text-warning">Deep analysis pending</p>
+            <p className="text-eyebrow text-warning">No published dossier</p>
             <p className="mt-2 text-small text-muted-foreground leading-relaxed">
-              {ticker} advanced past the composite ranking, but the deep
-              agents (catalyst, debate, critic) haven&rsquo;t produced a
-              dossier for it yet — each scan analyzes the ranking top-down
-              until its run budget is spent. The market metrics above are
-              current; bull / bear cases and price targets will appear once
-              a scan reaches it.
+              {ticker} isn&rsquo;t on the current focus list with a complete,
+              fact-checked dossier, so only its live market metrics are shown.
+              A name appears with a full thesis, bull / bear cases and a price
+              reference range once a scan produces — and fact-checks — the
+              complete dossier.
             </p>
           </div>
         </Reveal>
@@ -301,22 +313,44 @@ export default async function ResearchPage({
         )}
       </section>
 
-      {(pick?.price_target_upside != null ||
-        pick?.price_target_downside != null) && (
+      {pick?.price_reference && (
         <Reveal as="section" className="space-y-5">
-          <h2 className="text-eyebrow">Price targets · debate synthesis</h2>
+          <h2 className="text-eyebrow">
+            Price reference range ·{" "}
+            {pick.price_reference.horizon_days ?? "—"}-day Monte Carlo
+          </h2>
           <dl className="grid grid-cols-2 gap-x-8 gap-y-5 sm:grid-cols-4">
             <Stat
-              label="Upside target"
-              value={fmtMoney(pick?.price_target_upside)}
+              label="Lower · 5th pct"
+              value={fmtMoney(pick.price_reference.low)}
+              tone={-1}
+            />
+            <Stat label="Median" value={fmtMoney(pick.price_reference.mid)} />
+            <Stat
+              label="Upper · 95th pct"
+              value={fmtMoney(pick.price_reference.high)}
               tone={1}
             />
             <Stat
-              label="Downside target"
-              value={fmtMoney(pick?.price_target_downside)}
-              tone={-1}
+              label="Anchored on"
+              value={fmtMoney(pick.price_reference.basis)}
+              muted
             />
           </dl>
+          <p className="text-caption">
+            Statistical reference range —{" "}
+            <span className="text-foreground">not a forecast</span>. A zero-drift
+            Monte Carlo simulation over{" "}
+            {pick.price_reference.horizon_days ?? "—"} trading days, calibrated
+            to this name&rsquo;s own return distribution
+            {pick.price_reference.distribution === "student_t"
+              ? " (Student-t, fat-tailed)"
+              : pick.price_reference.distribution === "normal"
+              ? " (normal)"
+              : ""}
+            . Drift is zeroed so the band reflects volatility, not recent
+            momentum.
+          </p>
         </Reveal>
       )}
 

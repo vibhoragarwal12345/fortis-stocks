@@ -6,7 +6,14 @@ export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
   const token_hash = searchParams.get("token_hash")
   const type = searchParams.get("type") as EmailOtpType | null
-  const next = searchParams.get("next") ?? "/dashboard"
+  // Only ever redirect to a LOCAL path. An absolute ("https://evil.com") or
+  // protocol-relative ("//evil.com") `next` would otherwise be an open
+  // redirect once a valid OTP is presented.
+  const nextParam = searchParams.get("next") ?? "/dashboard"
+  const next =
+    nextParam.startsWith("/") && !nextParam.startsWith("//")
+      ? nextParam
+      : "/dashboard"
 
   if (token_hash && type) {
     const supabase = await createClient()

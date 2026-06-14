@@ -91,18 +91,8 @@ function stripMd(s: string): string {
 
 /** The card body: thesis → bull case → derived signal line. */
 function cardBody(r: Row, m: Metrics | undefined): { label: string | null; text: string } {
-  // Picks whose dossier is still assembling display, but we withhold their
-  // unverified prose — grade + metrics only, with an honest note.
-  if (!r.dossier_complete) {
-    const bits: string[] = []
-    if (m?.relative_volume != null && m.relative_volume >= 1.5)
-      bits.push(`${m.relative_volume.toFixed(1)}× average volume`)
-    if (m?.is_breakout) bits.push("breakout flag")
-    return {
-      label: "Dossier completing",
-      text: `Graded on composite strength${bits.length ? ` — ${bits.join(", ")}` : ""}. The full fact-checked thesis is still being assembled.`,
-    }
-  }
+  // Every displayed name has a complete dossier (the gate enforces it), so we
+  // lead with the thesis, then the bull case, then a derived-signal fallback.
   if (r.thesis && r.thesis.length > 50) {
     return { label: null, text: stripMd(r.thesis) }
   }
@@ -156,9 +146,9 @@ export default async function FocusListPage() {
         "ticker,rank,conviction_grade,composite_score,conviction_score_adjusted,catalyst_category,catalyst_description,thesis,bull_case,dossier_complete,run_date,run_type",
       )
       .eq("scan_id", latestScanRow.id)
-      // The whole picked shortlist (20-25) displays; dossier_complete is a
-      // label, not a filter. Names still assembling show "dossier completing"
-      // and withhold their unverified prose (see cardBody).
+      // A name displays ONLY with a complete, fact-checked dossier (the
+      // dossier gate enforces this). A shorter list is correct, not a bug.
+      .eq("dossier_complete", true)
       .order("rank", { ascending: true })
       .limit(25),
     supabase
@@ -203,12 +193,12 @@ export default async function FocusListPage() {
             Focus list · {latestScanRow.scan_type} scan · {fmtTime}
           </p>
           <h1 className="text-h1">
-            {picks.length} names from the latest scan.
+            {picks.length} names with a complete dossier.
           </h1>
           <p className="text-body-lg max-w-[680px] text-muted-foreground">
-            The composite top {picks.length}, grouped by conviction grade.
-            Click into any ticker for the full thesis, catalyst, insider
-            posture, and bull / bear cases.
+            Every name here carries a full, fact-checked dossier — thesis,
+            bull / bear cases, catalyst, insider posture, and a Monte Carlo
+            price reference range. Grouped by conviction grade.
           </p>
         </div>
 
@@ -235,6 +225,18 @@ export default async function FocusListPage() {
           </div>
         )}
       </Reveal>
+
+      {picks.length === 0 && (
+        <Reveal>
+          <Card>
+            <CardContent className="py-16 text-center text-small text-muted-foreground">
+              The latest scan is still assembling fact-checked dossiers. Names
+              appear here the moment one clears the thesis / bull / bear /
+              price-band / critic checks — check back shortly.
+            </CardContent>
+          </Card>
+        </Reveal>
+      )}
 
       {gradeOrder.map((grade) => {
         const list = grouped[grade] ?? []
@@ -279,9 +281,6 @@ export default async function FocusListPage() {
                               </Badge>
                               {catalyst && (
                                 <Badge variant="accent">{catalyst}</Badge>
-                              )}
-                              {!r.dossier_complete && (
-                                <Badge variant="neutral">Dossier completing</Badge>
                               )}
                             </CardTitle>
                           </div>

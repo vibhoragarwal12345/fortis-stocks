@@ -8,11 +8,15 @@ filings, technical setup, options positioning, historical analog, crowd
 consensus, validated-strength components -- and asks Groq Llama 3.3 70B
 (falling back to Gemini 2.0 Flash) to write a structured thesis:
 
-    BULL_CASE / BEAR_CASE / PRICE_TARGET / POSITION_SIZE_GUIDANCE / WHAT_TO_WATCH
+    THESIS / BULL_CASE / BEAR_CASE / PRICE_TARGET / POSITION_SIZE_GUIDANCE /
+    WHAT_TO_WATCH
 
-The parsed result is written back onto ranked_focus_list (migration 011):
-    bull_case, bear_case, price_target_upside, price_target_downside,
+The parsed result is written back onto ranked_focus_list (migrations 011/050):
+    thesis, bull_case, bear_case, price_target_upside, price_target_downside,
     position_size_guidance, what_to_watch, thesis_generated_at.
+Honest price reference levels come from the deterministic zero-drift Monte
+Carlo cone (pipeline/scan/price_bands.py -> price_reference), NOT from the LLM
+PRICE_TARGET line, which is kept for legacy/report use only.
 
 Usage:
     python pipeline/agents/debate_synthesizer.py [N]      # default N = 30
@@ -251,8 +255,8 @@ _SYSTEM = ("You are a senior portfolio manager at a $5B fundamentals-driven "
            "equity fund. You write institutional-grade investment theses. Be "
            "specific. Cite numbers. Name catalysts. Avoid generic language. "
            "CLOSED CONTEXT: you may ONLY cite facts that appear in the data "
-           "provided in the prompt -- never from memory. In BULL_CASE and "
-           "BEAR_CASE, every numeric or specific claim MUST be immediately "
+           "provided in the prompt -- never from memory. In THESIS, BULL_CASE "
+           "and BEAR_CASE, every numeric or specific claim MUST be immediately "
            "followed by a [DATA REF: key] tag naming the data key it came "
            "from (the allowed keys are listed in the prompt). If the data "
            "does not support a claim, do not make it.")
@@ -304,6 +308,11 @@ DATA KEYS for [DATA REF] tags (each prompt section above, in order):
 
 OUTPUT (use exactly these headers):
 
+THESIS:
+One or two sentences: the single, specific reason to own this now -- the line a
+PM would say in one breath. Synthesize from the data; introduce NO fact that is
+not already below, and tag every numeric or specific claim with [DATA REF: key].
+
 BULL_CASE:
 Two specific paragraphs (3-4 sentences each) arguing the long thesis. Cite
 specific numbers, dates, and catalysts. Address why now. EXPLICITLY address
@@ -345,7 +354,7 @@ def _generate(prompt: str) -> tuple[str | None, str]:
 # Parse the structured output
 # ══════════════════════════════════════════════════════════════════════════════
 
-_HEADERS = ["BULL_CASE", "BEAR_CASE", "PRICE_TARGET",
+_HEADERS = ["THESIS", "BULL_CASE", "BEAR_CASE", "PRICE_TARGET",
             "POSITION_SIZE_GUIDANCE", "WHAT_TO_WATCH"]
 
 
@@ -387,6 +396,7 @@ def _parse_thesis(text: str) -> dict:
     watch = [w for w in watch if len(w) > 8][:3]
 
     return {
+        "thesis":                sections.get("THESIS") or None,
         "bull_case":             sections.get("BULL_CASE") or None,
         "bear_case":             sections.get("BEAR_CASE") or None,
         "price_target_upside":   up_v,
@@ -527,7 +537,8 @@ def run(limit: int = DEFAULT_N, scan_id: int | None = None) -> int:
             # never reach the displayed shortlist (dossier gate enforces).
             fc_data = {k: ctx[k] for k in _DATA_KEYS if k in ctx}
             fc = factcheck("\n\n".join(
-                s for s in (parsed["bull_case"], parsed["bear_case"]) if s),
+                s for s in (parsed["thesis"], parsed["bull_case"],
+                            parsed["bear_case"]) if s),
                 fc_data)
             if fc["quality_grade"] == "UNVERIFIED":
                 log.warning("%s: thesis factcheck UNVERIFIED (%.2f, attempt %d)"
@@ -536,7 +547,7 @@ def run(limit: int = DEFAULT_N, scan_id: int | None = None) -> int:
                 continue
             # Strip the [DATA REF] tags for clean display; verification
             # already ran on the tagged text.
-            for k in ("bull_case", "bear_case", "position_size_guidance"):
+            for k in ("thesis", "bull_case", "bear_case", "position_size_guidance"):
                 if parsed.get(k):
                     parsed[k] = strip_data_refs(parsed[k])
             if parsed.get("what_to_watch"):
@@ -556,6 +567,7 @@ def run(limit: int = DEFAULT_N, scan_id: int | None = None) -> int:
     for r in results:
         try:
             q = db.table("ranked_focus_list").update({
+                "thesis":                r["thesis"],
                 "bull_case":             r["bull_case"],
                 "bear_case":             r["bear_case"],
                 "price_target_upside":   r["price_target_upside"],
@@ -597,6 +609,7 @@ def _report(results: list[dict]) -> None:
     for r in results:
         print(f"\n{'#' * 80}\n## {r['ticker']}   (price ${r['_price']}, "
               f"via {r['_method']})\n{'#' * 80}")
+        print(f"\nTHESIS:\n{r.get('thesis') or '(parse failed)'}")
         print(f"\nBULL CASE:\n{r['bull_case'] or '(parse failed)'}")
         print(f"\nBEAR CASE:\n{r['bear_case'] or '(parse failed)'}")
         print(f"\nPRICE TARGET:  upside ${r['price_target_upside']}  |  "

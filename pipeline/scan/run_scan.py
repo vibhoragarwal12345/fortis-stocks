@@ -6,10 +6,14 @@ Single entry point for an end-to-end market scan. Sequenced as:
 
     Layer 1   layer1_fast_scan -- ~3-5k tickers, pure math, ~3-5 min
     Layer 2   layer2_rank      -- score + shortlist top N -> ranked_focus_list
+    Bands     price_bands      -- zero-drift Monte Carlo price cone per pick
+                                  (deterministic; runs even if the LLM budget
+                                  is spent, so every name has honest levels)
     Layer 3   deep agents      -- catalyst, smart_money, debate, critic on top N
     Layer 4   conviction grade -- conviction_grader on the top N
     Gate      dossier_gate     -- only names with a complete, fact-checked
-                                  dossier stay on the displayed shortlist
+                                  dossier (bull+bear+thesis+price band) stay
+                                  on the displayed shortlist
 
 The shortlist N is sized to what the free-LLM budget reliably covers per
 scan (DEFAULT_TOP_N = 20): 4 LLM calls per dossier x 3 scans/day across
@@ -40,7 +44,7 @@ import os
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -136,6 +140,19 @@ def run(
     db = _db()
     t_total = time.time()
 
+    # Reap orphaned scans: a prior run hard-killed mid-flight (CI timeout,
+    # crash) leaves market_scans stuck at status='running' forever -- it
+    # clutters scan history and shows as a permanent "running" row. Mark any
+    # 'running' row older than 2h as 'failed' before opening this one.
+    try:
+        stale_cutoff = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()
+        db.table("market_scans").update({
+            "status": "failed",
+            "notes": "auto-failed: orphaned 'running' scan reaped by a later run",
+        }).eq("status", "running").lt("started_at", stale_cutoff).execute()
+    except Exception as exc:  # noqa: BLE001
+        log.warning("stale-scan reaper failed: %s", exc)
+
     # Mark the shared scan_state 'running' so the dashboard reflects it
     # immediately (covers cron runs; the manual trigger endpoint also sets
     # this before dispatch).
@@ -221,6 +238,19 @@ def run(
         "layer2_completed_at": _now(),
     }).eq("id", scan_id).execute()
     log.info("Layer 2 done: shortlist=%d", shortlist)
+
+    # ── Price reference bands (deterministic; always runs) ──────────────
+    # Zero-drift Monte Carlo cone per pick from price history -- no LLM, so
+    # every shortlisted name gets honest reference levels even when the
+    # Layer-3 budget is spent. The dossier gate requires price_reference.
+    if shortlist > 0:
+        ok, msg = _run_step(
+            "Price reference bands",
+            [PY, "-m", "pipeline.scan.price_bands", "--scan-id", str(scan_id)],
+        )
+        if not ok:
+            soft_failures += 1
+            notes.append(f"[non-fatal] {msg}")
 
     # Enrichment steps run against the soft deadline: once the budget is
     # spent we stop STARTING steps and fall through to gate + finalize.

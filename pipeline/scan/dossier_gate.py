@@ -2,18 +2,22 @@
 Dossier Gate -- the dossier-completeness LABEL.
 ==================================================
 
-The full picked shortlist (20-25 names) displays. This step flags which of
-those picks carry a COMPLETED, FACT-CHECKED dossier vs. which are still being
-assembled, so the UI can label the latter "dossier completing" and withhold
-their unverified prose (rather than hiding the name and dropping below the
-20-name floor). Runs after Layer 4 and, for the given scan:
+A name displays ONLY if it carries a COMPLETE, FACT-CHECKED dossier. This step
+decides which of the picked shortlist qualify and HIDES the rest -- a half-built
+dossier (a missing thesis, bull/bear, price band, critic verdict or grade) reads
+as unprofessional, so a shorter displayed list is correct, not a failure. Runs
+after Layer 4 and, for the given scan:
 
   1. Marks ranked_focus_list.dossier_complete = true for rows that have the
      full dossier:
         catalyst_description      (catalyst_agent -- has deterministic
                                    template fallback, so it never gates a
                                    name out by itself)
-        bull_case + bear_case     (debate_synthesizer, factchecked)
+        thesis + bull_case + bear_case
+                                  (debate_synthesizer, factchecked together)
+        price_reference           (price_bands.py -- zero-drift Monte Carlo
+                                   cone; deterministic, so it is present for
+                                   every name the scan reached)
         critic_objection_level    (critic_agent, factchecked)
         conviction_grade          (conviction_grader)
         dossier_quality_grade     VERIFIED or PARTIALLY_VERIFIED
@@ -59,16 +63,22 @@ log = logging.getLogger(__name__)
 # Every dossier section that must be present before a name may display.
 _REQUIRED_FIELDS = (
     "catalyst_description",
+    "thesis",
     "bull_case",
     "bear_case",
     "critic_objection_level",
     "conviction_grade",
 )
+# Structured (non-text) dossier requirements -- checked the same way (truthy),
+# but listed separately because they are jsonb, not prose.
+_REQUIRED_STRUCTURED = ("price_reference",)
 _PASSING_GRADES = ("VERIFIED", "PARTIALLY_VERIFIED")
 
 
 def _is_complete(row: dict) -> bool:
     if any(not row.get(f) for f in _REQUIRED_FIELDS):
+        return False
+    if any(not row.get(f) for f in _REQUIRED_STRUCTURED):
         return False
     grade = row.get("dossier_quality_grade")
     # NULL = legacy pre-048 dossier (grandfathered by the migration); every
@@ -83,6 +93,7 @@ def gate(scan_id: int) -> tuple[int, int]:
 
     rows = (db.table("ranked_focus_list")
             .select("ticker,rank," + ",".join(_REQUIRED_FIELDS)
+                    + "," + ",".join(_REQUIRED_STRUCTURED)
                     + ",dossier_quality_grade")
             .eq("scan_id", scan_id)
             .order("rank").execute().data or [])
@@ -95,18 +106,24 @@ def gate(scan_id: int) -> tuple[int, int]:
     bare = [r["ticker"] for r in rows if not _is_complete(r)]
     now = datetime.now(timezone.utc).isoformat()
 
-    # The whole picked shortlist (20-25 names) DISPLAYS — that's the product
-    # rule. `dossier_complete` is now a QUALITY LABEL, not a hide-filter: names
-    # with the full fact-checked dossier are marked complete; the rest display
-    # too but the UI labels them "dossier completing" and withholds their
-    # unverified prose. So we no longer touch scan_results.advanced.
+    # A name displays ONLY with a complete dossier. We mark dossier_complete
+    # (the focus list + landing filter on it) AND sync scan_results.advanced
+    # so the dashboard shortlist, ticker tape and research fallback hide bare
+    # names too. Re-running the agents to fill a gap, then re-running the gate,
+    # heals a previously demoted name (advanced flips back to true).
     if complete:
         (db.table("ranked_focus_list")
            .update({"dossier_complete": True, "dossier_completed_at": now})
            .eq("scan_id", scan_id).in_("ticker", complete).execute())
+        (db.table("scan_results")
+           .update({"advanced": True})
+           .eq("scan_id", scan_id).in_("ticker", complete).execute())
     if bare:
         (db.table("ranked_focus_list")
            .update({"dossier_complete": False})
+           .eq("scan_id", scan_id).in_("ticker", bare).execute())
+        (db.table("scan_results")
+           .update({"advanced": False})
            .eq("scan_id", scan_id).in_("ticker", bare).execute())
 
     log.info("dossier gate scan_id=%d: %d/%d picks carry a complete dossier",
