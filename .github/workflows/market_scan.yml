@@ -18,13 +18,13 @@ name: Market scan · 3x per trading day
 # routing load to slow providers (June 12 2026: NVIDIA at 60-90 s/call
 # carried ~45% of calls and blew the job timeout). The dossier gate hides
 # any name that still lacks a dossier, so the displayed list is 20-25.
-# run_scan.py enforces a 46-min soft deadline internally so the gate and
-# finalize ALWAYS run; timeout-minutes is the hard backstop above it.
-# 3 runs/weekday is ~1,900-2,000 Actions-min/month -- close to the
-# free 2,000-min ceiling, so the other heavy workflows (multibagger) plus
-# manual refreshes may tip it over; a paid plan or trimming is the lever
-# if minutes run out. The /api/scan manual refresh reuses this same
-# workflow, gated to once per 2h, so it adds little on top.
+# run_scan.py enforces a soft deadline internally (SCAN_SOFT_DEADLINE_SEC,
+# raised to 63 min below, owner directive June 14 2026) so the gate + finalize
+# ALWAYS run; timeout-minutes (72) is the hard backstop above it. The longer
+# deadline lets the critic finish more dossiers, but RAISES Actions usage --
+# 3 runs/weekday now trend ABOVE the free 2,000-min/month ceiling, so a paid
+# plan or trimming a daily scan is likely needed; watch the bill. The /api/scan
+# manual refresh reuses this same workflow, gated to once per 2h.
 #
 # Layer 3 (LLM-heavy) + Layer 4 are enabled. Layer 2 stamps the
 # shortlist with run_type='midday' so the unmodified deep agents pick
@@ -66,12 +66,15 @@ env:
   NVIDIA_API_KEY:              ${{ secrets.NVIDIA_API_KEY }}
   OPENROUTER_API_KEY:          ${{ secrets.OPENROUTER_API_KEY }}
   TIINGO_API_KEY:              ${{ secrets.TIINGO_API_KEY }}
+  # Soft deadline raised 46 -> 63 min (owner directive). Must stay BELOW
+  # timeout-minutes (72) so the gate + finalize always run before the hard kill.
+  SCAN_SOFT_DEADLINE_SEC:      "3780"
 
 jobs:
   scan:
     name: "Run two-speed funnel"
     runs-on: ubuntu-latest
-    timeout-minutes: 55
+    timeout-minutes: 72
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-pipeline
