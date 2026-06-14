@@ -19,7 +19,7 @@ PROVIDER TIERS (selection order):
     tier 1  gemini                     -- different model family, sits behind
                                           the primaries
     tier 2  openrouter                 -- last-resort overflow router
-                                          (free Llama slot)
+                                          (free gpt-oss-120b + Llama slots)
 
 Within tier 0 the gateway picks the provider with the LARGEST remaining
 fraction of its daily budget, so load spreads across Groq/Cerebras/NVIDIA
@@ -114,12 +114,21 @@ def _providers() -> list[_Provider]:
         _Provider("gemini", "gemini", GEMINI_API_KEY,
                   "gemini-2.5-flash",
                   tier=1, rpd=250),
-        # OpenRouter free slots: last resort when everything else is
-        # rate-limited. ~50 free requests/day without a credit balance.
-        _Provider("openrouter", "openai", OPENROUTER_API_KEY,
-                  "meta-llama/llama-3.3-70b-instruct:free",
+        # OpenRouter free slots: last-resort overflow when the primaries are
+        # rate-limited. The account-level FREE cap is ~50 req/day (shared
+        # across these models) + ~20 req/min; two models give per-minute
+        # rotation so one model's throttle doesn't stall the chain. BOTH are
+        # FREE (`:free`) -- never a paid slot. gpt-oss-120b goes first (same
+        # family Cerebras runs here; verified responsive June 2026); Llama
+        # 70b:free is the heavily-throttled backup (speed=1 => tried last).
+        _Provider("openrouter-gptoss", "openai", OPENROUTER_API_KEY,
+                  "openai/gpt-oss-120b:free",
                   "https://openrouter.ai/api/v1",
                   tier=2, rpd=50),
+        _Provider("openrouter-llama", "openai", OPENROUTER_API_KEY,
+                  "meta-llama/llama-3.3-70b-instruct:free",
+                  "https://openrouter.ai/api/v1",
+                  tier=2, speed=1, rpd=50),
     ]
     return [p for p in candidates if p.api_key]
 
