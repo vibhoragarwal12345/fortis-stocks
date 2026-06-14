@@ -70,21 +70,29 @@ export default async function ResearchPage({
     .limit(1)
     .maybeSingle()
 
-  let pick = deepRow as Pick | null
-  if (!pick) {
-    // No dossier anywhere — fall back to the newest shallow row so the
-    // grade/score header still renders.
+  // Prose (thesis / bull / bear / price band / catalyst / sizing) renders ONLY
+  // from a COMPLETE, fact-checked dossier — the gate's invariant must hold on a
+  // direct URL too, not just in the nav.
+  const pick = deepRow as Pick | null
+
+  // Header fallback: with no complete dossier, still surface the latest
+  // grade/score so the page isn't bare. This row is NEVER used for prose.
+  let headerPick = pick
+  if (!headerPick) {
     const { data: anyRow } = await supabase
       .from("ranked_focus_list")
-      .select(PICK_SELECT)
+      .select(
+        "ticker,run_date,run_type,conviction_grade,composite_score,conviction_score_adjusted",
+      )
       .eq("ticker", ticker)
       .order("scan_id", { ascending: false, nullsFirst: false })
       .limit(1)
       .maybeSingle()
-    pick = anyRow as Pick | null
+    headerPick = anyRow as Pick | null
   }
-  // Shortlisted but never deep-analyzed: say so instead of rendering blanks.
-  const deepPending = pick != null && !pick.bull_case
+  // No complete dossier (incomplete, or a non-shortlist name): show market
+  // metrics + an honest note instead of partial, unverified prose.
+  const deepPending = pick == null
 
   // Latest Layer-1 scan metrics for the ticker -- this is what gives the
   // page real-time market context even when the ticker is NOT on the
@@ -119,22 +127,22 @@ export default async function ResearchPage({
 
   const { data: form4 } = await supabase
     .from("form4_transactions")
-    .select(
-      "transaction_code,is_directional_signal,filing_date,person_name,person_title",
-    )
+    .select("transaction_code,is_directional_signal,transaction_date")
     .eq("ticker", ticker)
-    // Server component: per-request "now" for the 90-day filing window.
+    // Server component: per-request "now" for the 90-day window. (Columns are
+    // transaction_date/insider/role on form4_transactions — NOT filing_date.)
     // eslint-disable-next-line react-hooks/purity
-    .gte("filing_date", new Date(Date.now() - 90 * 86_400_000).toISOString())
-    .order("filing_date", { ascending: false })
+    .gte(
+      "transaction_date",
+      new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10),
+    )
+    .order("transaction_date", { ascending: false })
     .limit(50)
 
   const insider = (form4 ?? []) as Array<{
     transaction_code: string | null
     is_directional_signal: boolean
-    filing_date: string
-    person_name: string | null
-    person_title: string | null
+    transaction_date: string
   }>
   const buys = insider.filter(
     (i) =>
@@ -147,7 +155,7 @@ export default async function ResearchPage({
       ["S", "V"].includes((i.transaction_code || "").toUpperCase()),
   ).length
 
-  if (!pick && !scan) {
+  if (!headerPick && !scan) {
     return (
       <div className="mx-auto max-w-[1120px] px-6 py-14 md:px-10 md:py-16 space-y-12">
         <BackLink />
@@ -170,8 +178,8 @@ export default async function ResearchPage({
   // The page header shows either the scan or the pick metadata --
   // whichever is fresher. If we only have scan metrics (Layer 1+2), we
   // skip the deep-analysis sections gracefully.
-  const headerRunDate = pick?.run_date ?? "—"
-  const headerRunType = pick?.run_type ?? "scan"
+  const headerRunDate = headerPick?.run_date ?? "—"
+  const headerRunType = headerPick?.run_type ?? "scan"
 
   return (
     <div className="mx-auto max-w-[1120px] space-y-16 px-6 py-14 md:space-y-20 md:px-10 md:py-16">
@@ -182,27 +190,27 @@ export default async function ResearchPage({
         </p>
         <div className="flex flex-wrap items-center gap-4">
           <h1 className="text-data text-display">{ticker}</h1>
-          {pick?.conviction_grade && (
+          {headerPick?.conviction_grade && (
             <Badge
-              variant={GRADE_VARIANT[pick.conviction_grade]}
+              variant={GRADE_VARIANT[headerPick.conviction_grade]}
               className="translate-y-1 text-[12px]"
             >
-              Grade {pick.conviction_grade}
+              Grade {headerPick.conviction_grade}
             </Badge>
           )}
         </div>
         <p className="text-small text-muted-foreground">
           Composite score{" "}
           <span className="text-data text-foreground">
-            {pick?.composite_score != null
-              ? Number(pick.composite_score).toFixed(1)
+            {headerPick?.composite_score != null
+              ? Number(headerPick.composite_score).toFixed(1)
               : "—"}
           </span>
-          {pick?.conviction_score_adjusted != null && (
+          {headerPick?.conviction_score_adjusted != null && (
             <>
               {" · conviction-adjusted "}
               <span className="text-data text-foreground">
-                {Number(pick.conviction_score_adjusted).toFixed(1)}
+                {Number(headerPick.conviction_score_adjusted).toFixed(1)}
               </span>
             </>
           )}
@@ -354,16 +362,20 @@ export default async function ResearchPage({
         </Reveal>
       )}
 
-      {pick?.catalyst_description && (
-        <Reveal as="section" className="space-y-5">
-          <h2 className="text-eyebrow">
-            Catalyst · {pick.catalyst_category ?? "—"}
-          </h2>
-          <p className="text-body text-foreground/85 leading-relaxed">
-            {pick.catalyst_description}
-          </p>
-        </Reveal>
-      )}
+      {pick?.catalyst_description &&
+        (pick.catalyst_category ?? "none").toLowerCase() !== "none" &&
+        !/there is no specific catalyst|MIXED_SIGNALS/i.test(
+          pick.catalyst_description,
+        ) && (
+          <Reveal as="section" className="space-y-5">
+            <h2 className="text-eyebrow">
+              Catalyst · {pick.catalyst_category ?? "—"}
+            </h2>
+            <p className="text-body text-foreground/85 leading-relaxed">
+              {pick.catalyst_description}
+            </p>
+          </Reveal>
+        )}
 
       <Reveal as="section" className="space-y-5">
         <h2 className="text-eyebrow">Insider posture · last 90 days</h2>
