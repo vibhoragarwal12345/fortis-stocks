@@ -84,15 +84,34 @@ def net_signal(trades: list[dict]) -> dict:
     buy_val = sum(t["value_inr"] or 0 for t in buys)
     sell_val = sum(t["value_inr"] or 0 for t in sells)
     net = buy_val - sell_val
-    promoter_sell = any(
+    n_buys, n_sells = len(buys), len(sells)
+    # Derived label (4 categories) -- never a hardcoded string. Direction is the
+    # NET of buys vs sells (by count, corroborated by value); inter-se-only is
+    # non-directional. This is the canonical tag the report renders.
+    n_inter = sum(1 for t in trades if t["inter_se"])
+    if n_buys == 0 and n_sells == 0 and n_inter > 0:
+        label = "INTER-SE TRANSFER"
+    elif n_buys == 0 and n_sells == 0:
+        label = "NO DISCLOSURES"
+    elif n_buys > n_sells or (n_buys == n_sells and net > 0):
+        label = "NET BUYING"
+    elif n_sells > n_buys or (n_buys == n_sells and net < 0):
+        label = "NET SELLING"
+    else:
+        label = "NEUTRAL"
+    # promoter open-market selling fires ONLY when the NET is actually selling --
+    # a single promoter sell amid net buying must NOT trip it (the prior bug that
+    # mis-tagged Maharashtra Seamless / RattanIndia / Ajooni as 'selling').
+    promoter_sell = (net < 0 or n_sells > n_buys) and any(
         t["direction"] == "SELL" and "promoter" in (t["person_category"] or "").lower()
         for t in directional)
     return {
-        "n_buys": len(buys), "n_sells": len(sells),
-        "n_inter_se": sum(1 for t in trades if t["inter_se"]),
+        "n_buys": n_buys, "n_sells": n_sells,
+        "n_inter_se": n_inter,
         "buy_value_inr": buy_val, "sell_value_inr": sell_val,
         "net_value_inr": net,
         "signal": ("net_buying" if net > 0 else "net_selling" if net < 0 else "neutral"),
+        "label": label,
         "promoter_open_market_selling_flag": promoter_sell,
     }
 
