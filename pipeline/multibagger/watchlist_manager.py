@@ -124,10 +124,10 @@ def add_qualifying(throttle_ms: int = 1100) -> int:
         log.warning("No theses found -- run deep_research.py first.")
         return 0
 
-    # Existing watchlist (so we don't duplicate)
+    # Existing watchlist (id needed to refresh in place)
     existing = {
         r["ticker"]: r for r in (
-            db.table("emerging_watchlist").select("ticker, status").execute().data or []
+            db.table("emerging_watchlist").select("id, ticker, status").execute().data or []
         )
     }
 
@@ -143,8 +143,32 @@ def add_qualifying(throttle_ms: int = 1100) -> int:
         score = float(thesis.get("multibagger_score") or 0)
         if tier == "tier_3_speculative" and score < TIER3_MIN_SCORE:
             continue
-        if ticker in existing and existing[ticker]["status"] in ("active", "thesis_intact", "thesis_weakening"):
+
+        # Fields the latest BEST thesis owns -- refreshed on every weekly
+        # discovery run so the displayed tier / dossier never lags the research.
+        dossier = {
+            "conviction_tier": tier,
+            "multibagger_score": score,
+            "thesis_summary": (thesis.get("business_model") or "")[:1500],
+            "the_10x_path": thesis.get("the_10x_path"),
+            "what_kills_it": thesis.get("what_kills_it"),
+            "key_metrics_to_track": thesis.get("key_metrics_to_track") or [],
+            "thesis_id": thesis.get("id"),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        prior = existing.get(ticker)
+        if prior and prior["status"] in ("active", "thesis_intact", "thesis_weakening"):
+            # Already tracked -- REFRESH the dossier + tier + thesis link to the
+            # latest best thesis, preserving entry price / returns / status.
+            try:
+                db.table("emerging_watchlist").update(_clean_for_json(dossier)).eq("id", prior["id"]).execute()
+                added += 1
+                log.info("  refreshed %s (%s, score=%.1f)", ticker, tier, score)
+            except Exception as exc:
+                log.warning("  %s refresh failed: %s", ticker, exc)
             continue
+
         quote = _finnhub_quote(ticker)
         price = quote.get("c") if isinstance(quote, dict) else None
         market_cap = _finnhub_profile_market_cap(ticker)
