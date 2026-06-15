@@ -24,8 +24,7 @@ const RUN_TYPE_LABEL: Record<string, string> = {
   premarket: "Pre-market brief",
   midday: "Midday brief",
   close: "Close brief",
-  monthly_emerging: "Emerging opportunities · monthly",
-  quarterly_thesis_review: "Quarterly thesis review",
+  weekly_emerging: "Emerging opportunities · weekly",
 }
 
 export default async function ReportPage({

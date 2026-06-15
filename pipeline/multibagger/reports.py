@@ -2,25 +2,18 @@
 Multibagger Report Generators
 =============================
 
-Two cadences, both separate from the daily briefs:
-
-    monthly_emerging_opportunities()
+    weekly_emerging_opportunities()
         Generates the "Emerging Opportunities" report -- the new candidates
-        and watchlist movers from the latest monthly run. Markdown output;
-        HTML can be rendered later via the same Jinja template family used
-        by report_composer.
+        and watchlist movers from the latest weekly discovery run. Markdown
+        output; HTML can be rendered later via the same Jinja template family
+        used by report_composer. Writes to public.reports with report_type
+        'weekly_emerging' so it slots into the same dashboard plumbing.
 
-    quarterly_thesis_review()
-        Generates the quarterly thesis-review report -- for each active
-        watchlist name, state (intact / weakening / broken), score delta,
-        and reasoning. Includes post-mortems for broken theses.
-
-Both write to the existing public.reports table with a new report_type
-so they slot into the same delivery / dashboard plumbing.
+(The quarterly thesis-review report was removed June 2026 -- the weekly
+discovery run + the weekly watchlist refresh cover thesis status.)
 
 CLI
-    python pipeline/multibagger/reports.py --monthly
-    python pipeline/multibagger/reports.py --quarterly
+    python pipeline/multibagger/reports.py --weekly
 """
 
 from __future__ import annotations
@@ -88,10 +81,10 @@ def _persist_report(db, report_type: str, markdown: str, html: str | None = None
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Monthly -- Emerging Opportunities
+# Weekly -- Emerging Opportunities
 # ══════════════════════════════════════════════════════════════════════════════
 
-def monthly_emerging_opportunities() -> str:
+def weekly_emerging_opportunities() -> str:
     db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
     # Latest theses per ticker, newest first
     theses = (
@@ -179,7 +172,7 @@ def monthly_emerging_opportunities() -> str:
             md.append("---")
             md.append("")
 
-    md.append("## Movers since last month")
+    md.append("## Movers since last week")
     md.append("")
     movers = sorted(wl_rows, key=lambda r: r.get("return_since_added") or 0, reverse=True)[:10]
     if movers:
@@ -200,81 +193,17 @@ def monthly_emerging_opportunities() -> str:
     md.append(RISK_BANNER)
 
     md_text = "\n".join(md)
-    _persist_report(db, "monthly_emerging", md_text)
-    return md_text
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Quarterly -- Thesis Review
-# ══════════════════════════════════════════════════════════════════════════════
-
-def quarterly_thesis_review() -> str:
-    db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-    rows = (
-        db.table("emerging_watchlist")
-          .select("ticker, status, conviction_tier, multibagger_score, return_since_added, "
-                  "peak_return_pct, max_drawdown_pct, last_reviewed_date, notes")
-          .execute()
-          .data or []
-    )
-
-    today = date.today().isoformat()
-    md = [
-        f"# Quarterly Thesis Review — {today}",
-        "",
-        RISK_BANNER,
-        "",
-    ]
-
-    buckets: dict[str, list[dict]] = {}
-    for r in rows:
-        buckets.setdefault(r["status"], []).append(r)
-
-    for status, label in (
-        ("thesis_intact", "Theses intact"),
-        ("thesis_weakening", "Theses weakening"),
-        ("thesis_broken", "Theses broken (post-mortem)"),
-        ("active", "Active (newly added)"),
-        ("graduated", "Graduated to daily pipeline"),
-        ("archived", "Archived"),
-    ):
-        items = buckets.get(status) or []
-        if not items:
-            continue
-        md.append(f"## {label} ({len(items)})")
-        md.append("")
-        md.append("| Ticker | Tier | Score | Return | Peak | Max DD | Last review | Reasoning |")
-        md.append("|---|---|---|---|---|---|---|---|")
-        for r in items:
-            md.append(
-                f"| {r['ticker']} | {r.get('conviction_tier','—')} | "
-                f"{float(r.get('multibagger_score') or 0):.1f} | "
-                f"{_pct(r.get('return_since_added'))} | "
-                f"{_pct(r.get('peak_return_pct'))} | "
-                f"{_pct(r.get('max_drawdown_pct'))} | "
-                f"{r.get('last_reviewed_date') or '—'} | "
-                f"{(r.get('notes') or '').replace('|','/')[:200]} |"
-            )
-        md.append("")
-
-    md.append("")
-    md.append(RISK_BANNER)
-    md_text = "\n".join(md)
-    _persist_report(db, "quarterly_thesis_review", md_text)
+    _persist_report(db, "weekly_emerging", md_text)
     return md_text
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--monthly", action="store_true")
-    ap.add_argument("--quarterly", action="store_true")
-    args = ap.parse_args()
-    if args.monthly or not (args.monthly or args.quarterly):
-        log.info("Generating monthly Emerging Opportunities report…")
-        monthly_emerging_opportunities()
-    if args.quarterly:
-        log.info("Generating quarterly thesis review…")
-        quarterly_thesis_review()
+    ap.add_argument("--weekly", action="store_true",
+                    help="(default) generate the weekly Emerging Opportunities report")
+    ap.parse_args()
+    log.info("Generating weekly Emerging Opportunities report…")
+    weekly_emerging_opportunities()
     log.info("done.")
     return 0
 

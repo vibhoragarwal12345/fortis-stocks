@@ -89,8 +89,7 @@ export default async function EmergingPage() {
         <h1 className="text-h1">Structured speculation.</h1>
         <p className="text-body-lg max-w-[680px] text-muted-foreground">
           Small-cap multibagger candidates tracked over years. Researched
-          honestly, risk-framed relentlessly. Updates monthly; thesis review
-          quarterly.
+          honestly, risk-framed relentlessly. Updated weekly.
         </p>
       </Reveal>
 

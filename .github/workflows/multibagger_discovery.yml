@@ -1,11 +1,13 @@
-name: Multibagger · Monthly
+name: Multibagger · Discovery (weekly)
 
-# 1st of every month, 15:00 UTC. Full screen + deep research + report.
-# This is the heavyweight workflow -- ~30-60 min depending on universe size
-# and Finnhub rate limits.
+# Emerging multibagger DISCOVERY engine: full screen + deep research + report.
+# Saturdays 15:00 UTC -- WEEKLY (cadence changed from monthly June 2026). The
+# weekend slot keeps it off the weekday Actions budget and lands before Monday
+# open + before the Sunday watchlist refresh. Heavyweight -- ~30-60 min
+# depending on universe size and Finnhub rate limits.
 on:
   schedule:
-    - cron: "0 15 1 * *"
+    - cron: "0 15 * * 6"
   workflow_dispatch:
     inputs:
       sample:
@@ -18,7 +20,7 @@ on:
         default: "30"
 
 concurrency:
-  group: multibagger-monthly
+  group: multibagger-discovery
   cancel-in-progress: false
 
 env:
@@ -79,7 +81,7 @@ jobs:
       - run: python -m pipeline.multibagger.deep_research --top-n ${{ github.event.inputs.top_n || 30 }}
 
   watchlist-and-report:
-    name: "Stage 4 · Watchlist + monthly report"
+    name: "Stage 4 · Watchlist + weekly report"
     needs: deep-research
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -91,4 +93,4 @@ jobs:
       - name: Refresh prices for the new entries
         run: python -m pipeline.multibagger.watchlist_manager --update
       - name: Generate Emerging Opportunities report
-        run: python -m pipeline.multibagger.reports --monthly
+        run: python -m pipeline.multibagger.reports --weekly

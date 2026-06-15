@@ -13,13 +13,12 @@ This package is INTENTIONALLY SEPARATE from the daily conviction grader.
 A future multibagger scores TERRIBLY on cross-source confirmation (that's WHY
 it's still cheap). Different philosophy, different scoring, different cadence.
 
-Pipeline:
-    universe.py          monthly  -- build the broader small/micro-cap universe
-    screener.py          monthly  -- 6 multibagger DNA traits
-    scorer.py            monthly  -- multibagger_score with hard caps
-    deep_research.py     monthly  -- LLM thesis for the top 30, balanced + honest
-    watchlist_manager.py weekly   -- add / update / graduate / archive candidates
-    quarterly_review.py  quarterly-- re-score, thesis status, post-mortems
-    tracker.py           weekly   -- honest return tracking incl. failures
-    reports.py           monthly+quarterly -- Emerging Opportunities + Quarterly Review
+Pipeline (cadence changed monthly -> weekly June 2026; quarterly review removed):
+    universe.py          weekly  -- build the broader small/micro-cap universe
+    screener.py          weekly  -- 6 multibagger DNA traits
+    scorer.py            weekly  -- multibagger_score with hard caps
+    deep_research.py     weekly  -- LLM thesis for the top N, balanced + honest
+    watchlist_manager.py weekly  -- add / update / graduate / archive candidates
+    tracker.py           weekly  -- honest return tracking incl. failures
+    reports.py           weekly  -- Emerging Opportunities report
 """

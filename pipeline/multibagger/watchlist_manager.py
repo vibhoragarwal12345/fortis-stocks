@@ -16,7 +16,7 @@ three modes:
                  'graduated') and flow into the daily pipeline universe.
 
     --archive    Names with status='thesis_broken' get archived (status =
-                 'archived'); separate post-mortem from quarterly_review.
+                 'archived').
 
 CLI
     python pipeline/multibagger/watchlist_manager.py --add
