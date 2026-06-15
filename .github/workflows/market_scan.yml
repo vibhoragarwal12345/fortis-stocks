@@ -37,8 +37,14 @@ name: Market scan · 2x per trading day
 
 on:
   schedule:
-    - cron: "0 12 * * 1-5"   # pre-market
-    - cron: "30 16 * * 1-5"  # midday
+    - cron: "0 12 * * 1-5"   # pre-market  (GitHub native cron -- BACKUP; often lags)
+    - cron: "30 16 * * 1-5"  # midday      (GitHub native cron -- BACKUP; often lags)
+  # PRIMARY trigger: Supabase pg_cron fires a repository_dispatch at exactly
+  # 12:00 + 16:30 UTC (see migration 053). GitHub's native schedule above is an
+  # unreliable backup -- it can lag 15-60 min or drop a tick under load. The
+  # external dispatch is punctual. client_payload.scan_type sets the label.
+  repository_dispatch:
+    types: [run-market-scan]
   workflow_dispatch:
     inputs:
       scan_type:
@@ -86,7 +92,9 @@ jobs:
       - name: Derive scan_type from cron slot
         id: derive
         run: |
-          if [ -n "${{ github.event.inputs.scan_type }}" ]; then
+          if [ -n "${{ github.event.client_payload.scan_type }}" ]; then
+            echo "scan_type=${{ github.event.client_payload.scan_type }}" >> $GITHUB_OUTPUT
+          elif [ -n "${{ github.event.inputs.scan_type }}" ]; then
             echo "scan_type=${{ github.event.inputs.scan_type }}" >> $GITHUB_OUTPUT
           else
             HOUR=$(date -u +%H)
