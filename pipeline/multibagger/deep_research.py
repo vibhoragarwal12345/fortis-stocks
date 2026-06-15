@@ -427,9 +427,18 @@ def _clean_for_json(v):
 def run(top_n: int = 30, tickers: list[str] | None = None) -> int:
     db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
+    # Restrict to the LATEST screen so we never re-research stale candidate rows
+    # from prior weeks (multiple screen_dates accumulate per ticker, which was
+    # producing duplicate theses per name).
+    last = (db.table("multibagger_candidates").select("screen_date")
+              .order("screen_date", desc=True).limit(1).execute().data or [])
+    latest_screen = last[0]["screen_date"] if last else None
+
     q = (db.table("multibagger_candidates")
            .select("*")
            .order("multibagger_score", desc=True))
+    if latest_screen:
+        q = q.eq("screen_date", latest_screen)
     if tickers:
         q = q.in_("ticker", [t.upper() for t in tickers])
     else:

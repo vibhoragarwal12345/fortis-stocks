@@ -40,6 +40,7 @@ from pathlib import Path
 
 import pandas as pd
 import requests
+import yfinance as yf
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from config import FINNHUB_API_KEY, SUPABASE_SERVICE_KEY, SUPABASE_URL  # noqa: E402
@@ -139,6 +140,33 @@ def _fetch_recommendation(ticker: str) -> list:
     return obj
 
 
+def _fetch_yf_stats(ticker: str) -> dict:
+    """Ownership + cash fields Finnhub's free tier does NOT expose
+    (heldPercentInsiders / heldPercentInstitutions / cash / cashflow), pulled
+    from yfinance. Cached on disk (same 14-day TTL) so the weekly run is cheap.
+    Degrades to {} on failure -- the caller then treats the fields as unknown."""
+    cached = _cache_get(ticker, "yf")
+    if cached is not None:
+        return cached
+    out: dict = {}
+    try:
+        info = yf.Ticker(ticker).info or {}
+        out = {
+            "held_pct_insiders":      info.get("heldPercentInsiders"),
+            "held_pct_institutions":  info.get("heldPercentInstitutions"),
+            "total_cash":             info.get("totalCash"),
+            "free_cashflow":          info.get("freeCashflow"),
+            "operating_cashflow":     info.get("operatingCashflow"),
+            "debt_to_equity":         info.get("debtToEquity"),
+        }
+    except Exception as exc:  # noqa: BLE001 -- yfinance raises many types
+        log.debug("yfinance stats failed for %s: %s", ticker, exc)
+    # Only cache a non-empty result so a transient failure isn't pinned for 14d.
+    if any(v is not None for v in out.values()):
+        _cache_put(ticker, "yf", out)
+    return out
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Helpers
 # ══════════════════════════════════════════════════════════════════════════════
@@ -157,6 +185,23 @@ def _num(v) -> float | None:
 
 def _clip(v: float, lo: float = 0, hi: float = 100) -> float:
     return max(lo, min(hi, v))
+
+
+def _cash_runway_months(total_cash, fcf, ocf) -> float | None:
+    """Months of cash at the current burn. None when the company is NOT burning
+    (free/operating cash flow >= 0 -> no dilution risk) or when inputs are
+    missing. Feeds the scorer's cash-runway dilution cap (previously dead
+    because this was hardcoded None)."""
+    cash = _num(total_cash)
+    cf = _num(fcf)
+    if cf is None:
+        cf = _num(ocf)
+    if cash is None or cf is None or cf >= 0:
+        return None
+    monthly_burn = abs(cf) / 12.0
+    if monthly_burn <= 0:
+        return None
+    return round(cash / monthly_burn, 1)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -333,28 +378,30 @@ def trait_large_tam(sector, market_cap: float | None) -> tuple[float, dict]:
 # Trait 5 -- Aligned owner-operators
 # ══════════════════════════════════════════════════════════════════════════════
 
-def trait_aligned_owners(m: dict, insider_form4: dict | None) -> tuple[float, dict]:
-    """Finnhub /stock/metric doesn't expose insider ownership directly on the
-    free tier. We approximate via:
-      - Form 4 directional buy vs sell ratio (if our form4_transactions has it)
-      - If neither, baseline 50 (unknown -- penalised only for clearly bad signals)
-    """
-    metric = m.get("metric") or {}
-    insider_pct = _num(metric.get("insiderHoldingsPercentage"))
-
-    evidence: dict = {"insider_ownership_pct": insider_pct}
-    score = 50.0
+def trait_aligned_owners(insider_pct: float | None, inst_pct: float | None,
+                         insider_form4: dict | None) -> tuple[float, dict]:
+    """Owner-operator alignment from REAL ownership data (yfinance's
+    heldPercentInsiders). Finnhub's free tier omits insider ownership, which
+    left this trait flatlined at the 50 baseline for EVERY name -- the bug this
+    fixes. High insider ownership = skin in the game; Form 4 directional buy/sell
+    ratio tilts it when present. A genuinely-unknown insider % stays neutral at
+    50 (and is labelled), but that is now the exception, not the rule."""
+    evidence: dict = {"insider_ownership_pct": insider_pct,
+                      "institutional_ownership_pct": inst_pct}
     if insider_pct is not None:
         if insider_pct >= 20:
-            score = 95
+            score = 95.0
         elif insider_pct >= 10:
-            score = 80
+            score = 80.0
         elif insider_pct >= 5:
-            score = 60
-        elif insider_pct >= 1:
-            score = 40
+            score = 65.0
+        elif insider_pct >= 2:
+            score = 45.0
         else:
-            score = 25
+            score = 30.0
+    else:
+        score = 50.0
+        evidence["note"] = "insider ownership unavailable from connected sources"
 
     if insider_form4:
         buys = insider_form4.get("directional_buys") or 0
@@ -448,12 +495,24 @@ def screen_ticker(row: dict, insider_map: dict[str, dict]) -> dict:
 
     metric_blob = _fetch_metric(ticker)
     rec_blob    = _fetch_recommendation(ticker)
+    yf_stats    = _fetch_yf_stats(ticker)
+
+    # Ownership % from yfinance (Finnhub's free tier omits these). Clamp 0-100
+    # -- Yahoo occasionally reports institutional > 100% (timing / short interest).
+    def _pct(frac):
+        v = _num(frac)
+        return None if v is None else _clip(v * 100.0)
+    insider_pct = _pct(yf_stats.get("held_pct_insiders"))
+    inst_pct    = _pct(yf_stats.get("held_pct_institutions"))
+    runway = _cash_runway_months(yf_stats.get("total_cash"),
+                                 yf_stats.get("free_cashflow"),
+                                 yf_stats.get("operating_cashflow"))
 
     t1, e1 = trait_small_base(market_cap), {"market_cap": market_cap}
     t2, e2 = trait_durable_growth(metric_blob)
     t3, e3 = trait_unit_economics(metric_blob)
     t4, e4 = trait_large_tam(sector, market_cap)
-    t5, e5 = trait_aligned_owners(metric_blob, insider_map.get(ticker.upper()))
+    t5, e5 = trait_aligned_owners(insider_pct, inst_pct, insider_map.get(ticker.upper()))
     t6, e6 = trait_under_discovered(rec_blob)
 
     trait_scores = {
@@ -468,6 +527,11 @@ def screen_ticker(row: dict, insider_map: dict[str, dict]) -> dict:
 
     # Pull out the raw metrics we want to persist for the scorer.
     metric = (metric_blob or {}).get("metric") or {}
+    # debt/equity: Finnhub ratio first; fall back to yfinance (a percent -> /100).
+    _d2e = _num(metric.get("totalDebt/totalEquityQuarterly"))
+    if _d2e is None:
+        _yf_de = _num(yf_stats.get("debt_to_equity"))
+        _d2e = (_yf_de / 100.0) if _yf_de is not None else None
 
     return {
         "ticker": ticker,
@@ -483,12 +547,11 @@ def screen_ticker(row: dict, insider_map: dict[str, dict]) -> dict:
         "gross_margin_trend": e3.get("gm_trend_bps"),
         "operating_margin_ttm": e3.get("operating_margin_ttm"),
         "operating_margin_trend": e3.get("om_trend_bps"),
-        "insider_ownership_pct": e5.get("insider_ownership_pct"),
+        "insider_ownership_pct": insider_pct,
         "analyst_count": e6.get("analyst_count"),
-        "institutional_ownership_pct": _num(metric.get("institutionalOwnershipPercentage")),
-        "debt_to_equity": _num(metric.get("totalDebt/totalEquityQuarterly")),
-        # cash runway requires cash + burn rate, not in metric; leave None
-        "cash_runway_months": None,
+        "institutional_ownership_pct": inst_pct,
+        "debt_to_equity": _d2e,
+        "cash_runway_months": runway,
         "evidence": {"t1": e1, "t2": e2, "t3": e3, "t4": e4, "t5": e5, "t6": e6},
     }
 
