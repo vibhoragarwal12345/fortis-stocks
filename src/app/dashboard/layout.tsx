@@ -4,7 +4,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { getActiveTenantMember } from "@/lib/tenant"
 import { themeFromTenant, tenantCssVars } from "@/lib/theme"
-import { checkAccess } from "@/lib/permissions"
+import { checkAccess, isOwner } from "@/lib/permissions"
 import { AtmosphereBackdrop } from "@/components/atmosphere-backdrop"
 import { NavLink } from "@/components/nav-link"
 import { PageTransition } from "@/components/ui/page-transition"
@@ -45,11 +45,16 @@ async function getTapeItems(
 
 // Top-level nav for every /dashboard route. NavLink lights the active
 // section (exact match for Today, prefix for everything else).
-const navItems = [
+// "Scan history" is owner-only (operational surface) and is appended per
+// request below -- it never renders for client tenants.
+type NavItem = { href: string; label: string; exact?: boolean }
+const navItems: NavItem[] = [
   { href: "/dashboard",              label: "Today", exact: true },
   { href: "/dashboard/focus-list",   label: "Focus list" },
   { href: "/dashboard/emerging",     label: "Emerging" },
   { href: "/dashboard/commodities",  label: "Commodities" },
+]
+const ownerNavItems: NavItem[] = [
   { href: "/dashboard/scan-history", label: "Scan history" },
 ]
 
@@ -67,6 +72,9 @@ export default async function DashboardLayout({
   const theme = themeFromTenant(tenant)
   const access = checkAccess(tenant)
   const tapeItems = access.ok ? await getTapeItems(supabase) : []
+  // Owner-only operational links (scan history) are appended for the owner
+  // account only; client tenants never see them in the nav.
+  const navLinks = isOwner(user) ? [...navItems, ...ownerNavItems] : navItems
 
   if (!access.ok) {
     return (
@@ -125,7 +133,7 @@ export default async function DashboardLayout({
 
           {/* ── Primary nav (desktop) ───────────────────────────────── */}
           <nav className="hidden md:flex items-center gap-1">
-            {navItems.map((item) => (
+            {navLinks.map((item) => (
               <NavLink
                 key={item.href}
                 href={item.href}
@@ -161,7 +169,7 @@ export default async function DashboardLayout({
           aria-label="Mobile primary"
           className="md:hidden flex overflow-x-auto border-t border-border px-4 py-1.5 gap-1 text-[13px] [&::-webkit-scrollbar]:hidden"
         >
-          {navItems.map((item) => (
+          {navLinks.map((item) => (
             <NavLink
               key={`m-${item.href}`}
               href={item.href}

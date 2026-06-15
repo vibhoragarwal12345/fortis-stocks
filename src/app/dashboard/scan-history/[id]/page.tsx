@@ -2,6 +2,7 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 
 import { createClient } from "@/lib/supabase/server"
+import { isOwner } from "@/lib/permissions"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Reveal } from "@/components/ui/reveal"
 
@@ -62,6 +63,14 @@ export default async function ScanDetailPage({
   if (Number.isNaN(id)) notFound()
 
   const supabase = await createClient()
+
+  // Owner-only operational surface (same gate as the scan-history list).
+  // Anyone else -> 404, so a guessed scan-id URL reveals nothing.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!isOwner(user)) notFound()
+
   const { data: scanRow } = await supabase
     .from("market_scans")
     .select(

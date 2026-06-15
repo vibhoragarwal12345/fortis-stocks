@@ -1,6 +1,8 @@
 import Link from "next/link"
+import { notFound } from "next/navigation"
 
 import { createClient } from "@/lib/supabase/server"
+import { isOwner } from "@/lib/permissions"
 import { Card, CardContent } from "@/components/ui/card"
 import { Reveal } from "@/components/ui/reveal"
 
@@ -48,6 +50,14 @@ const STATUS_TONE: Record<string, string> = {
 
 export default async function ScanHistoryPage() {
   const supabase = await createClient()
+
+  // Owner-only operational surface. For anyone else (incl. signed-in client
+  // tenants) the page must not exist -- 404 so the route isn't even revealed.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!isOwner(user)) notFound()
+
   const { data } = await supabase
     .from("market_scans")
     .select(
