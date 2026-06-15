@@ -60,29 +60,45 @@ traits of historical 100-baggers (small base, long runways, high returns on
 capital, owner-operators). You write rigorous, BALANCED multibagger theses.
 
 CRITICAL RULES
-- You may ONLY cite facts from the provided DATA section. Every numeric
-  or specific claim MUST be immediately followed by [DATA REF: key_name],
-  where key_name is one of the snake_case keys in the DATA section.
-- You are honest about risk -- most multibagger candidates fail. The
-  WHAT_KILLS_IT section MUST be as rigorous and specific as THE_10X_PATH.
-- Never use hype language. Forbidden phrases include: "to the moon",
-  "can't miss", "guaranteed", "next Nvidia", "no-brainer", "moonshot",
-  "10-bagger lock", "easy 10x". Reject these in your own writing.
-- Use plain English. No marketing speak.
-- If the data is thin in a section, say so honestly ("DATA section does
-  not provide enough information to assess X"). Do not fabricate context.
+- You may ONLY cite facts from the provided DATA section. Every numeric or
+  specific claim MUST be immediately followed by [DATA REF: key_name], where
+  key_name is one of the snake_case keys in the DATA section.
+- ALWAYS write selection_rationale. This name was surfaced by a screen that
+  scores six multibagger-DNA traits. In 2-4 sentences, state WHY it was
+  shortlisted -- name its highest-scoring traits (the trait_*_score / *_score
+  keys) and give the THEORY for why that profile can compound into a
+  multibagger. This is MANDATORY and must be written even when external data is
+  thin, because the trait scores are always present. It is the heart of the
+  dossier -- never leave it generic, never skip it.
+- You are honest about risk -- most candidates fail. WHAT_KILLS_IT must be as
+  rigorous and specific as THE_10X_PATH.
+- Thin data is the NORM for under-covered names. Where a section's external
+  data is missing, still give the THEORY from the screen + trait scores, then
+  add ONE honest line naming what is not verifiable (e.g. "No analyst coverage
+  and few filings -- moat not verifiable from connected sources."). NEVER
+  output a bare "DATA section does not provide enough information" as the whole
+  section, and NEVER fabricate financials, founders, or a 10x path.
+- key_metrics_to_track must be 4 SPECIFIC, human-readable things an analyst
+  would watch for THIS thesis (e.g. "quarterly revenue growth holding above the
+  33% TTM pace", "operating margin crossing breakeven", "cash runway beyond 18
+  months"). NEVER output raw data-key names like "revenue_cagr_3y_pct" -- phrase
+  them the way a person would say them, specific to this company.
+- Never use hype language. Forbidden: "to the moon", "can't miss",
+  "guaranteed", "next Nvidia", "no-brainer", "moonshot", "easy 10x". Plain
+  English, no marketing speak.
 
 OUTPUT FORMAT
 Return STRICT JSON with these exact keys. No prose outside the JSON.
 
 {
+  "selection_rationale":"<MANDATORY: why the screen shortlisted this -- name the top DNA traits (cite the score keys) + the compounding theory; always written even when external data is thin>",
   "business_model": "<plain English: what they do, how they earn revenue>",
-  "the_10x_path":   "<concrete path: what TAM capture, margin expansion, multiple re-rating; cite metrics>",
-  "moat_assessment":"<honest: network effects / switching costs / brand / IP / NONE>",
-  "founder_assessment":"<who runs it, alignment, track record from data only>",
+  "the_10x_path":   "<concrete path: TAM capture, margin expansion, multiple re-rating; cite metrics>",
+  "moat_assessment":"<network effects / switching costs / brand / IP / NONE -- give the theory; if unverifiable from data, say so honestly>",
+  "founder_assessment":"<who runs it + alignment from the data; if unknown, say so AND cite the alignment score>",
   "what_has_to_go_right":"<3-4 key assumptions the thesis depends on>",
   "what_kills_it": "<3-4 specific failure modes -- as rigorous as the 10x path>",
-  "key_metrics_to_track":["metric1","metric2","metric3","metric4"],
+  "key_metrics_to_track":["specific readable metric 1","metric 2","metric 3","metric 4"],
   "risk_rating":   "speculative|high_risk|moderate_risk",
   "conviction_tier":"tier_1_high_conviction|tier_2_promising|tier_3_speculative"
 }
@@ -289,6 +305,7 @@ def _contains_forbidden(thesis: dict) -> list[str]:
 # ══════════════════════════════════════════════════════════════════════════════
 
 THESIS_SECTIONS = [
+    "selection_rationale",
     "business_model",
     "the_10x_path",
     "moat_assessment",
@@ -296,6 +313,22 @@ THESIS_SECTIONS = [
     "what_has_to_go_right",
     "what_kills_it",
 ]
+
+
+def _has_text(s) -> bool:
+    return bool(s and str(s).strip() and len(str(s).strip()) > 12)
+
+
+# Honest fallbacks when a section cannot be grounded in connected sources --
+# shown verbatim instead of unverified prose. NEVER fabricate; state the gap.
+_LIMITED_NOTE = {
+    "business_model": "Limited data — business model not verifiable from connected sources for this under-covered name.",
+    "the_10x_path": "Limited data — a specific 10x path cannot be grounded in the available data yet.",
+    "moat_assessment": "Limited data — moat not verifiable from connected sources.",
+    "founder_assessment": "Limited data — founder / ownership detail not available from connected sources.",
+    "what_has_to_go_right": "Limited data — key assumptions cannot be grounded in the available data yet.",
+    "what_kills_it": "Limited data — specific failure modes not yet documented from connected sources.",
+}
 
 
 def research_candidate(db, candidate: dict) -> dict | None:
@@ -319,22 +352,55 @@ def research_candidate(db, candidate: dict) -> dict | None:
         log.warning("  %s: forbidden phrases %s -- discarding", ticker, forbidden)
         return None
 
-    # Run factcheck across each prose section.
-    combined = "\n\n".join(str(thesis.get(s, "")) for s in THESIS_SECTIONS)
-    fc = factcheck(combined, data)
+    # Section-aware verification (factcheck is deterministic -- per-section is
+    # free). The selection_rationale (the theory) is the SPINE: it must verify
+    # or the name is dropped -- we never show a name we cannot justify. Every
+    # OTHER section that fails verification is replaced with an honest
+    # limited-data note rather than shown unverified. No fabricated claim ever
+    # reaches the dossier (empty-but-honest > full-but-fake).
+    sr_fc = factcheck(str(thesis.get("selection_rationale") or ""), data)
+    if not _has_text(thesis.get("selection_rationale")) or sr_fc["quality_grade"] == "UNVERIFIED":
+        log.warning("  %s: selection rationale missing/UNVERIFIED (%.2f) -- discarding",
+                    ticker, sr_fc["verification_score"])
+        return None
+
+    scores = [sr_fc["verification_score"]]
+    for s in THESIS_SECTIONS:
+        val = thesis.get(s)
+        if s == "selection_rationale":
+            thesis[s] = strip_data_refs(str(val))
+            continue
+        sec_fc = factcheck(str(val or ""), data)
+        if not _has_text(val) or sec_fc["quality_grade"] == "UNVERIFIED":
+            thesis[s] = _LIMITED_NOTE.get(
+                s, "Limited data — not available from connected sources.")
+        else:
+            thesis[s] = strip_data_refs(str(val))
+            scores.append(sec_fc["verification_score"])
+    worst = min(scores)
+    fc = {
+        "verification_score": round(worst, 4),
+        "quality_grade": "VERIFIED" if worst >= 0.95 else "PARTIALLY_VERIFIED",
+        "selection_rationale_score": sr_fc["verification_score"],
+    }
 
     return {
         "ticker": ticker,
         "multibagger_score": candidate.get("multibagger_score"),
         "conviction_tier": thesis.get("conviction_tier") or "tier_3_speculative",
         "risk_rating": thesis.get("risk_rating") or "speculative",
+        "selection_rationale": thesis.get("selection_rationale"),
         "business_model": thesis.get("business_model"),
         "the_10x_path": thesis.get("the_10x_path"),
         "moat_assessment": thesis.get("moat_assessment"),
         "founder_assessment": thesis.get("founder_assessment"),
         "what_has_to_go_right": thesis.get("what_has_to_go_right"),
         "what_kills_it": thesis.get("what_kills_it"),
-        "key_metrics_to_track": thesis.get("key_metrics_to_track") or [],
+        "key_metrics_to_track": [
+            strip_data_refs(str(m))
+            for m in (thesis.get("key_metrics_to_track") or [])
+            if str(m).strip()
+        ],
         "verification_score": fc["verification_score"],
         "quality_grade":      fc["quality_grade"],
         "factcheck_details":  fc,
@@ -374,11 +440,7 @@ def run(top_n: int = 30, tickers: list[str] | None = None) -> int:
         return 0
     log.info("Researching %d candidates", len(candidates))
 
-    written = 0
-    for cand in candidates:
-        result = research_candidate(db, cand)
-        if not result:
-            continue
+    def _persist(result: dict) -> bool:
         payload = _clean_for_json({
             **{k: v for k, v in result.items()
                if k not in ("factcheck_details", "data_snapshot")},
@@ -387,13 +449,36 @@ def run(top_n: int = 30, tickers: list[str] | None = None) -> int:
         })
         try:
             db.table("multibagger_theses").insert(payload).execute()
-            written += 1
             log.info("  %s: %s (grade=%s, fc=%.2f)",
                      result["ticker"], result["conviction_tier"],
                      result["quality_grade"], result["verification_score"])
+            return True
         except Exception as exc:
             log.warning("  %s persist failed: %s", result.get("ticker"), exc)
+            return False
+
+    written = 0
+    failed: list[dict] = []
+    for cand in candidates:
+        result = research_candidate(db, cand)
+        if result and _persist(result):
+            written += 1
+        else:
+            failed.append(cand)
         time.sleep(1.0)
+
+    # One retry pass for names that failed generation or the factcheck gate
+    # (transient LLM/rate-limit, or a borderline thesis that re-grounds on a
+    # second pass) -- mirrors the main scan's retry discipline.
+    if failed:
+        log.info("retry pass: %d candidate(s) after cooldown", len(failed))
+        time.sleep(20)
+        for cand in failed:
+            result = research_candidate(db, cand)
+            if result and _persist(result):
+                written += 1
+            time.sleep(1.0)
+
     log.info("Wrote %d theses.", written)
     return written
 

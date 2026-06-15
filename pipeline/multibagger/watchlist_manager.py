@@ -103,7 +103,9 @@ def _clean_for_json(v):
 def add_qualifying(throttle_ms: int = 1100) -> int:
     db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-    # Latest thesis per ticker
+    # BEST thesis per ticker -- highest factcheck verification (tie -> latest).
+    # Picking the latest blindly surfaced UNVERIFIED dossiers even when a
+    # VERIFIED version existed for the same name.
     theses = (
         db.table("multibagger_theses")
           .select("*")
@@ -111,11 +113,14 @@ def add_qualifying(throttle_ms: int = 1100) -> int:
           .execute()
           .data or []
     )
-    latest_by_ticker: dict[str, dict] = {}
+    best_by_ticker: dict[str, dict] = {}
     for t in theses:
-        latest_by_ticker.setdefault(t["ticker"], t)
+        tk = t["ticker"]
+        cur = best_by_ticker.get(tk)
+        if cur is None or float(t.get("verification_score") or 0) > float(cur.get("verification_score") or 0):
+            best_by_ticker[tk] = t
 
-    if not latest_by_ticker:
+    if not best_by_ticker:
         log.warning("No theses found -- run deep_research.py first.")
         return 0
 
@@ -127,7 +132,13 @@ def add_qualifying(throttle_ms: int = 1100) -> int:
     }
 
     added = 0
-    for ticker, thesis in latest_by_ticker.items():
+    for ticker, thesis in best_by_ticker.items():
+        # Invariant: a name joins the watchlist only with a meaningful,
+        # fact-checked dossier. An UNVERIFIED best thesis means the dossier
+        # could not be grounded -- skip it rather than display empty/unverified.
+        if (thesis.get("quality_grade") or "").upper() == "UNVERIFIED":
+            log.info("  skip %s -- best thesis still UNVERIFIED", ticker)
+            continue
         tier = thesis.get("conviction_tier") or "tier_3_speculative"
         score = float(thesis.get("multibagger_score") or 0)
         if tier == "tier_3_speculative" and score < TIER3_MIN_SCORE:
