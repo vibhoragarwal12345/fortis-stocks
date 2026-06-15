@@ -185,6 +185,7 @@ def run(
     # failures are recorded in `notes` but the scan still completes.
     critical_failures = 0
     soft_failures = 0
+    complete: int | None = None   # # of complete dossiers; set by the gate below
 
     # ── Layer 1 ─────────────────────────────────────────────────────────
     t0 = time.time()
@@ -309,12 +310,13 @@ def run(
             soft_failures += 1
             notes.append(f"[non-fatal] {msg}")
 
-    # ── Dossier gate: label dossier completeness across the picks ───────
-    # The full picked shortlist (20-25) displays; this flags which picks carry
-    # a complete fact-checked dossier vs. which the UI shows as "dossier
-    # completing". shortlist_count stays the PICK count (what's displayed), so
-    # every surface agrees. A gate-step crash is non-fatal here (it only sets a
-    # label) but recorded.
+    # ── Dossier gate: hide picks that lack a complete fact-checked dossier ──
+    # A name DISPLAYS only with a complete, fact-checked dossier (owner directive
+    # June 2026: bare/half-built dossiers "look unprofessional"). The gate sets
+    # dossier_complete and syncs scan_results.advanced=false to hide the rest on
+    # every surface. So the displayed count == `complete` below -- which is why a
+    # truncated run can look empty, and why the promotion guard further down keeps
+    # a thin run off the dashboard. A gate-step crash is non-fatal (recorded).
     if not skip_layer3 and shortlist > 0:
         ok, msg = _run_step(
             "Dossier gate",
@@ -369,9 +371,30 @@ def run(
         "notes":                "; ".join(notes) if notes else None,
     }).eq("id", scan_id).execute()
 
+    # Promotion guard: a fresh scan only becomes the DISPLAYED scan if it carries
+    # enough complete, fact-checked dossiers to look credible to a client. A run
+    # that got truncated (soft-deadline hit, agents skipped, or -- on a laptop --
+    # the machine slept mid-scan) can finish 'complete' on the Layer-1/2 core yet
+    # produce only a handful of dossiers. Promoting it would EMPTY the dashboard.
+    # Instead we keep the last good scan displayed and record why. (June 15 2026:
+    # a sleep-truncated local run with debate skipped became 'latest' and the
+    # client-facing dashboard looked broken; this is the guard against that.)
+    # CI (Linux) never sleeps, so this almost never trips there -- it's a floor.
+    min_display = int(os.getenv("SCAN_MIN_DISPLAY_DOSSIERS", "12"))
+    prior_id = None
+    try:
+        prior = db.table("scan_state").select("latest_scan_id").eq("id", 1).execute().data or []
+        prior_id = (prior[0] if prior else {}).get("latest_scan_id")
+    except Exception:  # noqa: BLE001
+        pass
+
+    promote = status == "complete" and not (
+        complete is not None and complete < min_display and prior_id and prior_id != scan_id
+    )
+
     # Update the shared scan_state so the dashboard's refresh control flips
     # back to idle and points at this scan (or surfaces the failure).
-    if status == "complete":
+    if status == "complete" and promote:
         _set_scan_state(
             db,
             current_status="idle",
@@ -380,6 +403,15 @@ def run(
             running_since=None,
             last_error=None,
         )
+    elif status == "complete":
+        # Completed but too thin to display -- keep the prior good scan up.
+        msg = (f"scan {scan_id} NOT promoted to dashboard: only {complete} "
+               f"complete dossier(s) (< {min_display} floor); kept scan "
+               f"{prior_id} displayed")
+        notes.append(msg)
+        log.warning(msg)
+        db.table("market_scans").update({"notes": "; ".join(notes)}).eq("id", scan_id).execute()
+        _set_scan_state(db, current_status="idle", running_since=None, last_error=None)
     else:
         _set_scan_state(
             db,
