@@ -30,9 +30,11 @@ Usage:
 """
 
 import logging
+import os
 import re
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -287,82 +289,87 @@ def run(limit: int = DEFAULT_N, scan_id: int | None = None) -> None:
     except Exception as exc:
         log.debug("smart_money_intel preload failed: %s", exc)
 
-    # Critique per ticker, with one retry pass (mirrors debate_synthesizer):
-    # a transient provider failure or a factcheck rejection gets a second
-    # shot instead of leaving the dossier incomplete.
+    # Critique per ticker, CONCURRENTLY (mirrors debate_synthesizer): the LLM
+    # call is the slow part, so a thread pool cuts wall-time ~Nx and lets the
+    # bigger pool finish in-window. Each critique persists the moment it
+    # survives factcheck (crash resilience). A transient failure / factcheck
+    # rejection gets one retry pass.
+    max_workers = max(1, int(os.environ.get("DOSSIER_CONCURRENCY", "5")))
+
+    def _process(r: dict) -> dict | None:
+        sm = smart_money.get(r["ticker"])
+        text, method = _generate(_build_prompt(r["ticker"], r["bull_case"], sm))
+        if not text:
+            log.warning("%s: no critique generated", r["ticker"])
+            return None
+        parsed = _parse(text)
+        # Same factcheck bar as the thesis writer: fact-bearing sections must
+        # tag claims with valid [DATA REF] keys.
+        fc = factcheck("\n\n".join(
+            s for s in (parsed["critic_weaknesses"],
+                        parsed["critic_rewritten_bear_case"]) if s),
+            _critic_data(r["bull_case"], sm))
+        if fc["quality_grade"] == "UNVERIFIED":
+            log.warning("%s: critique factcheck UNVERIFIED (%.2f) -- discarding",
+                        r["ticker"], fc["verification_score"])
+            return None
+        for k in ("critic_weaknesses", "critic_disconfirming_data",
+                  "critic_precedent_failures", "critic_hidden_risks",
+                  "critic_rewritten_bear_case"):
+            if parsed.get(k):
+                parsed[k] = strip_data_refs(parsed[k])
+        parsed["ticker"] = r["ticker"]
+        parsed["_method"] = method
+        parsed["_fc"] = fc
+        # The dossier's verification is the WEAKER of thesis and critique
+        # factchecks -- both narratives reach the advisor.
+        thesis_score = r.get("dossier_verification_score")
+        parsed["_dossier_score"] = round(min(
+            float(thesis_score) if thesis_score is not None else 1.0,
+            fc["verification_score"]), 4)
+        parsed["_original_bear"] = r.get("bear_case")
+        # Pattern-driven objection override (Step 6.7). Only fires when
+        # confidence is HIGH/MEDIUM (LOW = informational only per spec).
+        if sm and sm.get("confidence_level") in ("HIGH", "MEDIUM"):
+            pat = sm.get("pattern_detected")
+            if pat in ("INSIDER_SMOKE_SIGNAL", "VALUE_TRAP_WARNING"):
+                if parsed["critic_objection_level"] != "STRONG":
+                    log.info("%s: critic objection raised STRONG by %s pattern",
+                             r["ticker"], pat)
+                    parsed["critic_objection_level"] = "STRONG"
+            elif pat == "CAPITULATION_BOTTOM":
+                # Spec: MODERATE objection if a bear case is being made. In this
+                # pipeline the critic always argues bear, so MODERATE unless
+                # already STRONG.
+                if parsed["critic_objection_level"] == "NONE":
+                    parsed["critic_objection_level"] = "MODERATE"
+        parsed["_persisted"] = _persist_one(db, parsed, scan_id, run_date)
+        log.info("%s: %s objection (via %s, factcheck %s %.2f)",
+                 r["ticker"], parsed["critic_objection_level"], method,
+                 fc["quality_grade"], fc["verification_score"])
+        return parsed
+
     results: list[dict] = []
-    failed: list[dict] = []
-    updated = 0
-    queue = rows
+    failed: list[dict] = list(rows)
     for attempt in (1, 2):
+        queue, failed = failed, []
+        if not queue:
+            break
         if attempt == 2:
-            if not failed:
-                break
-            queue, failed = failed, []
             log.info("retry pass: %d ticker(s) after 30s cooldown", len(queue))
             time.sleep(30)
-        for r in queue:
-            try:                                   # never let one ticker kill the run
-                sm = smart_money.get(r["ticker"])
-                text, method = _generate(_build_prompt(r["ticker"], r["bull_case"], sm))
-                if not text:
-                    log.warning("%s: no critique generated (attempt %d)",
-                                r["ticker"], attempt)
-                    failed.append(r)
-                    continue
-                parsed = _parse(text)
-                # Same factcheck bar as the thesis writer: the fact-bearing
-                # sections must tag claims with valid [DATA REF] keys.
-                fc = factcheck("\n\n".join(
-                    s for s in (parsed["critic_weaknesses"],
-                                parsed["critic_rewritten_bear_case"]) if s),
-                    _critic_data(r["bull_case"], sm))
-                if fc["quality_grade"] == "UNVERIFIED":
-                    log.warning("%s: critique factcheck UNVERIFIED (%.2f, "
-                                "attempt %d) -- discarding", r["ticker"],
-                                fc["verification_score"], attempt)
-                    failed.append(r)
-                    continue
-                for k in ("critic_weaknesses", "critic_disconfirming_data",
-                          "critic_precedent_failures", "critic_hidden_risks",
-                          "critic_rewritten_bear_case"):
-                    if parsed.get(k):
-                        parsed[k] = strip_data_refs(parsed[k])
-                parsed["ticker"] = r["ticker"]
-                parsed["_method"] = method
-                parsed["_fc"] = fc
-                # The dossier's verification is the WEAKER of thesis and
-                # critique factchecks -- both narratives reach the advisor.
-                thesis_score = r.get("dossier_verification_score")
-                parsed["_dossier_score"] = round(min(
-                    float(thesis_score) if thesis_score is not None else 1.0,
-                    fc["verification_score"]), 4)
-                parsed["_original_bear"] = r.get("bear_case")
-                # Pattern-driven objection override (Step 6.7). Only fires when
-                # confidence is HIGH/MEDIUM (LOW = informational only per spec).
-                if sm and sm.get("confidence_level") in ("HIGH", "MEDIUM"):
-                    pat = sm.get("pattern_detected")
-                    if pat in ("INSIDER_SMOKE_SIGNAL", "VALUE_TRAP_WARNING"):
-                        if parsed["critic_objection_level"] != "STRONG":
-                            log.info("%s: critic objection raised STRONG by %s pattern",
-                                     r["ticker"], pat)
-                            parsed["critic_objection_level"] = "STRONG"
-                    elif pat == "CAPITULATION_BOTTOM":
-                        # Spec: MODERATE objection if a bear case is being made.
-                        # In this pipeline the critic always argues bear, so we
-                        # MODERATE the objection unless it was already STRONG.
-                        if parsed["critic_objection_level"] == "NONE":
-                            parsed["critic_objection_level"] = "MODERATE"
-                results.append(parsed)
-                if _persist_one(db, parsed, scan_id, run_date):
-                    updated += 1
-                log.info("%s: %s objection (via %s, factcheck %s %.2f)",
-                         r["ticker"], parsed["critic_objection_level"], method,
-                         fc["quality_grade"], fc["verification_score"])
-            except Exception as exc:
-                log.warning("%s: critique iteration error -- %s",
-                            r["ticker"], type(exc).__name__)
-                continue
+        with ThreadPoolExecutor(max_workers=max_workers) as ex:
+            futs = {ex.submit(_process, r): r for r in queue}
+            for fut in as_completed(futs):
+                r = futs[fut]
+                try:
+                    parsed = fut.result()
+                except Exception as exc:  # noqa: BLE001
+                    log.warning("%s: critique iteration error -- %s",
+                                r["ticker"], type(exc).__name__)
+                    parsed = None
+                (results if parsed else failed).append(parsed or r)
+    updated = sum(1 for r in results if r.get("_persisted"))
 
     if failed:
         log.warning("%d ticker(s) STILL missing critiques after retry: %s",

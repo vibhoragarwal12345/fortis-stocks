@@ -1,7 +1,9 @@
-name: Market scan · 3x per trading day
+name: Market scan · 2x per trading day
 
-# Lean rewrite PART 4. Runs the two-speed funnel three times each weekday:
-# pre-market, midday, and post-close.
+# Lean rewrite PART 4. Runs the two-speed funnel twice each weekday:
+# pre-market and midday. (Post-close was dropped June 14 2026 -- markets are
+# closed overnight so its picks just duplicate the next premarket run; cutting
+# it frees Actions minutes for the longer/bigger premarket + midday scans.)
 #
 # Cron is UTC; GitHub Actions doesn't honour DST. We pick year-round UTC
 # slots tied to EST (UTC-5). During EDT (UTC-4) every run shifts one
@@ -9,22 +11,25 @@ name: Market scan · 3x per trading day
 #
 #     12:00 UTC  =  07:00 ET (EST)  / 08:00 ET (EDT)   pre-market
 #     16:30 UTC  =  11:30 ET (EST)  / 12:30 ET (EDT)   midday
-#     22:00 UTC  =  17:00 ET (EST)  / 18:00 ET (EDT)   post-close
 #
 # Budget: Layer 1 scores the full ~3,300-name universe; the slow LLM
-# agents (Layer 3) + grader (Layer 4) run on the top 25 only -- sized so
-# the free-LLM daily budget covers a FULL fact-checked dossier for every
-# shortlisted name across all 3 daily scans now that llm.py stopped
+# agents (Layer 3) + grader (Layer 4) run on the top 35 -- sized so that
+# after the dossier gate trims names whose critique/bear fail factcheck
+# (~30-35% on a strict bar), 20-25 fully-verified dossiers still DISPLAY.
+# Layer 3 generates dossiers CONCURRENTLY (DOSSIER_CONCURRENCY) so 35 names
+# fit the window. The free-LLM daily budget covers this across 2 daily scans
+# now that llm.py stopped
 # routing load to slow providers (June 12 2026: NVIDIA at 60-90 s/call
 # carried ~45% of calls and blew the job timeout). The dossier gate hides
 # any name that still lacks a dossier, so the displayed list is 20-25.
 # run_scan.py enforces a soft deadline internally (SCAN_SOFT_DEADLINE_SEC,
 # raised to 63 min below, owner directive June 14 2026) so the gate + finalize
 # ALWAYS run; timeout-minutes (72) is the hard backstop above it. The longer
-# deadline lets the critic finish more dossiers, but RAISES Actions usage --
-# 3 runs/weekday now trend ABOVE the free 2,000-min/month ceiling, so a paid
-# plan or trimming a daily scan is likely needed; watch the bill. The /api/scan
-# manual refresh reuses this same workflow, gated to once per 2h.
+# deadline lets the critic finish more dossiers. Parallel Layer-3 cuts each
+# scan's wall-time, and post-close is gone, so 2 runs/weekday should fit closer
+# to the free 2,000-min/month ceiling -- but VALIDATE actual minutes over the
+# first week; a paid plan is the lever if it tips over. The /api/scan manual
+# refresh reuses this same workflow, gated to once per 2h.
 #
 # Layer 3 (LLM-heavy) + Layer 4 are enabled. Layer 2 stamps the
 # shortlist with run_type='midday' so the unmodified deep agents pick
@@ -34,7 +39,6 @@ on:
   schedule:
     - cron: "0 12 * * 1-5"   # pre-market
     - cron: "30 16 * * 1-5"  # midday
-    - cron: "0 22 * * 1-5"   # post-close
   workflow_dispatch:
     inputs:
       scan_type:
@@ -101,5 +105,5 @@ jobs:
           fi
           python -m pipeline.scan.run_scan \
             --scan-type ${{ steps.derive.outputs.scan_type }} \
-            --top-n 25 \
+            --top-n 35 \
             $SAMPLE_ARG

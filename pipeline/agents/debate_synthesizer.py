@@ -24,9 +24,11 @@ Usage:
 
 import json
 import logging
+import os
 import re
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -505,61 +507,70 @@ def run(limit: int = DEFAULT_N, scan_id: int | None = None) -> int:
     except Exception as exc:
         log.debug("smart_money_intel preload failed: %s", exc)
 
-    # Synthesize per ticker. Failures (provider quota, transient rate
-    # limits) get one retry pass after a cooldown instead of being
-    # silently dropped -- partial coverage is what hid price targets from
-    # the dashboard.
+    # Synthesize per ticker, CONCURRENTLY. The slow part is the LLM call and the
+    # gateway already fans across providers, so generating dossiers in parallel
+    # cuts wall-time ~Nx -- that's what lets a 35-name pool finish inside the
+    # scan window. Failures (provider quota, transient rate limits, factcheck
+    # rejection) get one retry pass instead of being silently dropped.
+    max_workers = max(1, int(os.environ.get("DOSSIER_CONCURRENCY", "5")))
+
+    def _process(rfl: dict) -> dict | None:
+        t = rfl["ticker"]
+        ctx = _assemble(t, rfl, tech, news, sec, options, patterns,
+                        debates, validated, smart_money)
+        text, method = _generate(_build_prompt(ctx))
+        if not text:
+            log.warning("%s: no thesis generated", t)
+            return None
+        parsed = _parse_thesis(text)
+        # Factcheck the narrative against the exact data the prompt provided
+        # (closed context). UNVERIFIED = too many claims without a valid
+        # [DATA REF]; treat as a failure so the retry pass gets another shot --
+        # an unverified thesis must never reach the shortlist (the gate enforces).
+        fc_data = {k: ctx[k] for k in _DATA_KEYS if k in ctx}
+        fc = factcheck("\n\n".join(
+            s for s in (parsed["thesis"], parsed["bull_case"],
+                        parsed["bear_case"]) if s),
+            fc_data)
+        if fc["quality_grade"] == "UNVERIFIED":
+            log.warning("%s: thesis factcheck UNVERIFIED (%.2f) -- discarding",
+                        t, fc["verification_score"])
+            return None
+        # Strip the [DATA REF] tags for clean display; verification already ran.
+        for k in ("thesis", "bull_case", "bear_case", "position_size_guidance"):
+            if parsed.get(k):
+                parsed[k] = strip_data_refs(parsed[k])
+        if parsed.get("what_to_watch"):
+            parsed["what_to_watch"] = [strip_data_refs(w)
+                                       for w in parsed["what_to_watch"]]
+        parsed["ticker"] = t
+        parsed["_method"] = method
+        parsed["_price"] = ctx["price"]
+        parsed["_fc"] = fc
+        log.info("%s: thesis via %s (factcheck %s %.2f)", t, method,
+                 fc["quality_grade"], fc["verification_score"])
+        return parsed
+
     results: list[dict] = []
-    failed: list[dict] = []
-    queue = todo
+    failed: list[dict] = list(todo)
     for attempt in (1, 2):
+        queue, failed = failed, []
+        if not queue:
+            break
         if attempt == 2:
-            if not failed:
-                break
-            queue, failed = failed, []
-            log.info("retry pass: %d ticker(s) after 30s cooldown",
-                     len(queue))
+            log.info("retry pass: %d ticker(s) after 30s cooldown", len(queue))
             time.sleep(30)
-        for rfl in queue:
-            t = rfl["ticker"]
-            ctx = _assemble(t, rfl, tech, news, sec, options, patterns,
-                            debates, validated, smart_money)
-            text, method = _generate(_build_prompt(ctx))
-            if not text:
-                log.warning("%s: no thesis generated (attempt %d)", t, attempt)
-                failed.append(rfl)
-                continue
-            parsed = _parse_thesis(text)
-            # Factcheck the narrative sections against the exact data the
-            # prompt provided (closed context). UNVERIFIED = too many claims
-            # without a valid [DATA REF] -- treat like a generation failure
-            # so the retry pass gets another shot; an unverified thesis must
-            # never reach the displayed shortlist (dossier gate enforces).
-            fc_data = {k: ctx[k] for k in _DATA_KEYS if k in ctx}
-            fc = factcheck("\n\n".join(
-                s for s in (parsed["thesis"], parsed["bull_case"],
-                            parsed["bear_case"]) if s),
-                fc_data)
-            if fc["quality_grade"] == "UNVERIFIED":
-                log.warning("%s: thesis factcheck UNVERIFIED (%.2f, attempt %d)"
-                            " -- discarding", t, fc["verification_score"], attempt)
-                failed.append(rfl)
-                continue
-            # Strip the [DATA REF] tags for clean display; verification
-            # already ran on the tagged text.
-            for k in ("thesis", "bull_case", "bear_case", "position_size_guidance"):
-                if parsed.get(k):
-                    parsed[k] = strip_data_refs(parsed[k])
-            if parsed.get("what_to_watch"):
-                parsed["what_to_watch"] = [strip_data_refs(w)
-                                           for w in parsed["what_to_watch"]]
-            parsed["ticker"] = t
-            parsed["_method"] = method
-            parsed["_price"] = ctx["price"]
-            parsed["_fc"] = fc
-            results.append(parsed)
-            log.info("%s: thesis generated via %s (factcheck %s %.2f)",
-                     t, method, fc["quality_grade"], fc["verification_score"])
+        with ThreadPoolExecutor(max_workers=max_workers) as ex:
+            futs = {ex.submit(_process, rfl): rfl for rfl in queue}
+            for fut in as_completed(futs):
+                rfl = futs[fut]
+                try:
+                    parsed = fut.result()
+                except Exception as exc:  # noqa: BLE001
+                    log.warning("%s: thesis iteration error -- %s",
+                                rfl["ticker"], type(exc).__name__)
+                    parsed = None
+                (results if parsed else failed).append(parsed or rfl)
 
     # Persist.
     now = datetime.now(timezone.utc).isoformat()

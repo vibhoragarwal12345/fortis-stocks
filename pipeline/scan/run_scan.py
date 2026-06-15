@@ -71,14 +71,13 @@ STEP_TIMEOUT_SEC = 1800  # 30 min per step ceiling
 # Keep comfortably below the workflow timeout (55 min).
 SOFT_DEADLINE_SEC = int(os.environ.get("SCAN_SOFT_DEADLINE_SEC", 46 * 60))
 
-# Per-scan dossier budget. Groq (~1K req / ~100K tokens per day) + Cerebras
-# (~1M tokens/day) + Gemini (~250 req/day on 2.5-flash free) across 3 daily
-# scans cover ~25 full dossiers per scan at 4 LLM calls each (catalyst +
-# smart-money + thesis + critic, plus retries) now that slow providers no
-# longer carry load (llm.py speed ranking). Layer 2 must cut to what Layer 3
-# can fully cover -- a longer list just ships bare names; the dossier gate
-# trims any shortfall, so the displayed list lands at 20-25.
-DEFAULT_TOP_N = 25
+# Per-scan dossier pool. Layer 3 generates dossiers CONCURRENTLY
+# (DOSSIER_CONCURRENCY, default 5), and the dossier gate trims any name whose
+# thesis/critique/bear fails factcheck (~30-35% on the strict bar). We pick 35
+# so ~20-25 FULLY-VERIFIED dossiers survive to display. Budget is not the
+# constraint (Cerebras ~1M tok/day) -- concurrency + the soft deadline are.
+# 2 daily scans now (post-close dropped June 14 2026).
+DEFAULT_TOP_N = 35
 
 
 def _now() -> str:

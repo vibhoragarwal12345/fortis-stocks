@@ -54,6 +54,7 @@ USAGE
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from dataclasses import dataclass
 
@@ -145,6 +146,7 @@ _LEDGER_REFRESH_CALLS = 25
 _usage: dict[str, dict[str, int]] = {}   # provider -> {"requests": n, "tokens": n}
 _ledger_db = None                        # cached supabase client (or False = unavailable)
 _calls_since_refresh = 0
+_lock = threading.Lock()                 # guards _usage / _exhausted under concurrent dossier generation
 
 
 def _ledger_client():
@@ -171,19 +173,21 @@ def _refresh_usage() -> None:
         from datetime import date
         rows = (db.table("llm_usage").select("provider,requests,total_tokens")
                 .eq("usage_date", date.today().isoformat()).execute().data or [])
-        for r in rows:
-            _usage[r["provider"]] = {
-                "requests": int(r["requests"] or 0),
-                "tokens":   int(r["total_tokens"] or 0),
-            }
+        with _lock:
+            for r in rows:
+                _usage[r["provider"]] = {
+                    "requests": int(r["requests"] or 0),
+                    "tokens":   int(r["total_tokens"] or 0),
+                }
     except Exception as exc:  # noqa: BLE001
         log.debug("LLM ledger read failed: %s", exc)
 
 
 def _record_usage(provider: str, tokens: int) -> None:
-    u = _usage.setdefault(provider, {"requests": 0, "tokens": 0})
-    u["requests"] += 1
-    u["tokens"] += tokens
+    with _lock:
+        u = _usage.setdefault(provider, {"requests": 0, "tokens": 0})
+        u["requests"] += 1
+        u["tokens"] += tokens
     db = _ledger_client()
     if not db:
         return
@@ -342,7 +346,8 @@ def complete(
                 if _is_daily_cap(exc):
                     log.warning("LLM %s daily cap hit -- disabling for the rest "
                                 "of this run", p.name)
-                    _exhausted.add(p.name)
+                    with _lock:
+                        _exhausted.add(p.name)
                     break  # next provider
                 if _is_rate_limit(exc) and attempt < _MAX_RETRIES - 1:
                     wait = _BACKOFF_BASE_SEC * (attempt + 1)
