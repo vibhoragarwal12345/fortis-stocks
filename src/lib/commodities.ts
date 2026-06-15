@@ -40,7 +40,7 @@ export type CommodityEntry = {
       range_52w?: { high: number | null; low: number | null; position_pct: number | null }
       support_resistance?: { nearest_support: number | null; nearest_resistance: number | null }
       reference_bands?: {
-        tactical_21d?: ReferenceBand
+        tactical_1w?: ReferenceBand
         structural_252d?: ReferenceBand
         label?: string
       }

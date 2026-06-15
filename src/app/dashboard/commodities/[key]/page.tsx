@@ -175,7 +175,7 @@ export default async function CommodityDetailPage({
             </CardHeader>
             <CardContent className="space-y-6">
               <NarrativeBlock read={e.tactical.narrative} />
-              <BandRow band={bands.tactical_21d} horizon="21-day" />
+              <BandRow band={bands.tactical_1w} horizon="1-week" />
               <div>
                 <p className="text-eyebrow mb-1.5">Tactical levels</p>
                 <Fact

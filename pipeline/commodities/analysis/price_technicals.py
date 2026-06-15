@@ -14,7 +14,8 @@ cone around spot: where price could plausibly sit given its return
 distribution, with NO directional assumption. Direction belongs to the
 trend/momentum layer, not the bands.
 Bands are computed for BOTH horizons separately:
-  tactical    21 trading days  (~1 month)  — for the SHORT-TERM read
+  tactical    5 trading days   (~1 week)   — for the SHORT-TERM read
+                                             (matches the weekly scan cadence)
   structural  252 trading days (~1 year)   — for the STRUCTURAL read
 and are labeled STATISTICAL REFERENCE LEVELS, NOT FORECASTS, everywhere.
 
@@ -38,7 +39,7 @@ from quant.monte_carlo import MonteCarloSimulator  # noqa: E402
 log = logging.getLogger("commodities.technicals")
 
 HISTORY_PERIOD = "2y"
-HORIZONS = {"tactical_21d": 21, "structural_252d": 252}
+HORIZONS = {"tactical_1w": 5, "structural_252d": 252}
 BAND_LABEL = ("STATISTICAL REFERENCE LEVELS — zero-drift volatility cone from a "
               "return-distribution simulation (no directional assumption) — "
               "NOT price forecasts, NOT targets")

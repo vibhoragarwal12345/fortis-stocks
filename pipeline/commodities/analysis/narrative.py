@@ -58,7 +58,7 @@ _SYSTEM = (
 )
 
 _TACTICAL_INSTRUCTIONS = (
-    "Write the SHORT-TERM / TACTICAL read (days-to-weeks horizon, for traders): "
+    "Write the SHORT-TERM / TACTICAL read (about a one-week horizon, for traders): "
     "what the technicals, positioning, curve structure, latest inventory moves "
     "and seasonal tendency say right now. Do NOT discuss multi-year supply/demand "
     "or secular themes — that belongs to a different horizon and a different reader."

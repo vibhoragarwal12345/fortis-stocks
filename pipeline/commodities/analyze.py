@@ -49,7 +49,8 @@ DISCLAIMER = (
 )
 
 TACTICAL_WARNING = (
-    "SHORT-TERM / TACTICAL — days-to-weeks horizon, written for traders. "
+    "SHORT-TERM / TACTICAL — about a one-week horizon (refreshed weekly), "
+    "written for traders. "
     "NOT an investment thesis: acting on this with long-horizon capital "
     "is the overtrading failure mode this system is designed to prevent."
 )
@@ -81,9 +82,9 @@ def _tactical_data(key: str, tech: dict, curve: dict, pos: dict,
         "pct_of_52w_range": _g(tech, "range_52w", "position_pct"),
         "nearest_support": _g(tech, "support_resistance", "nearest_support"),
         "nearest_resistance": _g(tech, "support_resistance", "nearest_resistance"),
-        "band_21d_bear_p5": _g(tech, "reference_bands", "tactical_21d", "bear_p5"),
-        "band_21d_normal_p50": _g(tech, "reference_bands", "tactical_21d", "normal_p50"),
-        "band_21d_bull_p95": _g(tech, "reference_bands", "tactical_21d", "bull_p95"),
+        "band_1w_bear_p5": _g(tech, "reference_bands", "tactical_1w", "bear_p5"),
+        "band_1w_normal_p50": _g(tech, "reference_bands", "tactical_1w", "normal_p50"),
+        "band_1w_bull_p95": _g(tech, "reference_bands", "tactical_1w", "bull_p95"),
         "curve_structure": curve.get("structure"),
         "curve_annualized_slope_pct": _g(curve, "slope", "annualized_slope_pct"),
         "spec_positioning_stance": pos.get("spec_stance"),
