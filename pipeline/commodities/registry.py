@@ -75,15 +75,13 @@ COMMODITIES: dict[str, dict] = {
         "cftc_name_hint": "COPPER",
         "news_query": "copper price LME demand",
     },
-    "iron_ore": {
-        "name": "Iron Ore / Steel",
-        "category": "metals",
-        "yf_symbol": None,  # no reliable free future on yfinance — FRED monthly is the primary, flagged low-frequency
-        "fred_spot": {"series": "PIORECRUSDM", "label": "Global iron ore price, IMF (FRED)", "freq": "monthly"},
-        "cftc_code": None,  # SGX/DCE iron ore not in CFTC data
-        "cftc_name_hint": None,
-        "news_query": "iron ore price steel China demand",
-    },
+    # NOTE: iron_ore was removed 2026-06-15 (owner directive). On free data it
+    # had no daily price (no yf future), no COT, no curve, no seasonality and no
+    # daily technicals — 5 of 6 analysis layers came back empty/UNVERIFIED and
+    # the tactical narrative could only say it had nothing to assess. It read as
+    # a near-empty card next to the other metals, so it was dropped rather than
+    # ship a hollow tile. Re-add here if a reliable free price/positioning feed
+    # appears.
     "soybeans": {
         "name": "Soybeans",
         "category": "ags",

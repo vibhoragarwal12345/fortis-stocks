@@ -2,8 +2,8 @@
 Metals supply/demand layer — HONESTLY PARTIAL by design.
 
 What is free and therefore VERIFIED here:
-  * FRED monthly global price indices (IMF): copper, iron ore — plus a US PPI
-    steel-mill-products proxy (WPU1017). Low-frequency trend context.
+  * FRED monthly global price index (IMF) for copper. Low-frequency trend
+    context. (Iron ore / steel was dropped 2026-06-15 — see registry.py.)
 
 What is NOT freely available, and is therefore flagged, never faked:
   * LME real-time inventories (paid)                       -> UNVERIFIED
@@ -35,8 +35,6 @@ log = logging.getLogger("commodities.metals_supply")
 # series -> (label, commodity keys)
 PRICE_TREND_SERIES = {
     "PCOPPUSDM":  ("Global copper price, USD/mt (IMF, monthly)", ["copper"]),
-    "PIORECRUSDM": ("Global iron ore price, USD/dmtu (IMF, monthly)", ["iron_ore"]),
-    "WPU1017":    ("US PPI: steel mill products (proxy, monthly)", ["iron_ore"]),
 }
 
 GATED_LAYERS = {
@@ -61,7 +59,7 @@ GATED_LAYERS = {
         "note": "USGS Mineral Commodity Summaries are annual PDF/data releases with no "
                 "stable machine API. If desired, drop the relevant CSVs into "
                 "pipeline/commodities/data/usgs/ and a Part B parser can pick them up.",
-        "informs": ["copper", "iron_ore"],
+        "informs": ["copper"],
     },
 }
 

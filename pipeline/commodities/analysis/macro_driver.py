@@ -76,12 +76,12 @@ def analyze(keys: list[str] | None = None,
             factors["dollar"] = {**dollar, "read": _read_direction(dollar, inverse=True)}
         if k in ("gold", "silver") and real_rate:
             factors["real_rates"] = {**real_rate, "read": _read_direction(real_rate, inverse=True)}
-        if k in ("copper", "iron_ore", "silver") and indpro:
+        if k in ("copper", "silver") and indpro:
             factors["industrial_demand"] = {**indpro,
                                             "read": _read_direction(indpro, inverse=False)}
         if cat == "energy" and cpi:
             factors["inflation_backdrop"] = {**cpi}
-        if k in ("copper", "iron_ore") and wb.get("status") == "OK":
+        if k == "copper" and wb.get("status") == "OK":
             factors["global_growth_baseline"] = wb
 
         heads = (news_data.get("per_commodity", {}).get(k, {}) or {})
