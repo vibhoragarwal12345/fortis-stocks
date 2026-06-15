@@ -31,6 +31,12 @@ GEMINI_API_KEY: str = os.environ.get("GEMINI_API_KEY", "")
 # Additional LLM providers in the gateway waterfall (pipeline/llm.py). Optional;
 # a missing key just drops that provider from the chain.
 CEREBRAS_API_KEY: str = os.environ.get("CEREBRAS_API_KEY", "")  # Cerebras Cloud — fast, generous free tier
+# Second free accounts for the two fast tier-0 workhorses. A full Monday
+# (stock scan + emerging discovery + commodities) exhausted a single account's
+# daily token budget and starved the critic/grader; a second key per provider
+# roughly doubles the daily ceiling. Missing = silently dropped from the chain.
+CEREBRAS_API_KEY_2: str = os.environ.get("CEREBRAS_API_KEY_2", "")
+GROQ_API_KEY_2: str = os.environ.get("GROQ_API_KEY_2", "")
 NVIDIA_API_KEY: str = os.environ.get("NVIDIA_API_KEY", "")      # NVIDIA NIM (build.nvidia.com)
 OPENROUTER_API_KEY: str = os.environ.get("OPENROUTER_API_KEY", "")  # OpenRouter — free-model overflow router (last resort)
 FINNHUB_API_KEY: str = os.environ.get("FINNHUB_API_KEY", "")

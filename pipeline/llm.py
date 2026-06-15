@@ -60,8 +60,10 @@ from dataclasses import dataclass
 
 from config import (  # noqa: E402
     CEREBRAS_API_KEY,
+    CEREBRAS_API_KEY_2,
     GEMINI_API_KEY,
     GROQ_API_KEY,
+    GROQ_API_KEY_2,
     NVIDIA_API_KEY,
     OPENROUTER_API_KEY,
 )
@@ -106,6 +108,15 @@ def _providers() -> list[_Provider]:
         _Provider("cerebras", "openai", CEREBRAS_API_KEY,
                   "gpt-oss-120b", "https://api.cerebras.ai/v1",
                   tier=0, rpd=2000, tpd=1_000_000),
+        # Second free accounts for the two fast workhorses -- own name => own
+        # budget row in llm_usage, so they roughly DOUBLE the daily tier-0
+        # ceiling. Dropped automatically (line below) when the _2 key is unset.
+        _Provider("cerebras_2", "openai", CEREBRAS_API_KEY_2,
+                  "gpt-oss-120b", "https://api.cerebras.ai/v1",
+                  tier=0, rpd=2000, tpd=1_000_000),
+        _Provider("groq_2", "openai", GROQ_API_KEY_2,
+                  "llama-3.3-70b-versatile", "https://api.groq.com/openai/v1",
+                  tier=0, rpd=1000, tpd=100_000),
         _Provider("nvidia", "openai", NVIDIA_API_KEY,
                   "meta/llama-3.3-70b-instruct", "https://integrate.api.nvidia.com/v1",
                   tier=0, rpd=500, speed=1),
