@@ -1,20 +1,21 @@
-name: Commodity scan · 1x per trading day
+name: Commodity scan · weekly (Mondays)
 
-# Commodities pipeline Part C. Once per weekday, after the stock post-close
-# scan window: the commodity model's fundamental inputs are weekly (EIA Wed,
-# COT Fri) or monthly (WASDE, IMF/FRED metals), so a daily run is already
-# generous — 3x/day would re-publish identical fundamentals and press the
-# Actions-minutes ceiling the stock scan sits near. Tactical technicals
-# refresh on this cadence too, which matches their days-to-weeks horizon.
+# Commodities pipeline Part C. WEEKLY on Mondays (owner directive, June 2026 --
+# was daily on weekdays). The commodity model's fundamental inputs are weekly
+# (EIA Wed, COT Fri) or monthly (WASDE, IMF/FRED metals), so a daily run just
+# re-published near-identical fundamentals and burned LLM budget the stock scan
+# needs. One Monday run gives the week its fresh read; tactical technicals on a
+# days-to-weeks horizon tolerate it.
 #
-#     22:45 UTC = 17:45 ET (EST) / 18:45 ET (EDT) — after US futures settle.
+#     45 22 * * 1  =  Monday 22:45 UTC = 17:45 ET (EST) / 18:45 ET (EDT)
+#                     -- after US futures settle.
 #
 # Required secrets beyond the stock scan's set: FRED_API_KEY, EIA_API_KEY,
 # USDA_NASS_API_KEY (all free-tier keys, already in .env.local locally).
 
 on:
   schedule:
-    - cron: "45 22 * * 1-5"
+    - cron: "45 22 * * 1"
   workflow_dispatch:
     inputs:
       commodities:

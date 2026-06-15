@@ -1,13 +1,20 @@
 name: Multibagger · Discovery (weekly)
 
 # Emerging multibagger DISCOVERY engine: full screen + deep research + report.
-# Saturdays 15:00 UTC -- WEEKLY (cadence changed from monthly June 2026). The
-# weekend slot keeps it off the weekday Actions budget and lands before Monday
-# open + before the Sunday watchlist refresh. Heavyweight -- ~30-60 min
-# depending on universe size and Finnhub rate limits.
+# WEEKLY on MONDAYS 15:00 UTC (owner directive June 2026 -- moved from Saturday
+# so the emerging refresh leads the trading week). Heavyweight -- ~30-60 min
+# depending on universe size and Finnhub rate limits. NOTE: this is LLM-heavy
+# (deep research) and Mondays also carry the stock scan (12:00 + 16:30 UTC) and
+# the weekly commodity scan (22:45 UTC) -- 15:00 sits between the stock slots;
+# watch the shared free-LLM daily budget on Mondays.
 on:
   schedule:
-    - cron: "0 15 * * 6"
+    - cron: "0 15 * * 1"
+  # On-demand trigger (same mechanism as the market scan): a repository_dispatch
+  # with this event type starts a run. Used to kick off a cycle immediately
+  # without waiting for Monday. Fine-grained PAT needs Contents:write.
+  repository_dispatch:
+    types: [run-multibagger-discovery]
   workflow_dispatch:
     inputs:
       sample:

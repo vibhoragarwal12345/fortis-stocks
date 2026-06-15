@@ -1,5 +1,4 @@
 import { createClient } from "@/lib/supabase/server"
-import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Reveal } from "@/components/ui/reveal"
 
@@ -18,9 +17,6 @@ type WatchRow = {
   added_date: string
   entry_market_cap: number | null
   current_market_cap: number | null
-  return_since_added: number | null
-  peak_return_pct: number | null
-  max_drawdown_pct: number | null
   status: string
   thesis_id: number | null
   notes: string | null
@@ -72,10 +68,6 @@ const TRAITS: [string, string][] = [
   ["under_discovered", "Under-discovered"],
 ]
 
-function pct(v: number | null): string {
-  if (v === null || v === undefined) return "—"
-  return `${v > 0 ? "+" : ""}${v.toFixed(1)}%`
-}
 function money(v: number | null): string {
   if (!v || v <= 0) return "—"
   if (v >= 1e9) return `$${(v / 1e9).toFixed(2)}B`
@@ -93,7 +85,7 @@ export default async function EmergingPage() {
   const { data: wl } = await supabase
     .from("emerging_watchlist")
     .select(
-      "id, ticker, conviction_tier, multibagger_score, added_date, entry_market_cap, current_market_cap, return_since_added, peak_return_pct, max_drawdown_pct, status, thesis_id, notes",
+      "id, ticker, conviction_tier, multibagger_score, added_date, entry_market_cap, current_market_cap, status, thesis_id, notes",
     )
     .in("status", ["active", "thesis_intact", "thesis_weakening"])
     .order("multibagger_score", { ascending: false, nullsFirst: false })
@@ -263,21 +255,11 @@ function EmergingCard({
               )}
             </p>
           </div>
-          <div className="text-right">
-            <p className="text-caption uppercase tracking-[0.14em] text-muted-foreground">
-              Return since added
-            </p>
-            <p
-              className={`text-data text-h2 ${
-                (row.return_since_added ?? 0) >= 0 ? "text-gain" : "text-loss"
-              }`}
-            >
-              {pct(row.return_since_added)}
-            </p>
-            <p className="text-caption tabular-nums">
-              peak {pct(row.peak_return_pct)} · max DD {pct(row.max_drawdown_pct)}
-            </p>
-          </div>
+          {/* Return-since-added / peak / max-DD intentionally NOT shown here:
+              the emerging list refreshes weekly while a multibagger thesis
+              plays out over YEARS, so a since-added move would be noise and
+              invite short-term reactions. Long-horizon tracking lives in the
+              outcomes tracker, not on this card. (Owner directive, June 2026.) */}
         </div>
 
         {/* ── WHY IT'S HERE — the selection theory leads every dossier ─ */}
