@@ -120,9 +120,11 @@ export default async function CommoditiesPage() {
                         </CardHeader>
                         <CardContent className="space-y-3">
                           <div className="flex flex-wrap gap-1.5">
-                            <Badge variant={SD_VARIANT[sd] ?? "outline"}>
-                              {sd === "unknown" ? "S/D unverified" : sd}
-                            </Badge>
+                            {sd !== "unknown" && (
+                              <Badge variant={SD_VARIANT[sd] ?? "outline"}>
+                                {sd}
+                              </Badge>
+                            )}
                             {curve && curve !== "unknown" && (
                               <Badge variant="neutral">
                                 {CURVE_LABEL[curve] ?? curve}

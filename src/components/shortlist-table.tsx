@@ -182,7 +182,7 @@ export function ShortlistTable({ rows }: { rows: ShortlistRow[] }) {
                 style={{ animationDelay: `${Math.min(i, 12) * 30}ms` }}
               >
                 <TableCell className="pl-5 text-data text-muted-foreground">
-                  {r.rank ?? "—"}
+                  {i + 1}
                 </TableCell>
                 <TableCell>
                   <span className="text-data font-medium">{r.ticker}</span>

@@ -136,11 +136,11 @@ export default async function CommodityDetailPage({
             </span>
           </div>
           <div className="flex flex-wrap gap-1.5">
-            <Badge variant={SD_VARIANT[sd.classification ?? "unknown"] ?? "outline"}>
-              {sd.classification === "unknown" || !sd.classification
-                ? "S/D unverified"
-                : `Supply/demand: ${sd.classification}`}
-            </Badge>
+            {sd.classification && sd.classification !== "unknown" && (
+              <Badge variant={SD_VARIANT[sd.classification] ?? "outline"}>
+                Supply/demand: {sd.classification}
+              </Badge>
+            )}
             {curve.structure && curve.structure !== "unknown" && (
               <Badge variant="neutral">{CURVE_LABEL[curve.structure] ?? curve.structure}</Badge>
             )}
