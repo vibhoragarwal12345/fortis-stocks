@@ -159,7 +159,7 @@ export default async function Home() {
 
         {/* Stat strip — the funnel in three numbers. */}
         <Reveal delay={100}>
-          <dl className="mb-12 grid grid-cols-3 gap-px overflow-hidden rounded-xl border border-border bg-border">
+          <dl className="mb-12 grid grid-cols-1 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-3">
             {STATS.map((s) => (
               <div key={s.label} className="bg-background px-5 py-5 md:px-7">
                 <dt className="order-last mt-1 text-caption">{s.label}</dt>

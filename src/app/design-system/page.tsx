@@ -1,6 +1,9 @@
 import type { CSSProperties } from "react"
 import { DM_Serif_Display, Fraunces } from "next/font/google"
+import { notFound } from "next/navigation"
 
+import { createClient } from "@/lib/supabase/server"
+import { isOwner } from "@/lib/permissions"
 import { AtmosphereBackdrop } from "@/components/atmosphere-backdrop"
 import { Badge } from "@/components/ui/badge"
 
@@ -43,7 +46,15 @@ function Chg({ v }: { v: number }) {
   )
 }
 
-export default function FullPreview() {
+export default async function FullPreview() {
+  // Internal design reference / mock content -- NOT part of the public product.
+  // Gate it to the owner so it isn't reachable by the public at launch.
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!isOwner(user)) notFound()
+
   return (
     <div className={`${fraunces.variable} ${dmSerif.variable} relative min-h-screen`} style={ULTRA}>
       <AtmosphereBackdrop src="/floor/wallstreet.webp" variant="atmosphere" position="center 52%" />
