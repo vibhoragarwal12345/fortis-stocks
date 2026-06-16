@@ -8,11 +8,10 @@ name: Multibagger · Discovery (weekly)
 # the weekly commodity scan (22:45 UTC) -- 15:00 sits between the stock slots;
 # watch the shared free-LLM daily budget on Mondays.
 on:
-  schedule:
-    - cron: "0 15 * * 1"
-  # On-demand trigger (same mechanism as the market scan): a repository_dispatch
-  # with this event type starts a run. Used to kick off a cycle immediately
-  # without waiting for Monday. Fine-grained PAT needs Contents:write.
+  # Scheduled trigger: Supabase pg_cron fires a repository_dispatch Monday
+  # 15:00 UTC (migration 054). GitHub's native `schedule:` cron was removed --
+  # pg_cron is the single reliable source. repository_dispatch also lets us kick
+  # off a cycle on demand; workflow_dispatch stays for manual runs.
   repository_dispatch:
     types: [run-multibagger-discovery]
   workflow_dispatch:

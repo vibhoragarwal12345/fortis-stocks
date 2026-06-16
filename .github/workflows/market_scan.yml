@@ -36,13 +36,12 @@ name: Market scan · 2x per trading day
 # it up; scan_id is the real lineage key on every table.
 
 on:
-  schedule:
-    - cron: "0 12 * * 1-5"   # pre-market  (GitHub native cron -- BACKUP; often lags)
-    - cron: "30 16 * * 1-5"  # midday      (GitHub native cron -- BACKUP; often lags)
-  # PRIMARY trigger: Supabase pg_cron fires a repository_dispatch at exactly
-  # 12:00 + 16:30 UTC (see migration 053). GitHub's native schedule above is an
-  # unreliable backup -- it can lag 15-60 min or drop a tick under load. The
-  # external dispatch is punctual. client_payload.scan_type sets the label.
+  # Scheduled trigger: Supabase pg_cron fires a repository_dispatch at exactly
+  # 12:00 + 16:30 UTC Mon-Fri (migration 053). GitHub's native `schedule:` cron
+  # was REMOVED (June 2026): it lagged 15-60 min / dropped ticks, AND it double-
+  # fired alongside pg_cron -- two scans per slot drained the shared LLM budget.
+  # pg_cron is now the single scheduled source; workflow_dispatch stays for
+  # manual runs. client_payload.scan_type sets the label.
   repository_dispatch:
     types: [run-market-scan]
   workflow_dispatch:

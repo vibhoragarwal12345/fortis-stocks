@@ -14,8 +14,12 @@ name: Commodity scan · weekly (Mondays)
 # USDA_NASS_API_KEY (all free-tier keys, already in .env.local locally).
 
 on:
-  schedule:
-    - cron: "45 22 * * 1"
+  # Scheduled trigger: Supabase pg_cron fires a repository_dispatch Monday
+  # 22:45 UTC (migration 054). GitHub's native `schedule:` cron was removed --
+  # pg_cron is the single reliable source (no lag/drops). workflow_dispatch
+  # stays for manual/partial runs.
+  repository_dispatch:
+    types: [run-commodity-scan]
   workflow_dispatch:
     inputs:
       commodities:

@@ -149,8 +149,16 @@ export default async function EmergingPage() {
     return (b.multibagger_score ?? 0) - (a.multibagger_score ?? 0)
   })
 
+  // Curate to a focused, high-conviction set. The weekly discovery adds EVERY
+  // qualifying tier-1/tier-2 name (+ strong tier-3), so the raw list balloons
+  // (32 as of June 2026) and reads as noise to a client. Show only the top
+  // dozen by conviction tier then score; the rest stay tracked in the DB.
+  // Adjust MAX_SHOWN to taste.
+  const MAX_SHOWN = 12
+  const shown = display.slice(0, MAX_SHOWN)
+
   const grouped: Record<string, WatchRow[]> = {}
-  for (const r of display) {
+  for (const r of shown) {
     const k = r.conviction_tier ?? "tier_3_speculative"
     ;(grouped[k] = grouped[k] ?? []).push(r)
   }
