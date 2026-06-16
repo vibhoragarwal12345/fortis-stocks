@@ -380,7 +380,7 @@ def run(
     # a sleep-truncated local run with debate skipped became 'latest' and the
     # client-facing dashboard looked broken; this is the guard against that.)
     # CI (Linux) never sleeps, so this almost never trips there -- it's a floor.
-    min_display = int(os.getenv("SCAN_MIN_DISPLAY_DOSSIERS", "12"))
+    min_display = int(os.getenv("SCAN_MIN_DISPLAY_DOSSIERS", "15"))
     prior_id = None
     try:
         prior = db.table("scan_state").select("latest_scan_id").eq("id", 1).execute().data or []

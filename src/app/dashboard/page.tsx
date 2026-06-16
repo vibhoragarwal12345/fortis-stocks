@@ -1,6 +1,7 @@
 import Link from "next/link"
 
 import { createClient } from "@/lib/supabase/server"
+import { BOARD_SIZE, getPromotedScanId } from "@/lib/board"
 import { trackEvent } from "@/lib/track"
 import { Card, CardContent } from "@/components/ui/card"
 import { CountUp } from "@/components/ui/count-up"
@@ -79,19 +80,23 @@ export default async function DashboardHomePage() {
 
   await trackEvent("dashboard_today_opened")
 
-  // ── Latest completed scan ────────────────────────────────────────────
-  const { data: latestScanRow } = await supabase
-    .from("market_scans")
-    .select(
-      "id, scan_timestamp, scan_type, status, tickers_scanned_count, shortlist_count, graded_count, completed_at",
-    )
-    .eq("status", "complete")
-    .order("completed_at", { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  // ── The PROMOTED scan (scan_state.latest_scan_id) ────────────────────
+  // Not "latest completed": the promotion guard only promotes a scan that
+  // fields a full verified board, so this is the one clients should see and
+  // it matches the ticker tape + Focus list.
+  const promotedId = await getPromotedScanId(supabase)
+  const { data: latestScanRow } = promotedId
+    ? await supabase
+        .from("market_scans")
+        .select(
+          "id, scan_timestamp, scan_type, status, tickers_scanned_count, shortlist_count, graded_count, completed_at",
+        )
+        .eq("id", promotedId)
+        .maybeSingle()
+    : { data: null }
   const scan = latestScanRow as ScanRow | null
 
-  // ── Shortlist for that scan ──────────────────────────────────────────
+  // ── The Sharp 15: top BOARD_SIZE complete dossiers for that scan ─────
   let shortlist: ScanResult[] = []
   if (scan) {
     const { data } = await supabase
@@ -102,7 +107,7 @@ export default async function DashboardHomePage() {
       .eq("scan_id", scan.id)
       .eq("advanced", true)
       .order("rank", { ascending: true })
-      .limit(40)
+      .limit(BOARD_SIZE)
     shortlist = (data ?? []) as ScanResult[]
   }
 
@@ -161,7 +166,8 @@ export default async function DashboardHomePage() {
           <Reveal>
             <div className="flex items-baseline justify-between gap-4">
               <h2 className="text-eyebrow">
-                Shortlist · top {shortlist.length} by composite score
+                Shortlist · {shortlist.length} fact-checked{" "}
+                {shortlist.length === 1 ? "dossier" : "dossiers"}
               </h2>
               <p className="text-caption text-data">
                 {scan.tickers_scanned_count ?? 0} tickers scanned

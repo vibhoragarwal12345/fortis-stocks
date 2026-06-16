@@ -80,6 +80,11 @@ env:
   # Soft deadline raised 46 -> 63 min (owner directive). Must stay BELOW
   # timeout-minutes (72) so the gate + finalize always run before the hard kill.
   SCAN_SOFT_DEADLINE_SEC:      "3780"
+  # Layer-3 dossier concurrency. Lowered 5 -> 3 (June 2026): with the gateway
+  # now sharding tier-0 load across both Cerebras accounts (llm.py), 3 steady
+  # threads clear the top names without the per-minute 429 storms that 5
+  # threads caused -- the critic reaches enough names to field a SHARP 15.
+  DOSSIER_CONCURRENCY:         "3"
 
 jobs:
   scan:

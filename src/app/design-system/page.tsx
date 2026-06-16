@@ -107,7 +107,7 @@ export default async function FullPreview() {
             </div>
             <div className="flex items-center gap-2">
               <Badge variant="accent">● Regime · Risk-on</Badge>
-              <span className="text-data text-[12px] text-muted-foreground">scanned 3,304 → 25 → 18</span>
+              <span className="text-data text-[12px] text-muted-foreground">scanned 3,304 → 35 → 15</span>
             </div>
           </div>
 

@@ -108,7 +108,7 @@ export default async function Home() {
                   <WordReveal
                     as="span"
                     className="block text-muted-foreground"
-                    text="Thirty convictions."
+                    text="Fifteen convictions."
                     delay={450}
                     step={90}
                   />
@@ -297,7 +297,7 @@ export default async function Home() {
               href="/login"
               className="text-foreground underline-offset-4 transition-premium hover:underline"
             >
-              Sign in to see all thirty.
+              Sign in to see all fifteen.
             </Link>
           </p>
         </Reveal>
@@ -351,7 +351,7 @@ export default async function Home() {
 
 const STATS = [
   { value: 3300, suffix: "+", label: "liquid US tickers swept" },
-  { value: 30, suffix: "", label: "deep dossiers per scan" },
+  { value: 15, suffix: "", label: "fact-checked dossiers per scan" },
   { value: 100, suffix: "%", label: "claims source-traced" },
 ] as const
 
@@ -365,8 +365,8 @@ const FEATURES = [
   {
     index: "02",
     eyebrow: "Composite ranking",
-    title: "Thirty names advance.",
-    body: "A weighted composite advances the thirty names most worth a closer look this cycle. The expensive work doesn't start until a name earns it.",
+    title: "A sharp fifteen.",
+    body: "A weighted composite surfaces the highest-conviction names each cycle; the expensive work starts only when a name earns it, and only fully fact-checked dossiers make the board of fifteen.",
   },
   {
     index: "03",

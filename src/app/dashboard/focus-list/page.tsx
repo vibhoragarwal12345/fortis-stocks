@@ -1,6 +1,7 @@
 import Link from "next/link"
 
 import { createClient } from "@/lib/supabase/server"
+import { BOARD_SIZE, getPromotedScanId } from "@/lib/board"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Reveal } from "@/components/ui/reveal"
@@ -112,15 +113,18 @@ function cardBody(r: Row, m: Metrics | undefined): { label: string | null; text:
 export default async function FocusListPage() {
   const supabase = await createClient()
 
-  // The focus list reflects the LATEST completed market scan. We look up
-  // the scan first (canonical source of truth) and then pull its picks.
-  const { data: latestScanRow } = await supabase
-    .from("market_scans")
-    .select("id, scan_timestamp, scan_type, completed_at")
-    .eq("status", "complete")
-    .order("completed_at", { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  // The focus list reflects the PROMOTED scan (scan_state.latest_scan_id) --
+  // the one the promotion guard cleared for display, matching the Today board
+  // and the ticker tape. (Not "latest completed", which may be a thin scan the
+  // guard held back.)
+  const promotedId = await getPromotedScanId(supabase)
+  const { data: latestScanRow } = promotedId
+    ? await supabase
+        .from("market_scans")
+        .select("id, scan_timestamp, scan_type, completed_at")
+        .eq("id", promotedId)
+        .maybeSingle()
+    : { data: null }
 
   if (!latestScanRow) {
     return (
@@ -150,7 +154,7 @@ export default async function FocusListPage() {
       // dossier gate enforces this). A shorter list is correct, not a bug.
       .eq("dossier_complete", true)
       .order("rank", { ascending: true })
-      .limit(25),
+      .limit(BOARD_SIZE),
     supabase
       .from("scan_results")
       .select("ticker,price,day_change_pct,relative_volume,is_breakout")
@@ -252,7 +256,7 @@ export default async function FocusListPage() {
               </div>
             </Reveal>
             <div className="grid gap-5 md:grid-cols-2">
-              {list.slice(0, 24).map((r, idx) => {
+              {list.map((r, idx) => {
                 const m = metrics.get(r.ticker)
                 const body = cardBody(r, m)
                 const catalyst = hasRealCatalyst(r)

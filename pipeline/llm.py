@@ -54,6 +54,7 @@ USAGE
 from __future__ import annotations
 
 import logging
+import random
 import threading
 import time
 from dataclasses import dataclass
@@ -299,7 +300,16 @@ def _eligible_providers() -> list[_Provider]:
     same-tier fallbacks, not load-bearing -- see _Provider.speed)."""
     ps = [p for p in _providers()
           if p.name not in _exhausted and _remaining_fraction(p) > 0.0]
-    return sorted(ps, key=lambda p: (p.tier, p.speed, -_remaining_fraction(p)))
+    # Under concurrent dossier generation every thread would otherwise pick the
+    # SAME top provider (largest budget) at the same instant -> a per-minute 429
+    # storm on one account, then a lockstep backoff that starves the critic. We
+    # bucket the budget fraction to 2dp and tie-break RANDOMLY, so near-equal
+    # providers (e.g. cerebras + cerebras_2) get sharded across threads --
+    # roughly doubling effective per-minute throughput on the fast tier.
+    return sorted(
+        ps,
+        key=lambda p: (p.tier, p.speed, round(-_remaining_fraction(p), 2), random.random()),
+    )
 
 
 def complete(
