@@ -197,20 +197,47 @@ def factcheck(text: str, data: dict[str, Any]) -> dict:
     }
 
 
-# Display stripping is deliberately MORE permissive than REF_PATTERN: models
-# sometimes emit malformed tags (e.g. multi-key "[DATA REF: a, b]") that fail
-# verification but must still never reach the rendered dossier.
-_STRIP_PATTERN = re.compile(r"\[DATA\s*REF:[^\]]*\]", re.IGNORECASE)
+# Display stripping. Handles well-formed AND multi-key tags ("[DATA REF: a, b]")
+# but the character class EXCLUDES '[' as well as ']' -- so a malformed/unclosed
+# tag can NEVER consume real prose up to a LATER tag's bracket. (The old
+# `[^\]]*` did exactly that: an unclosed "[DATA REF: ..." swallowed everything
+# to the next tag's ']', truncating the dossier mid-sentence -- June 2026 bug.)
+_STRIP_PATTERN = re.compile(r"\[DATA\s*REF:[^\[\]]*\]", re.IGNORECASE)
+
+# A complete prose section is substantial AND ends on a sentence boundary. The
+# displayed dossier must NEVER end mid-word/mid-sentence -- that reads as broken
+# or fabricated to a client.
+_TERMINAL_PUNCT = (".", "!", "?", '"', "'", ")", "”", "’", "…")
 
 
 def strip_data_refs(text: str) -> str:
-    """Remove [DATA REF: x] tags for clean display in reports."""
+    """Remove [DATA REF: x] tags for clean display in reports.
+
+    Only well-formed (closed) tags are stripped. An UNCLOSED remnant is left in
+    place ON PURPOSE -- trying to strip it cannot tell the malformed key from
+    the prose after it, so it would risk eating real text. Instead looks_complete
+    rejects any section that still contains a remnant, so it gets regenerated
+    (debate retry) or hidden (gate) -- never displayed. Prose is never lost.
+    """
     if not text:
         return ""
     out = _STRIP_PATTERN.sub("", text)
     out = re.sub(r"[ \t]+([,.;:!?])", r"\1", out)   # no orphan space before punctuation
     out = re.sub(r"[ \t]{2,}", " ", out)
     return out.strip()
+
+
+def looks_complete(text, min_len: int = 400) -> bool:
+    """True if `text` reads as a finished prose section: long enough to be real,
+    ending on a sentence boundary, and carrying no leftover [DATA REF tag. Catches
+    LLM stubs, mid-sentence truncation, and malformed-tag remnants so a half-
+    written or messy bull/bear case never reaches a client."""
+    if not text:
+        return False
+    t = str(text).rstrip()
+    if "[data ref" in t.lower():                    # leftover malformed tag
+        return False
+    return len(t) >= min_len and t.endswith(_TERMINAL_PUNCT)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

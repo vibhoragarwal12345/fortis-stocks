@@ -50,6 +50,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from agents.factcheck_agent import looks_complete  # noqa: E402
 from config import SUPABASE_SERVICE_KEY, SUPABASE_URL  # noqa: E402
 from supabase import create_client  # noqa: E402
 
@@ -79,6 +80,13 @@ def _is_complete(row: dict) -> bool:
     if any(not row.get(f) for f in _REQUIRED_FIELDS):
         return False
     if any(not row.get(f) for f in _REQUIRED_STRUCTURED):
+        return False
+    # Presence is not enough: the bull AND bear prose must read as FINISHED
+    # (substantial, ending on a sentence boundary). This is the hard safety net
+    # against a stub or mid-sentence-truncated case ever reaching a client --
+    # the failure mode that read as fabricated/broken data (June 2026).
+    if not (looks_complete(row.get("bull_case")) and
+            looks_complete(row.get("bear_case"))):
         return False
     grade = row.get("dossier_quality_grade")
     # NULL = legacy pre-048 dossier (grandfathered by the migration); every

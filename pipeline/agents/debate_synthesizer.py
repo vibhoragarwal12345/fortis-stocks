@@ -37,7 +37,7 @@ import pandas_ta as ta  # noqa: F401  -- registers df.ta accessor
 import yfinance as yf
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from agents.factcheck_agent import factcheck, strip_data_refs  # noqa: E402
+from agents.factcheck_agent import factcheck, looks_complete, strip_data_refs  # noqa: E402
 from config import (  # noqa: E402
     GEMINI_API_KEY, GROQ_API_KEY, SUPABASE_SERVICE_KEY, SUPABASE_URL,
 )
@@ -349,7 +349,11 @@ thesis. Format each as its own line starting with "- "."""
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _generate(prompt: str) -> tuple[str | None, str]:
-    return complete(prompt, system=_SYSTEM, temperature=0.5, max_tokens=1600)
+    # 3000 (was 1600): the structured output is THESIS + 2-paragraph BULL +
+    # 2-paragraph BEAR + price/sizing/what-to-watch, AND the reasoning models
+    # (gpt-oss) spend tokens thinking before emitting -- 1600 truncated a case
+    # mid-sentence on longer names. Generous headroom keeps every section whole.
+    return complete(prompt, system=_SYSTEM, temperature=0.5, max_tokens=3000)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -445,10 +449,13 @@ def run(limit: int = DEFAULT_N, scan_id: int | None = None) -> int:
     if not tickers:
         return 0
 
-    # Idempotent re-runs: rows that already carry a thesis are skipped, so
-    # a partial run can be completed by simply running the agent again.
-    already = [r["ticker"] for r in ranked if r.get("bull_case")]
-    todo = [r for r in ranked if not r.get("bull_case")]
+    # Idempotent re-runs: skip a name only if its bull AND bear already read as
+    # COMPLETE. A present-but-truncated/stub case is re-generated (not skipped),
+    # so re-running the agent HEALS incomplete dossiers instead of leaving them.
+    def _done(r: dict) -> bool:
+        return looks_complete(r.get("bull_case")) and looks_complete(r.get("bear_case"))
+    already = [r["ticker"] for r in ranked if _done(r)]
+    todo = [r for r in ranked if not _done(r)]
     if already:
         log.info("%d pick(s) already have theses (%s); processing %d",
                  len(already), ", ".join(already), len(todo))
@@ -543,6 +550,14 @@ def run(limit: int = DEFAULT_N, scan_id: int | None = None) -> int:
         if parsed.get("what_to_watch"):
             parsed["what_to_watch"] = [strip_data_refs(w)
                                        for w in parsed["what_to_watch"]]
+        # Completeness gate: the DISPLAYED bull + bear must read as finished
+        # prose (substantial, ending on a sentence boundary). A stub or a
+        # mid-sentence truncation is treated as a failure so the retry pass
+        # regenerates it -- a half-written case must never reach a client.
+        if not (looks_complete(parsed.get("bull_case")) and
+                looks_complete(parsed.get("bear_case"))):
+            log.warning("%s: bull/bear incomplete after strip -- discarding for retry", t)
+            return None
         parsed["ticker"] = t
         parsed["_method"] = method
         parsed["_price"] = ctx["price"]
