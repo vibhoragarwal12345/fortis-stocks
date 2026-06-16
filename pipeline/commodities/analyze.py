@@ -148,7 +148,8 @@ def _structural_data(key: str, tech: dict, curve: dict, sd: dict,
     return {k: v for k, v in d.items() if v is not None}
 
 
-def run(keys: list[str] | None = None, with_llm: bool = True) -> dict:
+def run(keys: list[str] | None = None, with_llm: bool = True,
+        mode: str = "full") -> dict:
     keys = keys or list(COMMODITIES)
     log.info("fetching shared sources once for %d commodities ...", len(keys))
     cats = {COMMODITIES[k]["category"] for k in keys}
@@ -168,7 +169,8 @@ def run(keys: list[str] | None = None, with_llm: bool = True) -> dict:
     season_all = seasonality.analyze(keys)
     mac_all = macro_driver.analyze(keys, macro_data=macro_data, news_data=news_data)
 
-    out = {"generated_at": utcnow_iso(), "disclaimer": DISCLAIMER, "commodities": {}}
+    out = {"generated_at": utcnow_iso(), "disclaimer": DISCLAIMER,
+           "scan_mode": mode, "commodities": {}}
     for k in keys:
         tech, sd = tech_all[k], sd_all[k]
         curve, pos = curve_all[k], pos_all[k]
@@ -177,7 +179,7 @@ def run(keys: list[str] | None = None, with_llm: bool = True) -> dict:
         tac_data = _tactical_data(k, tech, curve, pos, season, sd)
         struct_data = _structural_data(k, tech, curve, sd, mac)
 
-        reads = (narrative_agent.generate_reads(k, tac_data, struct_data)
+        reads = (narrative_agent.generate_reads(k, tac_data, struct_data, mode=mode)
                  if with_llm else
                  {"tactical": {"status": "SKIPPED"}, "structural": {"status": "SKIPPED"}})
 

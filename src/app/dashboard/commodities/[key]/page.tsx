@@ -248,6 +248,15 @@ export default async function CommodityDetailPage({
                 Carries no entry/exit timing information — do not trade off this
                 read.
               </p>
+              {e.structural.as_of && (
+                <p className="text-caption text-muted-foreground">
+                  Refreshed weekly · as of{" "}
+                  {new Date(e.structural.as_of).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </p>
+              )}
             </CardHeader>
             <CardContent className="space-y-6">
               <NarrativeBlock read={e.structural.narrative} />

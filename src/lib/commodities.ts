@@ -15,6 +15,9 @@ export type HorizonBlock = {
   audience_warning: string
   data: Record<string, unknown>
   narrative: NarrativeRead
+  // Set on the structural block when it was carried forward from the last
+  // weekly full run (daily tactical scans reuse it). ISO timestamp.
+  as_of?: string
 }
 
 export type ReferenceBand = {

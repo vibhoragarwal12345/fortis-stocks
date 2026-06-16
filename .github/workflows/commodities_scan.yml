@@ -1,27 +1,37 @@
-name: Commodity scan · weekly (Mondays)
+name: Commodity scan · daily tactical + weekly structural
 
-# Commodities pipeline Part C. WEEKLY on Mondays (owner directive, June 2026 --
-# was daily on weekdays). The commodity model's fundamental inputs are weekly
-# (EIA Wed, COT Fri) or monthly (WASDE, IMF/FRED metals), so a daily run just
-# re-published near-identical fundamentals and burned LLM budget the stock scan
-# needs. One Monday run gives the week its fresh read; tactical technicals on a
-# days-to-weeks horizon tolerate it.
-#
-#     45 22 * * 1  =  Monday 22:45 UTC = 17:45 ET (EST) / 18:45 ET (EDT)
-#                     -- after US futures settle.
+# Commodities pipeline Part C. TWO cadences (owner directive, June 2026):
+#   --mode tactical : DAILY pre-market (Mon-Fri), bundled with the stock pre-
+#                     market slot. Refreshes the short-term read (price, the
+#                     1-week band, news) and CARRIES FORWARD the weekly
+#                     structural read -- no structural LLM call is spent.
+#   --mode full     : WEEKLY on Mondays, regenerates everything incl. the
+#                     long-horizon structural read.
+# Tactical signals (price/technicals/news) move daily; structural fundamentals
+# (EIA weekly, COT weekly, IMF/FRED monthly) do not -- so each refreshes at its
+# own velocity. The doubled LLM budget covers the daily tactical pass.
 #
 # Required secrets beyond the stock scan's set: FRED_API_KEY, EIA_API_KEY,
 # USDA_NASS_API_KEY (all free-tier keys, already in .env.local locally).
 
 on:
-  # Scheduled trigger: Supabase pg_cron fires a repository_dispatch Monday
-  # 22:45 UTC (migration 054). GitHub's native `schedule:` cron was removed --
-  # pg_cron is the single reliable source (no lag/drops). workflow_dispatch
-  # stays for manual/partial runs.
+  # Scheduled trigger: Supabase pg_cron fires repository_dispatch with a
+  # client_payload.mode (migration 055): tactical daily ~12:05 UTC Mon-Fri,
+  # full weekly Monday 22:45 UTC. GitHub's native `schedule:` cron stays
+  # removed -- pg_cron is the single reliable source. workflow_dispatch is for
+  # manual/partial runs.
   repository_dispatch:
     types: [run-commodity-scan]
   workflow_dispatch:
     inputs:
+      mode:
+        description: "Scan mode"
+        required: false
+        default: "full"
+        type: choice
+        options:
+          - full
+          - tactical
       commodities:
         description: "Space-separated registry keys (blank = all)"
         required: false
@@ -59,6 +69,17 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-pipeline
 
+      - name: Derive scan mode
+        id: mode
+        run: |
+          if [ -n "${{ github.event.client_payload.mode }}" ]; then
+            echo "mode=${{ github.event.client_payload.mode }}" >> $GITHUB_OUTPUT
+          elif [ -n "${{ github.event.inputs.mode }}" ]; then
+            echo "mode=${{ github.event.inputs.mode }}" >> $GITHUB_OUTPUT
+          else
+            echo "mode=full" >> $GITHUB_OUTPUT
+          fi
+
       - name: Run commodity scan
         run: |
-          python -m pipeline.commodities.scan ${{ github.event.inputs.commodities }}
+          python -m pipeline.commodities.scan --mode ${{ steps.mode.outputs.mode }} ${{ github.event.inputs.commodities }}

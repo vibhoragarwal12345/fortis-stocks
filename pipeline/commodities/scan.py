@@ -79,6 +79,44 @@ def _persist(result: dict, signals: dict, status: str,
         return False
 
 
+def _carry_forward_structural(result: dict) -> dict:
+    """Tactical (daily) runs reuse the most recent run's STRUCTURAL block per
+    commodity, so the long-horizon read refreshes only on the weekly full run
+    while the tactical read updates daily -- and NO structural LLM call is
+    spent. The 'as_of' timestamp chains back to the full run that wrote it."""
+    try:
+        from supabase import create_client
+        from config import SUPABASE_SERVICE_KEY, SUPABASE_URL
+        db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+        prior = (db.table("commodity_scans").select("scan_time,payload")
+                 .neq("status", "failed").order("scan_time", desc=True)
+                 .limit(1).execute().data or [])
+    except Exception as exc:  # noqa: BLE001 -- non-fatal, leaves the stub
+        log.warning("carry-forward: could not load prior structural reads: %s", exc)
+        prior = []
+    prior_comms = prior[0]["payload"].get("commodities", {}) if prior else {}
+    prior_time = prior[0].get("scan_time") if prior else None
+    carried = 0
+    for e in result.get("commodities", {}).values():
+        prev_struct = (prior_comms.get(_key_of(e)) or {}).get("structural")
+        if prev_struct and (prev_struct.get("narrative") or {}).get("status") == "OK":
+            e["structural"] = {**prev_struct,
+                               "as_of": prev_struct.get("as_of") or prior_time}
+            carried += 1
+    log.info("carried forward structural reads for %d commodity(ies) (as of %s)",
+             carried, prior_time)
+    return result
+
+
+def _key_of(entry: dict) -> str:
+    """Reverse the display name back to a registry key for prior-scan lookup."""
+    name = entry.get("name")
+    for k, c in COMMODITIES.items():
+        if c["name"] == name:
+            return k
+    return ""
+
+
 def main() -> int:
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(levelname)-7s %(message)s",
@@ -87,8 +125,18 @@ def main() -> int:
     with_llm = "--no-llm" not in args
     local_only = "--local-only" in args
     keys = [a for a in args if a in COMMODITIES] or None
+    # --mode tactical : daily pre-market run, short-term read only (structural
+    #                   carried forward from the last weekly full run).
+    # --mode full     : weekly Monday run, regenerate everything (default).
+    mode = "full"
+    if "--mode" in args:
+        i = args.index("--mode")
+        if i + 1 < len(args) and args[i + 1] in ("tactical", "full"):
+            mode = args[i + 1]
 
-    result = analyze.run(keys, with_llm=with_llm)
+    result = analyze.run(keys, with_llm=with_llm, mode=mode)
+    if mode == "tactical":
+        result = _carry_forward_structural(result)
     signals = cross_link.build_signals(result)
     ok, total = _narrative_counts(result)
     status = _status(result, ok, total)
@@ -102,7 +150,8 @@ def main() -> int:
     persisted = local_only or _persist(result, signals, status, ok, total)
 
     bar = "=" * 70
-    print(f"\n{bar}\nCOMMODITY SCAN — {result['generated_at']}  [{status.upper()}]\n{bar}")
+    print(f"\n{bar}\nCOMMODITY SCAN [{mode.upper()}] — {result['generated_at']}  "
+          f"[{status.upper()}]\n{bar}")
     for k, e in result["commodities"].items():
         price = e.get("price") or {}
         tac = (e.get("tactical", {}).get("narrative") or {}).get("status")

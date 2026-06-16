@@ -161,13 +161,23 @@ def _generate(data: dict, instructions: str, horizon: str) -> dict:
     return result
 
 
-def generate_reads(commodity: str, tactical_data: dict, structural_data: dict) -> dict:
+def generate_reads(commodity: str, tactical_data: dict, structural_data: dict,
+                   mode: str = "full") -> dict:
     """The dual-horizon narrative pair. Inputs are FLAT dicts of citable
-    key -> value built by the orchestrator from verified agent outputs only."""
+    key -> value built by the orchestrator from verified agent outputs only.
+
+    mode='tactical' (daily pre-market run): generate ONLY the short-term read;
+    the structural read is carried forward from the last full (weekly) run by
+    the orchestrator, so the expensive long-horizon LLM call is skipped."""
+    tactical = _generate(tactical_data, _TACTICAL_INSTRUCTIONS, "SHORT-TERM / TACTICAL")
+    structural = (
+        _generate(structural_data, _STRUCTURAL_INSTRUCTIONS, "STRUCTURAL / LONG-TERM")
+        if mode == "full" else {"status": "CARRIED_FORWARD"}
+    )
     return {
         "commodity": commodity,
-        "tactical": _generate(tactical_data, _TACTICAL_INSTRUCTIONS, "SHORT-TERM / TACTICAL"),
-        "structural": _generate(structural_data, _STRUCTURAL_INSTRUCTIONS, "STRUCTURAL / LONG-TERM"),
+        "tactical": tactical,
+        "structural": structural,
         "separation_note": ("Two independent closed-context generations from two disjoint "
                             "data subsets — horizon leakage is excluded by construction "
                             "and additionally audited by the critic."),
