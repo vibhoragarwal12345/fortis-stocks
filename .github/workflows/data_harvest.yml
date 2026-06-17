@@ -1,4 +1,4 @@
-name: Data harvest · pre-scan enrichment (Tier A)
+name: Data harvest · pre-scan enrichment (Tier A + crowd)
 
 # Refreshes the enrichment tables the stock dossier reads (news_items,
 # sec_filings, options_signals) BEFORE the pre-market scan, so debate_synthesizer
@@ -28,6 +28,15 @@ env:
   NEXT_PUBLIC_SUPABASE_URL:  ${{ secrets.SUPABASE_URL }}
   SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
   FINNHUB_API_KEY:           ${{ secrets.FINNHUB_API_KEY }}
+  # LLM gateway keys — crowd_intelligence synthesizes its bull/bear debate via
+  # the LLM (deterministic template fallback if all are unset).
+  GROQ_API_KEY:              ${{ secrets.GROQ_API_KEY }}
+  GROQ_API_KEY_2:            ${{ secrets.GROQ_API_KEY_2 }}
+  GEMINI_API_KEY:            ${{ secrets.GEMINI_API_KEY }}
+  CEREBRAS_API_KEY:          ${{ secrets.CEREBRAS_API_KEY }}
+  CEREBRAS_API_KEY_2:        ${{ secrets.CEREBRAS_API_KEY_2 }}
+  NVIDIA_API_KEY:            ${{ secrets.NVIDIA_API_KEY }}
+  OPENROUTER_API_KEY:        ${{ secrets.OPENROUTER_API_KEY }}
 
 jobs:
   harvest:
@@ -52,3 +61,11 @@ jobs:
       - name: Options flow
         continue-on-error: true
         run: python pipeline/agents/options_flow.py 500
+
+      # Tier B: retail/pro crowd signals -> ticker_debates + social_mentions.
+      # Reads news_items (so it runs after the news harvester). Best-effort
+      # across free social sources + FinBERT (CI has torch/transformers); a dead
+      # source degrades gracefully and never blocks the chain.
+      - name: Crowd intelligence
+        continue-on-error: true
+        run: python pipeline/agents/crowd_intelligence.py
