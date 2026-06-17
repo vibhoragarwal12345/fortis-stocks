@@ -26,7 +26,7 @@ export default function LegalLayout({
           >
             <span aria-hidden className="size-2 rounded-[2px] bg-highlight" />
             <span className="text-[13px] font-semibold uppercase tracking-[0.22em]">
-              Fortis
+              Christopher Edwards Financial Associates
             </span>
           </Link>
         </div>

@@ -38,22 +38,22 @@ import { SITE_URL } from "@/lib/site"
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Fortis Stock Intelligence",
-    template: "%s — Fortis",
+    default: "Christopher Edwards Financial Associates",
+    template: "%s — Christopher Edwards Financial Associates",
   },
   description:
     "Institutional research for wealth advisors. The full liquid US market scanned through every trading day — every claim traced to its source.",
   openGraph: {
-    title: "Fortis Stock Intelligence",
+    title: "Christopher Edwards Financial Associates",
     description:
       "Three thousand stocks. Thirty convictions. Institutional research for wealth advisors — every claim traced to its source.",
     url: SITE_URL,
-    siteName: "Fortis Stock Intelligence",
+    siteName: "Christopher Edwards Financial Associates",
     type: "website",
   },
   twitter: {
     card: "summary",
-    title: "Fortis Stock Intelligence",
+    title: "Christopher Edwards Financial Associates",
     description:
       "Three thousand stocks. Thirty convictions. Institutional research for wealth advisors.",
   },

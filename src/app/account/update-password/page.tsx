@@ -7,7 +7,7 @@ import { CursorGlow } from "@/components/ui/cursor-glow"
 import { UpdatePasswordForm } from "@/components/update-password-form"
 import { SiteFooter } from "@/components/site-footer"
 
-export const metadata = { title: "Set new password — Fortis" }
+export const metadata = { title: "Set new password — Christopher Edwards Financial Associates" }
 export const dynamic = "force-dynamic"
 
 export default async function UpdatePasswordPage() {
@@ -31,7 +31,7 @@ export default async function UpdatePasswordPage() {
       >
         <span aria-hidden className="size-2 rounded-[2px] bg-highlight" />
         <span className="text-[13px] font-semibold uppercase tracking-[0.22em]">
-          Fortis
+          Christopher Edwards Financial Associates
         </span>
       </Link>
 

@@ -7,7 +7,7 @@ import { Reveal } from "@/components/ui/reveal"
 
 const GRADE_VARIANT = { A: "gradeA", B: "gradeB", C: "gradeC", D: "neutral" } as const
 
-export const metadata = { title: "Research — Fortis" }
+export const metadata = { title: "Research — Christopher Edwards Financial Associates" }
 export const dynamic = "force-dynamic"
 
 type PriceRef = {

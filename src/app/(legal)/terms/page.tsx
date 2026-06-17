@@ -3,7 +3,7 @@
 // Reasonable starter Terms & Conditions for an invite-only financial-research
 // platform. Not legal advice; have counsel review before production use.
 
-export const metadata = { title: "Terms & Conditions — Fortis" }
+export const metadata = { title: "Terms & Conditions — Christopher Edwards Financial Associates" }
 
 const EFFECTIVE_DATE = "June 11, 2026"
 
@@ -18,8 +18,8 @@ export default function TermsPage() {
 
       <p className="mt-8">
         These Terms &amp; Conditions (&ldquo;Terms&rdquo;) govern your access
-        to and use of Fortis Stock Intelligence (the &ldquo;Service&rdquo;),
-        operated by The Fortis Agency. By accessing the Service you agree to
+        to and use of Christopher Edwards Financial Associates (the &ldquo;Service&rdquo;),
+        operated by Christopher Edwards Financial Associates. By accessing the Service you agree to
         these Terms. If you do not agree, do not use the Service.
       </p>
 
@@ -74,7 +74,7 @@ export default function TermsPage() {
       <h2>Intellectual property</h2>
       <p>
         The Service, including its content, software, and design, is owned by
-        The Fortis Agency or its licensors and is protected by intellectual
+        Christopher Edwards Financial Associates or its licensors and is protected by intellectual
         property laws. We grant you a limited, non-exclusive, non-transferable
         right to use the Service in accordance with these Terms.
       </p>
@@ -90,7 +90,7 @@ export default function TermsPage() {
 
       <h2>Limitation of liability</h2>
       <p>
-        To the maximum extent permitted by law, The Fortis Agency will not be
+        To the maximum extent permitted by law, Christopher Edwards Financial Associates will not be
         liable for any indirect, incidental, special, consequential, or
         punitive damages, or for any trading or investment losses, arising out
         of or relating to your use of the Service.
@@ -105,8 +105,7 @@ export default function TermsPage() {
 
       <h2>Governing law</h2>
       <p>
-        These Terms are governed by the laws of the jurisdiction in which The
-        Fortis Agency is established, without regard to conflict-of-laws
+        These Terms are governed by the laws of the jurisdiction in which Christopher Edwards Financial Associates is established, without regard to conflict-of-laws
         principles.
       </p>
 
@@ -119,7 +118,7 @@ export default function TermsPage() {
 
       <h2>Contact</h2>
       <p>
-        Questions about these Terms can be directed to The Fortis Agency at the
+        Questions about these Terms can be directed to Christopher Edwards Financial Associates at the
         contact address provided in your onboarding communications.
       </p>
     </div>

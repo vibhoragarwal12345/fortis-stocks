@@ -9,7 +9,7 @@ import { PageTransition } from "@/components/ui/page-transition"
 import { SiteFooter } from "@/components/site-footer"
 import { signout } from "@/app/dashboard/actions"
 
-export const metadata = { title: "Admin — Fortis" }
+export const metadata = { title: "Admin — Christopher Edwards Financial Associates" }
 
 export default async function AdminLayout({
   children,
@@ -55,7 +55,7 @@ export default async function AdminLayout({
           >
             <span aria-hidden className="size-2 rounded-[2px] bg-highlight" />
             <span className="text-[13px] font-semibold uppercase tracking-[0.22em]">
-              Fortis
+              Christopher Edwards Financial Associates
             </span>
             <span className="text-eyebrow">
               Admin

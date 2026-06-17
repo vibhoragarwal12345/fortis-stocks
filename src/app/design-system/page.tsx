@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge"
 const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-fraunces", display: "swap" })
 const dmSerif = DM_Serif_Display({ subsets: ["latin"], weight: "400", variable: "--font-dmserif", display: "swap" })
 
-export const metadata = { title: "Full preview — Fortis" }
+export const metadata = { title: "Full preview — Christopher Edwards Financial Associates" }
 
 const DISPLAY: CSSProperties = { fontFamily: "var(--font-fraunces)" }
 const SERIF: CSSProperties = { fontFamily: "var(--font-dmserif)" }
@@ -64,7 +64,7 @@ export default async function FullPreview() {
         <div className="mx-auto flex h-14 max-w-[1180px] items-center justify-between gap-6 px-6">
           <div className="flex items-center gap-2">
             <span className="inline-block size-2 rounded-[2px] bg-highlight" />
-            <span className="text-[15px] font-semibold tracking-tight text-foreground">Fortis</span>
+            <span className="text-[15px] font-semibold tracking-tight text-foreground">Christopher Edwards Financial Associates</span>
           </div>
           <nav className="hidden items-center gap-1 md:flex">
             {NAV.map((n, i) => (

@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent } from "@/components/ui/card"
 import { Reveal } from "@/components/ui/reveal"
 
-export const metadata = { title: "Emerging Watchlist — Fortis" }
+export const metadata = { title: "Emerging Watchlist — Christopher Edwards Financial Associates" }
 export const dynamic = "force-dynamic"
 
 type WatchRow = {

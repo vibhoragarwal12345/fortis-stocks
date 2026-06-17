@@ -32,7 +32,7 @@ export async function login(formData: { email: string; password: string }) {
 
 /**
  * Open signup, instant access. The account is created pre-confirmed via
- * the admin API (no confirmation email at all), linked to the Fortis
+ * the admin API (no confirmation email at all), linked to the Christopher Edwards Financial Associates
  * tenant, and signed in immediately — signup lands straight in the
  * dashboard. (Invite gate removed for the friends-and-family launch;
  * admin-panel invites remain for other tenants.)

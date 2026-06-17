@@ -11,7 +11,7 @@ const LEGAL_LINKS = [
 ] as const
 
 export function SiteFooter({
-  brandName = "Fortis Stock Intelligence",
+  brandName = "Christopher Edwards Financial Associates",
 }: {
   brandName?: string
 }) {

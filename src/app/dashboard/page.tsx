@@ -9,7 +9,7 @@ import { Reveal } from "@/components/ui/reveal"
 import { WordReveal } from "@/components/ui/word-reveal"
 import { ShortlistTable, type ShortlistRow } from "@/components/shortlist-table"
 
-export const metadata = { title: "Today — Fortis" }
+export const metadata = { title: "Today — Christopher Edwards Financial Associates" }
 export const dynamic = "force-dynamic"
 
 type ScanRow = {

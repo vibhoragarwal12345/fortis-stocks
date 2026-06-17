@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent } from "@/components/ui/card"
 import { Reveal } from "@/components/ui/reveal"
 
-export const metadata = { title: "Report — Fortis" }
+export const metadata = { title: "Report — Christopher Edwards Financial Associates" }
 export const dynamic = "force-dynamic"
 
 type Report = {
@@ -103,7 +103,7 @@ export default async function ReportPage({
             links from older notifications still resolve. */}
         <div className="rounded-md border border-border bg-secondary/40 px-4 py-3 text-small text-muted-foreground">
           <span className="text-foreground">Historical report.</span>{" "}
-          Fortis no longer composes daily briefs — the platform refreshes
+          Christopher Edwards Financial Associates no longer composes daily briefs — the platform refreshes
           the dashboard every 2 hours instead.{" "}
           <Link
             href="/dashboard"

@@ -4,7 +4,7 @@
 // platform that stores user accounts (via Supabase Auth) and displays
 // delayed third-party market data. Not legal advice; have counsel review.
 
-export const metadata = { title: "Privacy Policy — Fortis" }
+export const metadata = { title: "Privacy Policy — Christopher Edwards Financial Associates" }
 
 const EFFECTIVE_DATE = "June 11, 2026"
 
@@ -18,9 +18,9 @@ export default function PrivacyPage() {
       </p>
 
       <p className="mt-8">
-        This Privacy Policy explains how Fortis Stock Intelligence
-        (&ldquo;Fortis,&rdquo; &ldquo;we,&rdquo; &ldquo;us&rdquo;), operated by
-        The Fortis Agency, collects, uses, and protects personal information
+        This Privacy Policy explains how Christopher Edwards Financial Associates
+        (&ldquo;Christopher Edwards Financial Associates,&rdquo; &ldquo;we,&rdquo; &ldquo;us&rdquo;), operated by
+        Christopher Edwards Financial Associates, collects, uses, and protects personal information
         when you access our stock-research platform (the
         &ldquo;Service&rdquo;). By using the Service you agree to the practices
         described here.
@@ -122,8 +122,7 @@ export default function PrivacyPage() {
 
       <h2>Contact</h2>
       <p>
-        Questions about this policy or your data can be directed to The Fortis
-        Agency at the contact address provided in your onboarding
+        Questions about this policy or your data can be directed to Christopher Edwards Financial Associates at the contact address provided in your onboarding
         communications.
       </p>
     </div>

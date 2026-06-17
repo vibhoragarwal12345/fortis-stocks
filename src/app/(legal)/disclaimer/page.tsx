@@ -1,10 +1,10 @@
 // TEMPLATE — must be reviewed by a qualified professional before production use.
 //
-// Research-not-advice disclaimer for Fortis. Expands the platform's existing
+// Research-not-advice disclaimer for Christopher Edwards Financial Associates. Expands the platform's existing
 // fiduciary language ("For licensed advisor review — not investment advice")
 // into a fuller statement. Not legal advice; have counsel review.
 
-export const metadata = { title: "Disclaimer — Fortis" }
+export const metadata = { title: "Disclaimer — Christopher Edwards Financial Associates" }
 
 const EFFECTIVE_DATE = "June 11, 2026"
 
@@ -19,8 +19,8 @@ export default function DisclaimerPage() {
 
       <p className="mt-8">
         <strong>For licensed advisor review — not investment advice.</strong>{" "}
-        Fortis Stock Intelligence (the &ldquo;Service&rdquo;) is a research and
-        analytics tool provided by The Fortis Agency for informational and
+        Christopher Edwards Financial Associates (the &ldquo;Service&rdquo;) is a research and
+        analytics tool provided by Christopher Edwards Financial Associates for informational and
         educational purposes only.
       </p>
 
@@ -36,7 +36,7 @@ export default function DisclaimerPage() {
       <h2>No fiduciary or advisory relationship</h2>
       <p>
         Use of the Service does not create an advisor-client, fiduciary, or
-        similar relationship between you and The Fortis Agency. Outputs are
+        similar relationship between you and Christopher Edwards Financial Associates. Outputs are
         intended to be reviewed by a licensed investment professional who
         exercises independent judgment before any action is taken.
       </p>
@@ -70,7 +70,7 @@ export default function DisclaimerPage() {
         You are solely responsible for evaluating the merits and risks of any
         investment decision. Conduct your own due diligence and consult a
         qualified, licensed professional before acting on any information from
-        the Service. To the maximum extent permitted by law, The Fortis Agency
+        the Service. To the maximum extent permitted by law, Christopher Edwards Financial Associates
         accepts no liability for any loss arising from use of the Service.
       </p>
     </div>

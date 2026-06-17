@@ -27,7 +27,7 @@ import {
 } from "@/lib/landing-data"
 
 export const metadata = {
-  title: "Fortis Stock Intelligence",
+  title: "Christopher Edwards Financial Associates",
   description:
     "Institutional research for wealth advisors. The full liquid US market scanned through every trading day, deep analysis on the names that earn it, conviction grades on what survives — every claim traced to its source.",
 }
@@ -64,7 +64,7 @@ export default async function Home() {
           >
             <span aria-hidden className="size-2 rounded-[2px] bg-highlight" />
             <span className="text-[13px] font-semibold uppercase tracking-[0.22em]">
-              Fortis
+              Christopher Edwards Financial Associates
             </span>
           </Link>
           <Link
@@ -94,7 +94,7 @@ export default async function Home() {
                       <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-highlight opacity-60" />
                       <span className="relative inline-flex size-2 rounded-full bg-highlight" />
                     </span>
-                    Fortis · Stock Intelligence
+                    Christopher Edwards Financial Associates
                   </p>
                 </Reveal>
                 <h1 className="text-display">
@@ -115,7 +115,7 @@ export default async function Home() {
                 </h1>
                 <Reveal delay={700}>
                   <p className="text-body-lg max-w-[620px] text-muted-foreground">
-                    Fortis sweeps every liquid US ticker through the trading
+                    Christopher Edwards Financial Associates sweeps every liquid US ticker through the trading
                     day, spends deep analysis only where it&rsquo;s earned,
                     and grades what survives — every claim traced to its
                     source.
@@ -330,7 +330,7 @@ export default async function Home() {
             Every claim traces back to a row in a database table.
           </h2>
           <p className="text-body-lg text-muted-foreground">
-            Fortis doesn&rsquo;t generate opinions. It ranks, grades, and
+            Christopher Edwards Financial Associates doesn&rsquo;t generate opinions. It ranks, grades, and
             explains — and every numeric claim in every brief carries a
             verified pointer to the data behind it. When the system is
             uncertain, it says so. When the track record is thin, it shows

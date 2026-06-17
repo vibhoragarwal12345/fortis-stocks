@@ -8,10 +8,10 @@ export type TenantTheme = {
 }
 
 const DEFAULT_THEME: TenantTheme = {
-  name: "Fortis Stock Intelligence",
+  name: "Christopher Edwards Financial Associates",
   logoUrl: null,
   primaryColor: "#0F6E56",
-  emailFromName: "Fortis",
+  emailFromName: "Christopher Edwards Financial Associates",
 }
 
 export function themeFromTenant(tenant: Tenant | null | undefined): TenantTheme {
