@@ -1,4 +1,4 @@
-name: Data harvest · pre-scan enrichment (Tier A + crowd)
+name: Data harvest · pre-scan enrichment (news/SEC/options/crowd/sentiment)
 
 # Refreshes the enrichment tables the stock dossier reads (news_items,
 # sec_filings, options_signals) BEFORE the pre-market scan, so debate_synthesizer
@@ -52,6 +52,13 @@ jobs:
         continue-on-error: true
         run: python pipeline/agents/news_harvester.py
 
+      # Verify each headline's source-tagged ticker against the tracked
+      # ticker_master.csv (sets resolution_status='verified'), so sentiment only
+      # scores trustworthy rows -- prevents a mis-tagged headline on a dossier.
+      - name: News resolver
+        continue-on-error: true
+        run: python pipeline/agents/news_resolver.py
+
       # SEC EDGAR 8-K / Form 4 / 13F recent-filings feed -> sec_filings
       - name: SEC watcher
         continue-on-error: true
@@ -69,3 +76,10 @@ jobs:
       - name: Crowd intelligence
         continue-on-error: true
         run: python pipeline/agents/crowd_intelligence.py
+
+      # Tier C: score the VERIFIED news + SEC + crowd debates (FinBERT on CI,
+      # lexicon fallback -- never crashes) and build ticker_sentiment_rollup.
+      # Gives the dossier real news sentiment + feeds in-scan cross-validation.
+      - name: Sentiment scorer
+        continue-on-error: true
+        run: python pipeline/processors/sentiment_scorer.py midday
