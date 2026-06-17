@@ -344,11 +344,60 @@ def run(
               .execute()
         )
         complete = int(getattr(cnt, "count", 0) or 0)
-        if complete < shortlist:
-            notes.append(f"dossier coverage {complete}/{shortlist}: "
-                         f"{shortlist - complete} pick(s) shown as 'dossier "
-                         "completing' (full fact-check still assembling)")
         log.info("Dossier gate: %d/%d picks carry a complete dossier", complete, shortlist)
+
+        # ── Fill-to-floor: heal incomplete dossiers up to the display floor ──
+        # One deep-agent pass covers only part of the pool under LLM rate
+        # limits, so a scan often lands below the floor (and then the promotion
+        # guard would keep the stale board up). Re-run debate+critic (both SKIP
+        # already-complete dossiers, so each pass heals only the rest), re-grade
+        # and re-gate, until we hit the floor or run out of time/progress. This
+        # makes a full board RELIABLE per scan -- and it ONLY adds complete
+        # dossiers, so it can never blank or corrupt the board.
+        min_display = int(os.getenv("SCAN_MIN_DISPLAY_DOSSIERS", "15"))
+        max_fill = int(os.getenv("SCAN_MAX_FILL_PASSES", "3"))
+        fill_pass = 0
+        while (complete < min_display and fill_pass < max_fill
+               and not _deadline_reached("fill-to-floor")):
+            fill_pass += 1
+            before = complete
+            log.info("Fill pass %d/%d: %d/%d complete (floor %d) -- healing "
+                     "incomplete dossiers", fill_pass, max_fill, complete,
+                     shortlist, min_display)
+            for fname, fcmd in (
+                ("debate_synthesizer",
+                 [PY, "pipeline/agents/debate_synthesizer.py", str(top_n),
+                  "--scan-id", str(scan_id)]),
+                ("critic_agent",
+                 [PY, "pipeline/agents/critic_agent.py", str(top_n),
+                  "--scan-id", str(scan_id)]),
+                ("conviction_grader",
+                 [PY, "pipeline/agents/conviction_grader.py", "scan"]),
+            ):
+                if _deadline_reached(f"fill {fill_pass}: {fname}"):
+                    break
+                ok, msg = _run_step(f"Fill {fill_pass}: {fname}", fcmd,
+                                    timeout_sec=min(STEP_TIMEOUT_SEC,
+                                                    max(120, _remaining_sec())))
+                if not ok:
+                    soft_failures += 1
+                    notes.append(f"[non-fatal] {msg}")
+            _run_step("Dossier gate (fill)",
+                      [PY, "-m", "pipeline.scan.dossier_gate", "--scan-id", str(scan_id)])
+            cnt = (db.table("ranked_focus_list").select("ticker", count="exact")
+                     .eq("scan_id", scan_id).eq("dossier_complete", True)
+                     .limit(1).execute())
+            complete = int(getattr(cnt, "count", 0) or 0)
+            log.info("Fill pass %d -> %d/%d complete", fill_pass, complete, shortlist)
+            if complete <= before:
+                log.info("Fill made no progress -- remaining names genuinely "
+                         "incomplete; stopping")
+                break
+
+        if complete < shortlist:
+            notes.append(f"dossier coverage {complete}/{shortlist}"
+                         + (f" after {fill_pass} fill pass(es)" if fill_pass else "")
+                         + f": {shortlist - complete} pick(s) shown as 'dossier completing'")
 
     # Count final graded rows.
     cnt = (
