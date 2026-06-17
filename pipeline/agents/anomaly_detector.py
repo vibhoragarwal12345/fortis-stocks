@@ -390,25 +390,41 @@ def _report(flags: list[dict]) -> None:
 # Entry point
 # ══════════════════════════════════════════════════════════════════════════════
 
-def run(run_type: str = "midday") -> None:
+def run(run_type: str = "midday", scan_id: int | None = None) -> None:
     if run_type not in ("premarket", "midday", "close"):
         log.warning("Unknown run_type '%s' -- defaulting to 'midday'", run_type)
         run_type = "midday"
 
     db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
     now = datetime.now(timezone.utc)
-    log.info("Anomaly Detector -- run_type=%s", run_type)
+    log.info("Anomaly Detector -- run_type=%s scan_id=%s", run_type, scan_id)
+
+    # In-scan mode (scan_id given): scope to that scan's shortlist and SKIP the
+    # market_snapshots price/volume family. That family is fed by the dormant
+    # market_data agent (stale), and is redundant with the dossier's fresh price
+    # technicals + scan_results breakout flags. We keep ONLY the families with
+    # FRESH inputs (options / SEC / insider / social) so nothing stale is ever
+    # emitted. (Universe mode -- no scan_id -- is unchanged.)
+    shortlist: set[str] | None = None
+    if scan_id is not None:
+        shortlist = {r["ticker"] for r in _fetch_all(
+            lambda: db.table("ranked_focus_list").select("ticker")
+                      .eq("scan_id", scan_id))}
+        log.info("scoped to scan %s shortlist: %d tickers", scan_id, len(shortlist))
 
     # ── Load sources ──────────────────────────────────────────────────────────
-    market = _latest_by_ticker(
-        _fetch_all(lambda: db.table("market_snapshots").select("*")
-                   .order("snapshot_time", desc=True)), "snapshot_time")
-    log.info("market_snapshots: %d tickers", len(market))
-    has_technicals = any(m.get("price_levels") for m in market.values())
-    if not has_technicals:
-        log.warning("market_snapshots has no technical columns -- "
-                    "range_expansion / breakout_52w / breakdown_52w / "
-                    "ma_crossover skipped (apply migration 005, re-run market_data)")
+    if scan_id is None:
+        market = _latest_by_ticker(
+            _fetch_all(lambda: db.table("market_snapshots").select("*")
+                       .order("snapshot_time", desc=True)), "snapshot_time")
+        log.info("market_snapshots: %d tickers", len(market))
+        has_technicals = any(m.get("price_levels") for m in market.values())
+        if not has_technicals:
+            log.warning("market_snapshots has no technical columns -- "
+                        "range_expansion / breakout_52w / breakdown_52w / "
+                        "ma_crossover skipped (apply migration 005, re-run market_data)")
+    else:
+        market = {}   # price/volume family intentionally skipped in-scan (see above)
 
     options = _latest_by_ticker(
         _fetch_all(lambda: db.table("options_signals").select("*")
@@ -453,6 +469,8 @@ def run(run_type: str = "midday") -> None:
     # ── Evaluate ──────────────────────────────────────────────────────────────
     tickers = (set(market) | set(options) | set(filings_by_ticker)
                | set(form4_by_ticker) | set(debates_by_ticker))
+    if shortlist is not None:
+        tickers &= shortlist
     log.info("Evaluating %d distinct tickers...", len(tickers))
 
     flags: list[dict] = []
@@ -502,5 +520,12 @@ def run(run_type: str = "midday") -> None:
 
 
 if __name__ == "__main__":
-    arg = sys.argv[1].lower() if len(sys.argv) > 1 else "midday"
-    run(arg)
+    _args = sys.argv[1:]
+    _scan_id = None
+    if "--scan-id" in _args:
+        _i = _args.index("--scan-id")
+        if _i + 1 < len(_args):
+            _scan_id = int(_args[_i + 1])
+            _args = _args[:_i] + _args[_i + 2:]
+    _rt = _args[0].lower() if _args else "midday"
+    run(_rt, scan_id=_scan_id)

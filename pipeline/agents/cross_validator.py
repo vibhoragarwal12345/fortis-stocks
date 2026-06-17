@@ -32,8 +32,13 @@ Usage:
 import logging
 import sys
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+# Credibility floor: cross-validation must only ever confirm on FRESH signals.
+# A source row older than this is treated as ABSENT (honest no-signal), never as
+# a stale confirmation. anomaly_flags is already filtered to its latest snapshot.
+_RECENCY_DAYS = 2
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from config import SUPABASE_SERVICE_KEY, SUPABASE_URL  # noqa: E402
@@ -112,9 +117,11 @@ def _load_anomalies(db) -> dict[str, list[dict]]:
 
 
 def _load_sentiment(db) -> dict[str, dict]:
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=_RECENCY_DAYS)).date().isoformat()
     rows = _fetch_all(lambda: db.table("ticker_sentiment_rollup")
                       .select("ticker,weighted_sentiment,sentiment_volume,"
-                              "snapshot_date").order("snapshot_date", desc=True))
+                              "snapshot_date").gte("snapshot_date", cutoff)
+                      .order("snapshot_date", desc=True))
     out: dict[str, dict] = {}
     for r in rows:                                  # newest first -> first wins
         out.setdefault(r["ticker"], r)
@@ -122,9 +129,11 @@ def _load_sentiment(db) -> dict[str, dict]:
 
 
 def _load_options(db) -> dict[str, dict]:
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=_RECENCY_DAYS)).isoformat()
     rows = _fetch_all(lambda: db.table("options_signals")
                       .select("ticker,pattern_detected,conviction_score,"
                               "put_call_ratio,snapshot_time")
+                      .gte("snapshot_time", cutoff)
                       .order("snapshot_time", desc=True))
     out: dict[str, dict] = {}
     for r in rows:
@@ -133,10 +142,12 @@ def _load_options(db) -> dict[str, dict]:
 
 
 def _load_debates(db) -> dict[str, dict]:
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=_RECENCY_DAYS)).date().isoformat()
     try:
         rows = _fetch_all(lambda: db.table("ticker_debates")
                           .select("ticker,attention_score,sentiment_balance,"
                                   "retail_pro_divergence,snapshot_date")
+                          .gte("snapshot_date", cutoff)
                           .order("snapshot_date", desc=True))
     except Exception as exc:
         log.warning("ticker_debates load failed: %s", exc)
@@ -316,13 +327,22 @@ def _report(rows: list[dict]) -> None:
 # Entry point
 # ══════════════════════════════════════════════════════════════════════════════
 
-def run(run_type: str = "midday") -> None:
+def run(run_type: str = "midday", scan_id: int | None = None) -> None:
     if run_type not in ("premarket", "midday", "close"):
         log.warning("Unknown run_type '%s' -- defaulting to 'midday'", run_type)
         run_type = "midday"
 
     db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-    log.info("Cross Validator -- run_type=%s", run_type)
+    log.info("Cross Validator -- run_type=%s scan_id=%s", run_type, scan_id)
+
+    # In-scan mode: scope validation to this scan's shortlist, so only displayed
+    # names are validated on the FRESH signals harvested + raised this cycle.
+    shortlist: set[str] | None = None
+    if scan_id is not None:
+        shortlist = {r["ticker"] for r in _fetch_all(
+            lambda: db.table("ranked_focus_list").select("ticker")
+                      .eq("scan_id", scan_id))}
+        log.info("scoped to scan %s shortlist: %d tickers", scan_id, len(shortlist))
 
     anomalies = _load_anomalies(db)
     sentiment = _load_sentiment(db)
@@ -332,6 +352,8 @@ def run(run_type: str = "midday") -> None:
              len(anomalies), len(sentiment), len(options), len(debates))
 
     tickers = set(anomalies) | set(sentiment) | set(options) | set(debates)
+    if shortlist is not None:
+        tickers &= shortlist
     log.info("Evaluating %d tickers with at least one signal", len(tickers))
 
     snapshot = datetime.now(timezone.utc).isoformat()
@@ -385,5 +407,12 @@ def run(run_type: str = "midday") -> None:
 
 
 if __name__ == "__main__":
-    arg = sys.argv[1].lower() if len(sys.argv) > 1 else "midday"
-    run(arg)
+    _args = sys.argv[1:]
+    _scan_id = None
+    if "--scan-id" in _args:
+        _i = _args.index("--scan-id")
+        if _i + 1 < len(_args):
+            _scan_id = int(_args[_i + 1])
+            _args = _args[:_i] + _args[_i + 2:]
+    _rt = _args[0].lower() if _args else "midday"
+    run(_rt, scan_id=_scan_id)

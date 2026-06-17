@@ -275,6 +275,15 @@ def run(
         # selection mixes scans). smart_money_intel is keyed per ticker,
         # not per scan, and keeps its positional (run_type, limit) form.
         for name, cmd in [
+            # Signals first: scoped to THIS scan's shortlist, reading the
+            # fresh harvested tables (news/SEC/options/crowd/sentiment) + this
+            # scan's scan_results. They write anomaly_flags + validated_signals
+            # that catalyst_agent + debate_synthesizer then consume. In-scan
+            # (--scan-id) keeps them all-fresh -- never stale rows on a dossier.
+            ("anomaly_detector",
+             [PY, "pipeline/agents/anomaly_detector.py", "--scan-id", str(scan_id)]),
+            ("cross_validator",
+             [PY, "pipeline/agents/cross_validator.py", "--scan-id", str(scan_id)]),
             ("catalyst_agent",
              [PY, "pipeline/agents/catalyst_agent.py",
               "--scan-id", str(scan_id)]),
