@@ -1,0 +1,54 @@
+name: Data harvest · pre-scan enrichment (Tier A)
+
+# Refreshes the enrichment tables the stock dossier reads (news_items,
+# sec_filings, options_signals) BEFORE the pre-market scan, so debate_synthesizer
+# and catalyst_agent see fresh data instead of stale rows. Restored June 2026
+# after an audit found these producers had not run since ~May 18 (the run_scan
+# funnel never invoked them).
+#
+# Runs as a SEPARATE workflow on purpose: the live run_scan critical path is not
+# touched, so a harvest failure degrades freshness but never breaks the scan.
+# Each step is continue-on-error for the same reason -- one flaky source must not
+# block the others.
+#
+# Trigger: Supabase pg_cron fires repository_dispatch 'run-data-harvest' at 10:30
+# UTC Mon-Fri (migration 056) -- ~90 min before the 12:00 UTC pre-market scan,
+# enough lead for the options scan (the slow step). workflow_dispatch is manual.
+
+on:
+  repository_dispatch:
+    types: [run-data-harvest]
+  workflow_dispatch:
+
+concurrency:
+  group: data-harvest
+  cancel-in-progress: false
+
+env:
+  NEXT_PUBLIC_SUPABASE_URL:  ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  FINNHUB_API_KEY:           ${{ secrets.FINNHUB_API_KEY }}
+
+jobs:
+  harvest:
+    name: "Harvest news + SEC + options"
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-pipeline
+
+      # News: Yahoo/Google RSS + Finnhub, last 24h, whole universe -> news_items
+      - name: News harvester
+        continue-on-error: true
+        run: python pipeline/agents/news_harvester.py
+
+      # SEC EDGAR 8-K / Form 4 / 13F recent-filings feed -> sec_filings
+      - name: SEC watcher
+        continue-on-error: true
+        run: python pipeline/agents/sec_watcher.py
+
+      # yfinance option chains for the top liquid names -> options_signals
+      - name: Options flow
+        continue-on-error: true
+        run: python pipeline/agents/options_flow.py 500
