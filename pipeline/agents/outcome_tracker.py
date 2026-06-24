@@ -43,6 +43,7 @@ Usage:
     python pipeline/agents/outcome_tracker.py update
     python pipeline/agents/outcome_tracker.py rollup
     python pipeline/agents/outcome_tracker.py backfill        # record all past runs
+    python pipeline/agents/outcome_tracker.py record-recent [days]  # record last N days (default 14)
     python pipeline/agents/outcome_tracker.py all             # update + rollup
 """
 
@@ -620,6 +621,32 @@ def backfill_all(db) -> int:
     return total
 
 
+def record_recent(db, days: int = 14) -> int:
+    """Idempotently record every A/B/C pick from runs in the last `days` days.
+
+    The lean scan (run_scan.py) does NOT record its own picks -- the recording
+    step that used to live in run_full_pipeline.py was orphaned by the lean
+    rewrite, which silently froze the track record. The nightly outcome job
+    calls this so no graded run is ever missed again. Bounded to a recent window
+    so it stays cheap and never re-opens an already-completed (>60d) row
+    (record sets still_active=True; within `days` nothing has reached 60d)."""
+    cutoff = (datetime.now(timezone.utc).date() - timedelta(days=days)).isoformat()
+    runs = _fetch_all(lambda: db.table("ranked_focus_list")
+                      .select("run_date,run_type")
+                      .gte("run_date", cutoff)
+                      .in_("conviction_grade", ["A", "B", "C"]))
+    if not runs:
+        log.info("record_recent: no graded picks in the last %d days", days)
+        return 0
+    unique = sorted({(_to_date(r["run_date"]), r["run_type"]) for r in runs})
+    log.info("record_recent: %d (run_date, run_type) combos in last %d days",
+             len(unique), days)
+    total = 0
+    for rd, rt in unique:
+        total += record_picks_from_run(db, rd, rt)
+    return total
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Summary report (printed to stdout)
 # ══════════════════════════════════════════════════════════════════════════════
@@ -680,13 +707,16 @@ def main():
         print_summary(db)
     elif cmd == "backfill":
         backfill_all(db)
+    elif cmd == "record-recent":
+        days = int(sys.argv[2]) if len(sys.argv) > 2 and sys.argv[2].isdigit() else 14
+        record_recent(db, days)
     elif cmd == "all":
         update_outcomes(db)
         compute_rollups(db)
         print_summary(db)
     else:
-        log.error("unknown command '%s' -- use: record | update | rollup | "
-                  "backfill | all", cmd)
+        log.error("unknown command '%s' -- use: record | record-recent | update | "
+                  "rollup | backfill | all", cmd)
         sys.exit(2)
 
 

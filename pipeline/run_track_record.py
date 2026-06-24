@@ -2,15 +2,18 @@
 Track-Record Scheduler
 Thin wrapper that runs the outcome / backtest cadences described in Step 6.6:
 
-  daily    -- outcome_tracker.update_outcomes  (forward-prices for active picks)
+  daily    -- outcome_tracker.record_recent  (capture entry prices for new picks)
+              + outcome_tracker.update_outcomes  (forward-prices for active picks)
   weekly   -- outcome_tracker.compute_rollups  (Sunday night)
   monthly  -- backtest_engine.generate_performance_report  (1st of month)
 
-The Step 6.6 spec also says "after each scheduled run completes,
-outcome_tracker.record_picks_from_run runs immediately". That happens inside
-run_full_pipeline.py via the appended `backfill` step (which is idempotent --
-it upserts on (ticker, recommended_date, recommended_run_type) and so safely
-covers picks from prior runs that may not yet have entry_price set).
+RECORDING (why record_recent is first): the lean scan (run_scan.py) does NOT
+record its own picks. The original recording step lived in run_full_pipeline.py,
+which the lean rewrite replaced -- silently freezing the track record (picks
+stopped being captured into pick_outcomes). The daily cadence now records the
+last 14 days of graded runs first (idempotent upsert on
+(ticker, recommended_date, recommended_run_type)) so no run is ever missed,
+then fills forward returns for everything active.
 
 Usage:
     python pipeline/run_track_record.py daily
@@ -45,7 +48,9 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 STEPS = {
-    "daily":   [("outcome_tracker.update_outcomes",
+    "daily":   [("outcome_tracker.record_recent",
+                  "pipeline/agents/outcome_tracker.py", ["record-recent", "14"]),
+                ("outcome_tracker.update_outcomes",
                   "pipeline/agents/outcome_tracker.py", ["update"])],
     "weekly":  [("outcome_tracker.compute_rollups",
                   "pipeline/agents/outcome_tracker.py", ["rollup"])],
