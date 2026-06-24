@@ -4,7 +4,7 @@
 // platform that stores user accounts (via Supabase Auth) and displays
 // delayed third-party market data. Not legal advice; have counsel review.
 
-export const metadata = { title: "Privacy Policy — Christopher Edwards Financial Associates" }
+export const metadata = { title: "Privacy Policy · Christopher Edwards Financial Associates" }
 
 const EFFECTIVE_DATE = "June 11, 2026"
 
@@ -63,7 +63,7 @@ export default function PrivacyPage() {
       <h2>Service providers</h2>
       <p>
         We share data with vendors who process it solely to deliver the
-        Service — including our hosting and authentication provider, our
+        Service, including our hosting and authentication provider, our
         transactional email provider, and our market-data providers. They are
         bound to use the data only as instructed. We do not sell personal
         information.

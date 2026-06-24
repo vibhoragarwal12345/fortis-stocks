@@ -9,7 +9,7 @@ import { Reveal } from "@/components/ui/reveal"
 import { WordReveal } from "@/components/ui/word-reveal"
 import { ShortlistTable, type ShortlistRow } from "@/components/shortlist-table"
 
-export const metadata = { title: "Today — Christopher Edwards Financial Associates" }
+export const metadata = { title: "Today · Christopher Edwards Financial Associates" }
 export const dynamic = "force-dynamic"
 
 type ScanRow = {
@@ -138,7 +138,7 @@ export default async function DashboardHomePage() {
           <Card>
             <CardContent className="py-16 text-center text-small text-muted-foreground">
               No completed scan yet. The first run lands on the next cron
-              tick (3× per trading day — pre-market, midday, post-close).
+              tick (3× per trading day: pre-market, midday, post-close).
             </CardContent>
           </Card>
         </Reveal>
@@ -207,12 +207,12 @@ function ScanWire({ rows }: { rows: ShortlistRow[] }) {
   const moverPct = topMover.dayChangePct!
   const lead =
     Math.abs(moverPct) >= 1
-      ? `${topMover.ticker} leads the tape — ${moverPct >= 0 ? "up" : "down"} ${Math.abs(moverPct).toFixed(1)}% ${
+      ? `${topMover.ticker} leads the tape, ${moverPct >= 0 ? "up" : "down"} ${Math.abs(moverPct).toFixed(1)}% ${
           topMover.relVol != null && topMover.relVol >= 1.5
             ? `on ${topMover.relVol.toFixed(1)}× volume`
             : "this session"
         }.`
-      : `A quiet tape — ${topMover.ticker} is the biggest mover at ${moverPct >= 0 ? "+" : ""}${moverPct.toFixed(2)}%.`
+      : `A quiet tape. ${topMover.ticker} is the biggest mover at ${moverPct >= 0 ? "+" : ""}${moverPct.toFixed(2)}%.`
 
   const cards = [
     topMover && {

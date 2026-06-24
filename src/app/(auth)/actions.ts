@@ -50,7 +50,7 @@ export async function signup(formData: { email: string; password: string }) {
 
   if (createErr) {
     const msg = /already|registered|exists/i.test(createErr.message)
-      ? "An account with this email already exists — sign in instead."
+      ? "An account with this email already exists. Sign in instead."
       : createErr.message
     return { error: msg }
   }

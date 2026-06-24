@@ -6,7 +6,7 @@ import { isOwner } from "@/lib/permissions"
 import { Card, CardContent } from "@/components/ui/card"
 import { Reveal } from "@/components/ui/reveal"
 
-export const metadata = { title: "Scan history — Christopher Edwards Financial Associates" }
+export const metadata = { title: "Scan history · Christopher Edwards Financial Associates" }
 export const dynamic = "force-dynamic"
 
 type Scan = {

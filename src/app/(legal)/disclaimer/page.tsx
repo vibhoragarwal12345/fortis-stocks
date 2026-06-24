@@ -4,7 +4,7 @@
 // fiduciary language ("For licensed advisor review — not investment advice")
 // into a fuller statement. Not legal advice; have counsel review.
 
-export const metadata = { title: "Disclaimer — Christopher Edwards Financial Associates" }
+export const metadata = { title: "Disclaimer · Christopher Edwards Financial Associates" }
 
 const EFFECTIVE_DATE = "June 11, 2026"
 
@@ -18,7 +18,7 @@ export default function DisclaimerPage() {
       </p>
 
       <p className="mt-8">
-        <strong>For licensed advisor review — not investment advice.</strong>{" "}
+        <strong>For licensed advisor review, not investment advice.</strong>{" "}
         Christopher Edwards Financial Associates (the &ldquo;Service&rdquo;) is a research and
         analytics tool provided by Christopher Edwards Financial Associates for informational and
         educational purposes only.

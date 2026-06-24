@@ -112,7 +112,7 @@ export const CURVE_LABEL: Record<string, string> = {
 
 export const RESEARCH_BANNER =
   "Research intelligence, not investment advice. Commodities carry higher " +
-  "risk than equities — leverage, volatility, geopolitical shocks. Data is " +
+  "risk than equities: leverage, volatility, geopolitical shocks. Data is " +
   "delayed and partially incomplete; gaps are labeled, never filled. Reference " +
   "levels are statistical, not forecasts. A qualified human must review any " +
   "decision made downstream of this research."

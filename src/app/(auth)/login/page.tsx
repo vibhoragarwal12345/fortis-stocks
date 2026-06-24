@@ -2,7 +2,7 @@ import Link from "next/link"
 
 import { LoginForm } from "@/components/login-form"
 
-export const metadata = { title: "Sign in — Christopher Edwards Financial Associates" }
+export const metadata = { title: "Sign in · Christopher Edwards Financial Associates" }
 
 interface LoginPageProps {
   searchParams: Promise<{ error?: string }>

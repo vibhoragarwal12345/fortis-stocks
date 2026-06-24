@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { Reveal } from "@/components/ui/reveal"
 import { ChangePasswordForm } from "@/components/change-password-form"
 
-export const metadata = { title: "Account — Christopher Edwards Financial Associates" }
+export const metadata = { title: "Account · Christopher Edwards Financial Associates" }
 export const dynamic = "force-dynamic"
 
 export default async function AccountPage() {

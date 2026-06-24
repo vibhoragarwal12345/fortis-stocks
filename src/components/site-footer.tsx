@@ -20,7 +20,7 @@ export function SiteFooter({
       <div className="mx-auto flex max-w-[1280px] flex-col gap-3 px-6 py-6 md:flex-row md:items-center md:justify-between md:px-10">
         <p className="text-caption">
           &copy; {new Date().getFullYear()} {brandName} · For licensed advisor
-          review — not investment advice.
+          review, not investment advice.
         </p>
         <nav
           aria-label="Legal"

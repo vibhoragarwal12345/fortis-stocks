@@ -20,7 +20,7 @@ export default function GlobalError({
         <h1 className="text-xl font-semibold tracking-tight">Something went wrong</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           A page-level error escaped without a more specific handler. The
-          rest of the product is fine — try again or head back to the
+          rest of the product is fine. Try again or head back to the
           dashboard.
         </p>
         {error.digest && (

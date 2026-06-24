@@ -29,7 +29,7 @@ import {
 export const metadata = {
   title: "Christopher Edwards Financial Associates",
   description:
-    "Institutional research for wealth advisors. The full liquid US market scanned through every trading day, deep analysis on the names that earn it, conviction grades on what survives — every claim traced to its source.",
+    "Institutional research for wealth advisors. The full liquid US market scanned through every trading day, deep analysis on the names that earn it, conviction grades on what survives. Every claim traced to its source.",
 }
 
 // Gateway. Not a marketing page: a full-fold aurora hero (nav + headline +
@@ -117,7 +117,7 @@ export default async function Home() {
                   <p className="text-body-lg max-w-[620px] text-muted-foreground">
                     Christopher Edwards Financial Associates sweeps every liquid US ticker through the trading
                     day, spends deep analysis only where it&rsquo;s earned,
-                    and grades what survives — every claim traced to its
+                    and grades what survives. Every claim traced to its
                     source.
                   </p>
                 </Reveal>
@@ -195,7 +195,7 @@ export default async function Home() {
           <h2 className="mt-3 text-h1">One live dashboard.</h2>
           <p className="mt-3 text-body text-muted-foreground">
             The latest scan, graded and ranked, the moment you sign in. Click
-            any name for the full dossier — catalyst, insider posture, the
+            any name for the full dossier: catalyst, insider posture, the
             debate, and the critic&rsquo;s verdict.
           </p>
         </Reveal>
@@ -236,7 +236,7 @@ export default async function Home() {
                     <TableCell>
                       {r.masked ? (
                         <span
-                          aria-label="Hidden — sign in to reveal"
+                          aria-label="Hidden, sign in to reveal"
                           className="text-data font-medium blur-[5px] select-none"
                         >
                           ▮▮▮▮
@@ -331,7 +331,7 @@ export default async function Home() {
           </h2>
           <p className="text-body-lg text-muted-foreground">
             Christopher Edwards Financial Associates doesn&rsquo;t generate opinions. It ranks, grades, and
-            explains — and every numeric claim in every brief carries a
+            explains. Every numeric claim in every brief carries a
             verified pointer to the data behind it. When the system is
             uncertain, it says so. When the track record is thin, it shows
             you. That&rsquo;s the integrity.
@@ -360,7 +360,7 @@ const FEATURES = [
     index: "01",
     eyebrow: "Full-market sweep",
     title: "Pure math on everything.",
-    body: "Every liquid US common stock with $1M+ in average daily dollar volume — price action, RSI, relative volume, 52-week change, breakout flags. Minutes, not hours.",
+    body: "Every liquid US common stock with $1M+ in average daily dollar volume: price action, RSI, relative volume, 52-week change, breakout flags. Minutes, not hours.",
   },
   {
     index: "02",
@@ -372,7 +372,7 @@ const FEATURES = [
     index: "03",
     eyebrow: "Deep analysis",
     title: "Graded conviction.",
-    body: "Catalyst, insider posture, two-sided debate, critic verdict — synthesized into an A / B / C grade, every claim factcheck-verified against its source.",
+    body: "Catalyst, insider posture, two-sided debate, critic verdict, synthesized into an A / B / C grade. Every claim factcheck-verified against its source.",
   },
 ] as const
 
@@ -380,12 +380,12 @@ const COVERAGE = [
   {
     eyebrow: "Emerging watchlist",
     title: "Long-horizon asymmetric bets.",
-    body: "A separate monthly engine hunts early-stage, under-discovered names with multibagger DNA — and treats “what kills it” as seriously as the 10x path. Speculative by design, labeled as such.",
+    body: "A separate weekly engine hunts early-stage, under-discovered names with multibagger DNA, and treats “what kills it” as seriously as the 10x path. Speculative by design, and clearly labeled.",
   },
   {
     eyebrow: "Scan history",
     title: "Every run on the record.",
-    body: "Each scan is archived in full — what it surfaced, what it scored, and when. Browse any past run; nothing is quietly rewritten after the fact.",
+    body: "Each scan is archived in full: what it surfaced, what it scored, and when. Browse any past run. Nothing is quietly rewritten after the fact.",
   },
 ] as const
 

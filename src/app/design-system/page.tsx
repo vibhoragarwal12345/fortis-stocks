@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge"
 const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-fraunces", display: "swap" })
 const dmSerif = DM_Serif_Display({ subsets: ["latin"], weight: "400", variable: "--font-dmserif", display: "swap" })
 
-export const metadata = { title: "Full preview — Christopher Edwards Financial Associates" }
+export const metadata = { title: "Full preview · Christopher Edwards Financial Associates" }
 
 const DISPLAY: CSSProperties = { fontFamily: "var(--font-fraunces)" }
 const SERIF: CSSProperties = { fontFamily: "var(--font-dmserif)" }
@@ -31,7 +31,7 @@ const PICKS: Pick[] = [
   { t: "NVDA", co: "NVIDIA", grade: "A", price: "1,182.50", chg: 2.41, thesis: "Datacenter demand still outrunning supply; pricing power intact into the next cycle." },
   { t: "MSFT", co: "Microsoft", grade: "A", price: "498.13", chg: 0.62, thesis: "Copilot attach accelerating; Azure reaccelerating off a higher base." },
   { t: "XOM", co: "Exxon Mobil", grade: "B", price: "121.04", chg: -1.18, thesis: "Buybacks underpin the floor; refining margins normalizing off 2025 highs." },
-  { t: "CVS", co: "CVS Health", grade: "C", price: "58.27", chg: -3.42, thesis: "Reimbursement pressure persists; turnaround unproven — on the watch tier." },
+  { t: "CVS", co: "CVS Health", grade: "C", price: "58.27", chg: -3.42, thesis: "Reimbursement pressure persists; turnaround unproven, on the watch tier." },
 ]
 
 function Grade({ g }: { g: "A" | "B" | "C" }) {
@@ -82,11 +82,11 @@ export default async function FullPreview() {
         <section className="space-y-6 pt-10">
           <p className="text-eyebrow text-highlight/90">Institutional research, for advisors</p>
           <h1 className="max-w-[15ch] text-[56px] leading-[1.02] tracking-[-0.025em] text-foreground md:text-[78px]" style={DISPLAY}>
-            Three thousand stocks. Thirty convictions.
+            Three thousand stocks. Fifteen convictions.
           </h1>
           <p className="max-w-[560px] text-[20px] leading-relaxed text-muted-foreground" style={SERIF}>
-            The full liquid US market, scanned three times every trading day —
-            every claim traced to its source, every number you can trust.
+            The full liquid US market, scanned three times every trading day.
+            Every claim traced to its source, every number you can trust.
           </p>
           <div className="flex flex-wrap items-center gap-3 pt-1">
             <button className="rounded-lg bg-highlight px-5 py-2.5 text-[14px] font-semibold text-[var(--highlight-foreground)] transition-premium hover:opacity-90">

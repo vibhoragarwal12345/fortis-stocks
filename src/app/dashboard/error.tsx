@@ -19,7 +19,7 @@ export default function DashboardError({
           This page failed to load
         </h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          A data query came back with an error. Try refreshing — the rest of
+          A data query came back with an error. Try refreshing. The rest of
           your dashboard is still working.
         </p>
         {error.digest && (

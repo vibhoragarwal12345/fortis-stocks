@@ -2,7 +2,7 @@ import Link from "next/link"
 
 import { SignupForm } from "@/components/signup-form"
 
-export const metadata = { title: "Create account — Christopher Edwards Financial Associates" }
+export const metadata = { title: "Create account · Christopher Edwards Financial Associates" }
 
 // Open signup — anyone can create an account and is signed in instantly
 // (accounts are created pre-confirmed; no confirmation email).

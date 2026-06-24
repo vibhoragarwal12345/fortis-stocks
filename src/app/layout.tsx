@@ -39,14 +39,14 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
     default: "Christopher Edwards Financial Associates",
-    template: "%s — Christopher Edwards Financial Associates",
+    template: "%s · Christopher Edwards Financial Associates",
   },
   description:
-    "Institutional research for wealth advisors. The full liquid US market scanned through every trading day — every claim traced to its source.",
+    "Institutional research for wealth advisors. The full liquid US market scanned through every trading day. Every claim traced to its source.",
   openGraph: {
     title: "Christopher Edwards Financial Associates",
     description:
-      "Three thousand stocks. Thirty convictions. Institutional research for wealth advisors — every claim traced to its source.",
+      "Three thousand stocks. Fifteen convictions. Institutional research for wealth advisors. Every claim traced to its source.",
     url: SITE_URL,
     siteName: "Christopher Edwards Financial Associates",
     type: "website",
@@ -55,7 +55,7 @@ export const metadata: Metadata = {
     card: "summary",
     title: "Christopher Edwards Financial Associates",
     description:
-      "Three thousand stocks. Thirty convictions. Institutional research for wealth advisors.",
+      "Three thousand stocks. Fifteen convictions. Institutional research for wealth advisors.",
   },
 }
 

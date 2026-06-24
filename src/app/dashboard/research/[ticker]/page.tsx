@@ -7,7 +7,7 @@ import { Reveal } from "@/components/ui/reveal"
 
 const GRADE_VARIANT = { A: "gradeA", B: "gradeB", C: "gradeC", D: "neutral" } as const
 
-export const metadata = { title: "Research — Christopher Edwards Financial Associates" }
+export const metadata = { title: "Research · Christopher Edwards Financial Associates" }
 export const dynamic = "force-dynamic"
 
 type PriceRef = {
@@ -272,7 +272,7 @@ export default async function ResearchPage({
               {ticker} isn&rsquo;t on the current focus list with a complete,
               fact-checked dossier, so only its live market metrics are shown.
               A name appears with a full thesis, bull / bear cases and a price
-              reference range once a scan produces — and fact-checks — the
+              reference range once a scan produces, and fact-checks, the
               complete dossier.
             </p>
           </div>
@@ -346,7 +346,7 @@ export default async function ResearchPage({
             />
           </dl>
           <p className="text-caption">
-            Statistical reference range —{" "}
+            Statistical reference range:{" "}
             <span className="text-foreground">not a forecast</span>. A zero-drift
             Monte Carlo simulation over{" "}
             {pick.price_reference.horizon_days ?? "—"} trading days, calibrated

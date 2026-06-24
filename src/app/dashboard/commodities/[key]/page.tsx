@@ -46,7 +46,7 @@ function NarrativeBlock({ read }: { read: NarrativeRead }) {
   }
   return (
     <p className="text-small text-muted-foreground">
-      No narrative published for this horizon —{" "}
+      No narrative published for this horizon:{" "}
       {read?.note ??
         "the generated text did not pass verification and was withheld rather than shown."}
     </p>
@@ -73,7 +73,7 @@ function BandRow({ band, horizon }: { band?: ReferenceBand; horizon: string }) {
         ))}
       </div>
       <p className="text-caption text-muted-foreground">
-        Zero-drift volatility cone — statistical reference levels, not
+        Zero-drift volatility cone: statistical reference levels, not
         forecasts or targets.
       </p>
     </div>
@@ -169,7 +169,7 @@ export default async function CommodityDetailPage({
                 Days-to-weeks horizon, written for traders
               </CardTitle>
               <p className="text-caption text-warning/90">
-                Not an investment thesis — acting on this read with long-horizon
+                Not an investment thesis. Acting on this read with long-horizon
                 capital is the overtrading failure this split exists to prevent.
               </p>
             </CardHeader>
@@ -245,7 +245,7 @@ export default async function CommodityDetailPage({
                 Multi-quarter horizon, written for investors
               </CardTitle>
               <p className="text-caption text-warning/90">
-                Carries no entry/exit timing information — do not trade off this
+                Carries no entry/exit timing information. Do not trade off this
                 read.
               </p>
               {e.structural.as_of && (

@@ -9,7 +9,7 @@ import { PageTransition } from "@/components/ui/page-transition"
 import { SiteFooter } from "@/components/site-footer"
 import { signout } from "@/app/dashboard/actions"
 
-export const metadata = { title: "Admin — Christopher Edwards Financial Associates" }
+export const metadata = { title: "Admin · Christopher Edwards Financial Associates" }
 
 export default async function AdminLayout({
   children,

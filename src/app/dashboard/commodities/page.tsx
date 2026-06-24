@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Reveal } from "@/components/ui/reveal"
 
-export const metadata = { title: "Commodities — Christopher Edwards Financial Associates" }
+export const metadata = { title: "Commodities · Christopher Edwards Financial Associates" }
 export const dynamic = "force-dynamic"
 
 function positioningLine(e: CommodityEntry): string | null {
@@ -68,8 +68,8 @@ export default async function CommoditiesPage() {
           <h1 className="text-h1">{entries.length} commodities, dual-horizon reads.</h1>
           <p className="text-body-lg max-w-[680px] text-muted-foreground">
             Supply/demand balance, futures-curve structure, trader positioning,
-            and a tactical-versus-structural narrative for every commodity —
-            every figure traced to a live fetch or labeled as a gap.
+            and a tactical-versus-structural narrative for every commodity.
+            Every figure traced to a live fetch or labeled as a gap.
           </p>
         </div>
         <div className="max-w-[820px] rounded-lg border border-warning/25 bg-warning/5 px-4 py-3">

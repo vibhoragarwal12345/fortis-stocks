@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent } from "@/components/ui/card"
 import { Reveal } from "@/components/ui/reveal"
 
-export const metadata = { title: "Report — Christopher Edwards Financial Associates" }
+export const metadata = { title: "Report · Christopher Edwards Financial Associates" }
 export const dynamic = "force-dynamic"
 
 type Report = {
@@ -60,7 +60,7 @@ export default async function ReportPage({
         </header>
         <Card>
           <CardContent className="py-16 text-center text-small text-muted-foreground">
-            The pipeline may not have run that day — daily briefs run
+            The pipeline may not have run that day. Daily briefs run
             weekdays only.
           </CardContent>
         </Card>
@@ -103,7 +103,7 @@ export default async function ReportPage({
             links from older notifications still resolve. */}
         <div className="rounded-md border border-border bg-secondary/40 px-4 py-3 text-small text-muted-foreground">
           <span className="text-foreground">Historical report.</span>{" "}
-          Christopher Edwards Financial Associates no longer composes daily briefs — the platform refreshes
+          Christopher Edwards Financial Associates no longer composes daily briefs. The platform refreshes
           the dashboard every 2 hours instead.{" "}
           <Link
             href="/dashboard"
@@ -128,7 +128,7 @@ export default async function ReportPage({
           <Card>
             <CardContent className="py-16 text-center text-small text-muted-foreground">
               Report exists but content is empty. The composer likely failed
-              to render — check pipeline logs for{" "}
+              to render. Check pipeline logs for{" "}
               <code className="font-mono">report_composer.py</code> on this
               date.
             </CardContent>

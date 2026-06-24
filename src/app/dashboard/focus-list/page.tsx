@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Reveal } from "@/components/ui/reveal"
 
-export const metadata = { title: "Focus list — Christopher Edwards Financial Associates" }
+export const metadata = { title: "Focus list · Christopher Edwards Financial Associates" }
 export const dynamic = "force-dynamic"
 
 type Row = {
@@ -33,11 +33,11 @@ type Metrics = {
 }
 
 const GRADE_LABEL: Record<string, string> = {
-  A: "Grade A — high conviction",
-  B: "Grade B — promising",
-  C: "Grade C — watch list",
-  D: "Grade D — passed on",
-  U: "Ungraded — Layer 4 pending",
+  A: "Grade A, high conviction",
+  B: "Grade B, promising",
+  C: "Grade C, watch list",
+  D: "Grade D, passed on",
+  U: "Ungraded, Layer 4 pending",
 }
 
 const GRADE_VARIANT = {
@@ -106,7 +106,7 @@ function cardBody(r: Row, m: Metrics | undefined): { label: string | null; text:
   if (m?.is_breakout) bits.push("breakout flag")
   return {
     label: null,
-    text: `Advanced on composite strength${bits.length ? ` — ${bits.join(", ")}` : ""}. Open the dossier for the full picture.`,
+    text: `Advanced on composite strength${bits.length ? `: ${bits.join(", ")}` : ""}. Open the dossier for the full picture.`,
   }
 }
 
@@ -136,7 +136,7 @@ export default async function FocusListPage() {
         <Card className="mt-12">
           <CardContent className="py-16 text-center text-small text-muted-foreground">
             Picks appear here after the next scan completes (3× per trading
-            day — pre-market, midday, post-close).
+            day: pre-market, midday, post-close).
           </CardContent>
         </Card>
       </div>
@@ -200,7 +200,7 @@ export default async function FocusListPage() {
             {picks.length} names with a complete dossier.
           </h1>
           <p className="text-body-lg max-w-[680px] text-muted-foreground">
-            Every name here carries a full, fact-checked dossier — thesis,
+            Every name here carries a full, fact-checked dossier: thesis,
             bull / bear cases, catalyst, insider posture, and a Monte Carlo
             price reference range. Grouped by conviction grade.
           </p>
@@ -236,7 +236,7 @@ export default async function FocusListPage() {
             <CardContent className="py-16 text-center text-small text-muted-foreground">
               The latest scan is still assembling fact-checked dossiers. Names
               appear here the moment one clears the thesis / bull / bear /
-              price-band / critic checks — check back shortly.
+              price-band / critic checks. Check back shortly.
             </CardContent>
           </Card>
         </Reveal>

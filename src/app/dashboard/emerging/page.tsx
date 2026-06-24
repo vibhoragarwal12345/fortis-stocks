@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent } from "@/components/ui/card"
 import { Reveal } from "@/components/ui/reveal"
 
-export const metadata = { title: "Emerging Watchlist — Christopher Edwards Financial Associates" }
+export const metadata = { title: "Emerging Watchlist · Christopher Edwards Financial Associates" }
 export const dynamic = "force-dynamic"
 
 type WatchRow = {
@@ -182,7 +182,7 @@ export default async function EmergingPage() {
             Emerging candidates are speculative, long-horizon, high-risk
             positions. Most will not become multibaggers. Position sizing should
             reflect the asymmetric risk: small bets, long horizons, expect many
-            failures and a few large winners. For licensed advisor review — not
+            failures and a few large winners. For licensed advisor review, not
             investment advice.
           </p>
         </div>
@@ -193,7 +193,7 @@ export default async function EmergingPage() {
           <Card>
             <CardContent className="py-16 text-center text-small text-muted-foreground">
               No candidates with a complete dossier yet. The weekly discovery
-              run will populate this — names appear only once they carry a
+              run will populate this. Names appear only once they carry a
               fact-checked thesis.
             </CardContent>
           </Card>
@@ -323,12 +323,12 @@ function EmergingCard({
           <Block label="Moat" tone="foreground">
             {hasText(thesis?.moat_assessment)
               ? thesis!.moat_assessment
-              : "Limited data — moat not verifiable from connected sources for this under-covered name."}
+              : "Limited data: moat not verifiable from connected sources for this under-covered name."}
           </Block>
           <Block label="Founder & alignment" tone="foreground">
             {hasText(thesis?.founder_assessment)
               ? thesis!.founder_assessment
-              : "Limited data — founder/ownership detail not available from connected sources."}
+              : "Limited data: founder/ownership detail not available from connected sources."}
           </Block>
           {hasText(thesis?.what_has_to_go_right) && (
             <Block label="What has to go right">{thesis!.what_has_to_go_right}</Block>
@@ -336,7 +336,7 @@ function EmergingCard({
           <Block label="What kills it" tone="destructive">
             {hasText(thesis?.what_kills_it)
               ? thesis!.what_kills_it
-              : "Limited data — specific failure modes not yet documented for this name."}
+              : "Limited data: specific failure modes not yet documented for this name."}
           </Block>
         </div>
 

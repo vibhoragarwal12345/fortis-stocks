@@ -3,7 +3,7 @@
 // Reasonable starter Terms & Conditions for an invite-only financial-research
 // platform. Not legal advice; have counsel review before production use.
 
-export const metadata = { title: "Terms & Conditions — Christopher Edwards Financial Associates" }
+export const metadata = { title: "Terms & Conditions · Christopher Edwards Financial Associates" }
 
 const EFFECTIVE_DATE = "June 11, 2026"
 
