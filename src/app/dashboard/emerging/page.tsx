@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent } from "@/components/ui/card"
+import { LastScanned } from "@/components/last-scanned"
 import { Reveal } from "@/components/ui/reveal"
 
 export const metadata = { title: "Emerging Watchlist · Christopher Edwards Financial Associates" }
@@ -90,6 +91,16 @@ export default async function EmergingPage() {
     .in("status", ["active", "thesis_intact", "thesis_weakening"])
     .order("multibagger_score", { ascending: false, nullsFirst: false })
 
+  // Most recent discovery timestamp, for the "last scanned" indicator. The
+  // weekly discovery run writes theses; the newest generated_at marks the run.
+  const { data: lastDisc } = await supabase
+    .from("multibagger_theses")
+    .select("generated_at")
+    .order("generated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  const lastScannedIso = (lastDisc?.generated_at as string | null) ?? null
+
   const rows = (wl ?? []) as WatchRow[]
   const tickers = rows.map((r) => r.ticker)
 
@@ -165,14 +176,27 @@ export default async function EmergingPage() {
 
   return (
     <div className="mx-auto max-w-[1280px] space-y-16 px-6 py-14 md:space-y-20 md:px-10 md:py-16">
-      <Reveal as="header" className="space-y-3">
-        <p className="text-eyebrow">Emerging watchlist · long horizon</p>
-        <h1 className="text-h1">Structured speculation.</h1>
-        <p className="text-body-lg max-w-[680px] text-muted-foreground">
-          Small-cap multibagger candidates tracked over years. Researched
-          honestly, risk-framed relentlessly. Updated weekly. Each name leads
-          with the theory for why our screen surfaced it.
-        </p>
+      <Reveal as="header">
+        <div className="flex flex-wrap items-start justify-between gap-x-8 gap-y-4">
+          <div className="space-y-3">
+            <p className="text-eyebrow">Emerging watchlist · long horizon</p>
+            <h1 className="text-h1">Structured speculation.</h1>
+            <p className="text-body-lg max-w-[680px] text-muted-foreground">
+              Small-cap multibagger candidates tracked over years. Researched
+              honestly, risk-framed relentlessly. Updated weekly. Each name leads
+              with the theory for why our screen surfaced it.
+            </p>
+          </div>
+          <LastScanned
+            rows={[
+              {
+                label: "Last scanned",
+                iso: lastScannedIso,
+                freshWithinMs: 8 * 24 * 60 * 60 * 1000,
+              },
+            ]}
+          />
+        </div>
       </Reveal>
 
       <Reveal>

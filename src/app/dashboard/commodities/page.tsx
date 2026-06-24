@@ -12,6 +12,7 @@ import {
 } from "@/lib/commodities"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { LastScanned } from "@/components/last-scanned"
 import { Reveal } from "@/components/ui/reveal"
 
 export const metadata = { title: "Commodities · Christopher Edwards Financial Associates" }
@@ -49,28 +50,45 @@ export default async function CommoditiesPage() {
   }
 
   const entries = Object.entries(scan.payload.commodities)
-  const fmtTime = new Date(scan.scan_time).toLocaleString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZoneName: "short",
-  })
+  // Two clocks. The tactical read regenerates every run (generated_at). The
+  // structural read is carried forward from the last full/weekly run, which
+  // stamps each block's as_of; on a fresh full run as_of is unset, so the
+  // structural analysis time IS generated_at.
+  const tacticalIso = scan.payload.generated_at
+  const structuralAsOfs = entries
+    .map(([, e]) => e.structural?.as_of)
+    .filter((x): x is string => Boolean(x))
+  const structuralIso = structuralAsOfs.length
+    ? structuralAsOfs.reduce((a, b) => (a > b ? a : b))
+    : scan.payload.generated_at
 
   return (
     <div className="mx-auto max-w-[1280px] space-y-16 px-6 py-14 md:space-y-20 md:px-10 md:py-16">
       <Reveal as="header" className="space-y-5">
-        <div className="space-y-3">
-          <p className="text-eyebrow">
-            Commodities · scan {fmtTime} · delayed data
-          </p>
-          <h1 className="text-h1">{entries.length} commodities, dual-horizon reads.</h1>
-          <p className="text-body-lg max-w-[680px] text-muted-foreground">
-            Supply/demand balance, futures-curve structure, trader positioning,
-            and a tactical-versus-structural narrative for every commodity.
-            Every figure traced to a live fetch or labeled as a gap.
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-x-8 gap-y-4">
+          <div className="space-y-3">
+            <p className="text-eyebrow">Commodities · delayed data</p>
+            <h1 className="text-h1">{entries.length} commodities, dual-horizon reads.</h1>
+            <p className="text-body-lg max-w-[680px] text-muted-foreground">
+              Supply/demand balance, futures-curve structure, trader positioning,
+              and a tactical-versus-structural narrative for every commodity.
+              Every figure traced to a live fetch or labeled as a gap.
+            </p>
+          </div>
+          <LastScanned
+            rows={[
+              {
+                label: "Short-term analysis",
+                iso: tacticalIso,
+                freshWithinMs: 26 * 60 * 60 * 1000,
+              },
+              {
+                label: "Long-term analysis",
+                iso: structuralIso,
+                freshWithinMs: 8 * 24 * 60 * 60 * 1000,
+              },
+            ]}
+          />
         </div>
         <div className="max-w-[820px] rounded-lg border border-warning/25 bg-warning/5 px-4 py-3">
           <p className="text-caption text-muted-foreground">{RESEARCH_BANNER}</p>
