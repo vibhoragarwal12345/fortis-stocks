@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>How the CEFA Commodities Engine Works</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=DM+Serif+Display&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+  @page { size: A4; margin: 0; }
+  *{ box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  :root{
+    --bg:#0b0a12; --fg:#ece9f5; --card:#15131f; --overlay:#1c1930;
+    --muted:#9a93b5; --soft:#d7d2e8; --border:rgba(255,255,255,0.09);
+    --accent:#a78bfa; --accent-soft:#c4b5fd; --accent-deep:#7c5cd6;
+    --f-display:'Fraunces',Georgia,serif;
+    --f-edit:'DM Serif Display',Georgia,serif;
+    --f-ui:'Geist','Segoe UI',Arial,sans-serif;
+    --f-mono:'Geist Mono',ui-monospace,Consolas,monospace;
+  }
+  html,body{ margin:0; padding:0; background:var(--bg); }
+  body::before{ content:""; position:fixed; inset:0; background:var(--bg); z-index:-1; }
+  body{ font-family:var(--f-ui); color:var(--soft); font-size:10.2pt; line-height:1.5;
+        font-feature-settings:"kern","ss01"; -webkit-font-smoothing:antialiased; }
+
+  /* one physical A4 page; padding is the safe inner margin, dark bleeds to edges */
+  .page{ padding:13mm 14mm; break-after:page; }
+  .page.last{ break-after:auto; }
+
+  h1,h2,h3{ font-family:var(--f-display); color:var(--fg); font-weight:600; }
+  h1{ font-size:24pt; letter-spacing:-0.025em; line-height:1.05; margin:0 0 4pt; }
+  h2{ font-size:14.5pt; letter-spacing:-0.02em; margin:13pt 0 5pt; padding-bottom:4pt;
+      border-bottom:1px solid var(--border); }
+  h2:first-of-type{ margin-top:0; }
+  h3{ font-size:11.5pt; letter-spacing:-0.012em; color:var(--accent-soft); margin:11pt 0 2pt; }
+  p{ margin:0 0 6pt; }
+  strong,b{ color:#f6f3fc; font-weight:600; }
+  em{ color:var(--muted); font-style:italic; }
+  code{ font-family:var(--f-mono); font-size:0.86em; background:var(--overlay);
+        color:var(--accent-soft); padding:.06em .32em; border-radius:4px; }
+
+  .eyebrow{ font-family:var(--f-ui); font-size:8.2pt; font-weight:500; letter-spacing:.2em;
+            text-transform:uppercase; color:var(--muted); margin-bottom:8pt; }
+  .lede{ font-family:var(--f-edit); font-size:12pt; line-height:1.46; color:#efedf7; }
+  .muted{ color:var(--muted); }
+  .small{ font-size:8.8pt; }
+
+  table{ border-collapse:collapse; width:100%; margin:8pt 0 10pt; font-size:9.1pt; }
+  thead th{ font-family:var(--f-ui); text-transform:uppercase; letter-spacing:.1em;
+            font-size:7.7pt; font-weight:600; color:var(--accent-soft); text-align:left;
+            padding:5pt 8pt; border-bottom:1px solid rgba(167,139,250,.35); }
+  td{ padding:5pt 8pt; border-bottom:1px solid rgba(255,255,255,.07); vertical-align:top; color:var(--soft); }
+  tr:nth-child(even) td{ background:rgba(255,255,255,.02); }
+  td.num{ text-align:right; white-space:nowrap; font-family:var(--f-mono); font-variant-numeric:tabular-nums; color:var(--fg); }
+
+  ul,ol{ margin:3pt 0 8pt; padding-left:16pt; }
+  li{ margin:0 0 3pt; }
+  li::marker{ color:var(--accent); }
+
+  .callout{ background:var(--card); border:1px solid var(--border); border-left:2px solid var(--accent);
+            padding:9pt 13pt; margin:10pt 0; border-radius:10px;
+            box-shadow:inset 0 1px 0 0 rgba(255,255,255,.04); }
+  .warn{ border-left-color:#f0a35e; }
+
+  .oneliner{ font-family:var(--f-edit); font-size:10.6pt; line-height:1.48;
+             color:var(--fg); background:linear-gradient(180deg,#1d1933,#15131f);
+             border:1px solid rgba(167,139,250,.30); border-radius:14px; padding:14pt 17pt; margin:12pt 0;
+             box-shadow:inset 0 1px 0 0 rgba(255,255,255,.05), 0 16px 48px -24px rgba(167,139,250,.55); }
+  .oneliner .label{ display:block; font-family:var(--f-ui); font-weight:600; letter-spacing:.16em;
+                    text-transform:uppercase; font-size:8pt; color:var(--accent-soft); margin-bottom:5pt; }
+
+  /* cover */
+  .cover-head{ border-bottom:1px solid var(--border); padding-bottom:10pt; margin-bottom:12pt; }
+  .cover-head .sub{ font-family:var(--f-edit); color:var(--muted); font-size:10.8pt; }
+  .figwrap svg{ width:160mm; height:auto; display:block; margin:6pt auto 2pt; }
+  .fignote{ text-align:center; color:var(--muted); font-size:8.2pt; font-style:italic;
+            font-family:var(--f-edit); margin-top:3pt; }
+  .glance{ display:flex; gap:10pt; margin:13pt 0 0; }
+  .glance .col{ flex:1; background:var(--card); border:1px solid var(--border); border-radius:12px;
+                padding:10pt 12pt; box-shadow:inset 0 1px 0 0 rgba(255,255,255,.04); }
+  .glance .h{ font-family:var(--f-ui); color:var(--fg); font-weight:600; font-size:9.4pt; margin-bottom:4pt; }
+  .glance .h::before{ content:""; display:inline-block; width:6px; height:6px; border-radius:50%;
+                      background:var(--accent); margin-right:6px; vertical-align:middle; }
+  .glance .b{ font-size:8.5pt; line-height:1.42; color:var(--soft); }
+  .closer{ text-align:center; color:var(--muted); font-size:8.4pt; font-style:italic;
+           font-family:var(--f-edit); margin-top:13pt; }
+</style>
+</head>
+<body>
+
+<!-- ============================ PAGE 1 — COVER ============================ -->
+<section class="page">
+  <div class="cover-head">
+    <div class="eyebrow">Christopher Edwards Financial Associates &middot; Confidential</div>
+    <h1>How the CEFA Commodities Engine Works</h1>
+    <div class="sub">Ten major commodities, read on two separate clocks at once &mdash; a one-week tactical view and a multi-quarter structural view, kept architecturally apart.</div>
+  </div>
+
+  <p class="lede"><strong style="color:#fff">A commodity has to be read on two clocks at once.</strong> A short-term <em>tactical</em>
+  clock for traders, and a structural <em>long-term</em> clock for investors &mdash; and blending them is how investors overtrade and
+  traders chase themes that don&rsquo;t matter this week. This engine keeps the two reads architecturally apart, sources every figure
+  from a live tagged source, and feeds three clean signals back to the stock side.</p>
+
+  <div class="figwrap">
+  <svg viewBox="0 0 1100 470" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The CEFA commodities two-clock flow">
+    <defs>
+      <linearGradient id="vg" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#5b3fb0"/><stop offset="100%" stop-color="#a78bfa"/>
+      </linearGradient>
+    </defs>
+    <!-- 1. commodities -->
+    <rect x="330" y="14" width="440" height="58" rx="13" fill="url(#vg)"/>
+    <text x="550" y="40" text-anchor="middle" fill="#fff" font-family="Geist,Segoe UI,Arial" font-size="24" font-weight="700">10 COMMODITIES</text>
+    <text x="550" y="60" text-anchor="middle" fill="#efeafb" font-family="Geist,Segoe UI,Arial" font-size="14">energy &middot; metals &middot; agriculture</text>
+    <line x1="550" y1="72" x2="550" y2="96" stroke="#a78bfa" stroke-width="1.6"/>
+    <!-- 2. gather + layers -->
+    <rect x="170" y="96" width="760" height="62" rx="12" fill="#15131f" stroke="rgba(167,139,250,.45)" stroke-width="1.4"/>
+    <text x="550" y="122" text-anchor="middle" fill="#ece9f5" font-family="Geist,Segoe UI,Arial" font-size="19" font-weight="600">GATHER &rarr; SIX ANALYSIS LAYERS &nbsp;<tspan fill="#9a93b5" font-size="14" font-weight="400">(pure math, no AI)</tspan></text>
+    <text x="550" y="144" text-anchor="middle" fill="#9a93b5" font-family="Geist,Segoe UI,Arial" font-size="13.5">prices &middot; EIA &middot; USDA &middot; CFTC &middot; macro &middot; news &nbsp;&mdash;&nbsp; every figure tagged VERIFIED / ESTIMATED / UNVERIFIED</text>
+    <!-- fork -->
+    <line x1="550" y1="158" x2="550" y2="178" stroke="#a78bfa" stroke-width="1.6"/>
+    <line x1="330" y1="178" x2="770" y2="178" stroke="#a78bfa" stroke-width="1.6"/>
+    <line x1="330" y1="178" x2="330" y2="200" stroke="#a78bfa" stroke-width="1.6"/>
+    <line x1="770" y1="178" x2="770" y2="200" stroke="#a78bfa" stroke-width="1.6"/>
+    <!-- 3. two clocks -->
+    <rect x="120" y="200" width="420" height="104" rx="12" fill="#141127" stroke="rgba(167,139,250,.35)" stroke-width="1.3"/>
+    <text x="330" y="232" text-anchor="middle" fill="#fff" font-family="Geist,Segoe UI,Arial" font-size="21" font-weight="700">TACTICAL</text>
+    <text x="330" y="254" text-anchor="middle" fill="#c4b5fd" font-family="Geist,Segoe UI,Arial" font-size="14">~1 week &middot; for traders</text>
+    <text x="330" y="284" text-anchor="middle" fill="#9a93b5" font-family="Geist,Segoe UI,Arial" font-size="13">separate AI pass &middot; 3 gates</text>
+    <rect x="560" y="200" width="420" height="104" rx="12" fill="#141127" stroke="rgba(167,139,250,.35)" stroke-width="1.3"/>
+    <text x="770" y="232" text-anchor="middle" fill="#fff" font-family="Geist,Segoe UI,Arial" font-size="21" font-weight="700">STRUCTURAL</text>
+    <text x="770" y="254" text-anchor="middle" fill="#c4b5fd" font-family="Geist,Segoe UI,Arial" font-size="14">multi-quarter &middot; for investors</text>
+    <text x="770" y="284" text-anchor="middle" fill="#9a93b5" font-family="Geist,Segoe UI,Arial" font-size="13">separate AI pass &middot; 3 gates</text>
+    <!-- wall between -->
+    <line x1="550" y1="196" x2="550" y2="308" stroke="#6f6791" stroke-width="1.3" stroke-dasharray="4 5"/>
+    <text x="550" y="340" text-anchor="middle" fill="#6f6791" font-family="Geist,Segoe UI,Arial" font-size="12" font-style="italic">disjoint data &mdash; no horizon leakage</text>
+    <!-- converge -->
+    <line x1="330" y1="304" x2="330" y2="356" stroke="#a78bfa" stroke-width="1.6"/>
+    <line x1="770" y1="304" x2="770" y2="356" stroke="#a78bfa" stroke-width="1.6"/>
+    <line x1="330" y1="356" x2="770" y2="356" stroke="#a78bfa" stroke-width="1.6"/>
+    <line x1="550" y1="356" x2="550" y2="376" stroke="#a78bfa" stroke-width="1.6"/>
+    <!-- 4. cross-link -->
+    <rect x="250" y="376" width="600" height="62" rx="12" fill="url(#vg)"/>
+    <text x="550" y="402" text-anchor="middle" fill="#140f28" font-family="Geist,Segoe UI,Arial" font-size="18" font-weight="700">CROSS-LINK &rarr; THE STOCK ENGINE</text>
+    <text x="550" y="423" text-anchor="middle" fill="#2a2150" font-family="Geist,Segoe UI,Arial" font-size="13.5" font-weight="500">copper = growth &middot; gold = risk &middot; oil = inflation &nbsp;(deterministic, no AI)</text>
+  </svg>
+  </div>
+  <div class="fignote">Ten markets &middot; six deterministic layers each &middot; two architecturally-separated narratives &middot; three cross-asset signals.</div>
+
+  <div class="glance">
+    <div class="col"><div class="h">Two clocks, never crossed</div><div class="b">Tactical (one week) and structural (multi-quarter) are built from disjoint data and written by separate AI passes &mdash; a horizon can&rsquo;t leak into the other, and a critic audits for it anyway.</div></div>
+    <div class="col"><div class="h">Verify or label &mdash; never invent</div><div class="b">Every number is tagged to a live source; gaps are labelled <em>unverified</em> or left out, never filled. The one AI layer may cite only data we actually have.</div></div>
+    <div class="col"><div class="h">Honest levels, real signals</div><div class="b">Reference bands are zero-drift volatility cones, not forecasts. Copper, gold and oil feed three clean structural signals to the stock side.</div></div>
+  </div>
+
+  <div class="oneliner">
+    <span class="label">In one line</span>
+    We research ten major commodities on two separate clocks &mdash; a one-week tactical read for traders and a multi-quarter
+    structural read for investors &mdash; kept architecturally apart so neither contaminates the other. Six deterministic layers feed two
+    independent AI narratives that may only cite live, tagged data and must pass a fact-check and a critic that bans advice language and
+    horizon leakage; levels are zero-drift cones, not forecasts; gaps are labelled, never filled; and three signals &mdash; copper,
+    gold, oil &mdash; feed the stock side.
+  </div>
+
+  <div class="closer">The full mechanics &mdash; the two clocks, the six layers, and the three gates &mdash; follow &rarr;</div>
+</section>
+
+<!-- ============================ PAGE 2 — TWO CLOCKS + COVERAGE ============================ -->
+<section class="page">
+  <div class="eyebrow">The Commodities Engine &middot; Full detail</div>
+  <h1 style="font-size:20pt; margin-bottom:8pt;">The one idea: two clocks, never crossed</h1>
+  <p class="lede" style="margin-bottom:6pt;">The classic way to get commodities wrong is to mix the horizons &mdash; to let a
+  one-week trading observation bleed into a multi-year thesis, or vice versa. They are different questions, for different readers. So
+  the engine refuses to blend them.</p>
+
+  <table>
+    <thead><tr><th style="width:20%"></th><th style="width:40%">Tactical read</th><th>Structural read</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Horizon</strong></td><td>~1 week</td><td>Multiple quarters to years</td></tr>
+      <tr><td><strong>Written for</strong></td><td>Traders</td><td>Investors</td></tr>
+      <tr><td><strong>Built from</strong></td><td>Technicals, positioning, curve, the latest inventory <em>surprise</em>, seasonality</td><td>Supply/demand <em>balance</em>, macro drivers, long trends, inventory <em>levels</em> vs the 5-year norm</td></tr>
+      <tr><td><strong>Carries</strong></td><td>Timing</td><td>No timing information at all</td></tr>
+      <tr><td><strong>Its rule</strong></td><td>&ldquo;Don&rsquo;t act on this with long-horizon capital&rdquo;</td><td>&ldquo;Don&rsquo;t trade off this read&rdquo;</td></tr>
+    </tbody>
+  </table>
+  <p class="small muted">The two reads are assembled from <strong>two disjoint sets of data</strong> and written by <strong>two
+  independent AI passes</strong> &mdash; the tactical writer never sees the structural framing, and vice versa. A horizon can&rsquo;t
+  leak by construction, and a separate AI auditor checks for leakage anyway.</p>
+
+  <h2>What we cover &mdash; ten commodities, three groups</h2>
+  <p>Everything keys off a single registry, so a commodity (and its every data source) is defined in exactly one place:</p>
+  <table>
+    <thead><tr><th style="width:22%">Group</th><th>Commodities</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Energy</strong></td><td>Crude Oil (WTI), Crude Oil (Brent), Natural Gas (Henry Hub)</td></tr>
+      <tr><td><strong>Metals</strong></td><td>Gold, Silver, Copper</td></tr>
+      <tr><td><strong>Agriculture</strong></td><td>Soybeans, Corn, Wheat (Chicago SRW), Coffee (Arabica)</td></tr>
+    </tbody>
+  </table>
+  <div class="callout"><strong>Why iron ore was dropped.</strong> It was covered briefly, then deliberately removed: on free data it
+  had no reliable daily price, no positioning data and no futures curve, so five of its six layers came back empty. Rather than ship a
+  hollow tile beside the others, we pulled it &mdash; and we&rsquo;ll only re-add a commodity when we can research it honestly. That
+  decision is the whole philosophy in miniature.</div>
+</section>
+
+<!-- ============================ PAGE 3 — GATHER + SIX LAYERS ============================ -->
+<section class="page">
+  <h2>Step 1 &mdash; Gather live data, and tag every number</h2>
+  <p><strong>Each source fetched once per run. No AI.</strong> The engine stands on independent, authoritative public sources:</p>
+  <table>
+    <thead><tr><th style="width:34%">Source</th><th>What it provides</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Market prices</strong> <span class="muted small">(front-month futures)</span></td><td>The live price for each commodity, sanity-checked against an independent <strong>FRED</strong> spot series wherever one exists</td></tr>
+      <tr><td><strong>EIA</strong> <span class="muted small">US Energy Information Admin.</span></td><td>Energy fundamentals &mdash; crude &amp; product inventories, gas storage, refinery utilisation, the strategic reserve</td></tr>
+      <tr><td><strong>USDA</strong> <span class="muted small">WASDE + NASS</span></td><td>Agricultural fundamentals &mdash; stocks, production, the monthly world supply/demand estimates</td></tr>
+      <tr><td><strong>CFTC Commitments of Traders</strong></td><td>How speculative money is <em>positioned</em> &mdash; net stance, how extreme vs history, weekly flow</td></tr>
+      <tr><td><strong>FRED macro</strong></td><td>The dollar, real interest rates, industrial production, global growth, inflation</td></tr>
+      <tr><td><strong>News</strong> <span class="muted small">(Google News RSS)</span></td><td>The headlines that give the numbers context, per commodity</td></tr>
+    </tbody>
+  </table>
+  <p class="small muted">Every figure carries a <strong style="color:#f6f3fc">provenance tag</strong> &mdash; <em>verified</em> from a named
+  live source, <em>estimated</em> (a statistical simulation), or <em>unverified</em>. Where a source is silent or paid-gated, the figure
+  is marked unverified or left out &mdash; <strong>never guessed, never filled in.</strong> Label the gaps; don&rsquo;t fill them.</p>
+
+  <h2>Step 2 &mdash; Six analysis layers (pure math, no AI)</h2>
+  <table>
+    <thead><tr><th style="width:5%">#</th><th style="width:22%">Layer</th><th>What it determines</th></tr></thead>
+    <tbody>
+      <tr><td class="num">1</td><td><strong>Price technicals</strong></td><td>Trend vs the 50- &amp; 200-day averages, RSI, ATR, realised volatility, 52-week range position, support/resistance &mdash; <strong>and the zero-drift reference bands</strong> (below)</td></tr>
+      <tr><td class="num">2</td><td><strong>Supply &amp; demand</strong></td><td>A balance classification &mdash; <em>tightening / loosening / balanced</em> &mdash; with a confidence level and an honest caveat when data is thin</td></tr>
+      <tr><td class="num">3</td><td><strong>Curve structure</strong></td><td>Whether the futures curve is in <strong>contango or backwardation</strong>, and how steeply &mdash; the market&rsquo;s own read on scarcity vs glut</td></tr>
+      <tr><td class="num">4</td><td><strong>Positioning</strong></td><td>From CFTC data: how speculators lean, how extreme vs the last three years, and whether the trade is <strong>crowded</strong></td></tr>
+      <tr><td class="num">5</td><td><strong>Seasonality</strong></td><td>This commodity&rsquo;s tendency in <em>this</em> calendar month &mdash; average move and how often it actually happens</td></tr>
+      <tr><td class="num">6</td><td><strong>Macro drivers</strong></td><td>The dollar, real rates, industrial production, growth and inflation &mdash; and one net read of tailwind vs headwind</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================ PAGE 4 — BANDS + NARRATIVE GATES ============================ -->
+<section class="page">
+  <h2>The zero-drift reference bands (honest levels, not forecasts)</h2>
+  <p>Layer 1 produces price <strong>reference bands</strong> &mdash; with a discipline worth spelling out, because it&rsquo;s where most
+  &ldquo;price target&rdquo; math quietly lies. For each commodity we run a <strong>10,000-path Monte Carlo simulation</strong>, the
+  return distribution <strong>fitted to the commodity&rsquo;s own recent behaviour</strong> (fat tails included). It yields three levels on
+  each clock &mdash; a <strong>lower band (5th percentile)</strong>, a <strong>midpoint (50th)</strong>, and an <strong>upper band
+  (95th)</strong> &mdash; over a <strong>one-week</strong> (tactical) and a <strong>one-year</strong> (structural) horizon.</p>
+  <div class="callout"><strong>The crucial move: we zero out the drift.</strong> A na&iuml;ve simulation extrapolates the recent trend
+  forward &mdash; which over a year turned a two-year gold rally into a &ldquo;+69% median&rdquo; band: <em>momentum dressed up as a
+  statistical forecast.</em> Zeroing the drift makes the bands describe <strong>volatility only</strong> &mdash; the range where price
+  could plausibly sit given how it actually moves &mdash; with no directional view baked in. Direction belongs in the supply/demand and
+  macro reads, not smuggled into a number. The bands are labelled <em>&ldquo;statistical reference levels &mdash; not forecasts, not
+  targets,&rdquo;</em> and being pure math they exist even when a data source is down.</div>
+
+  <h2>Step 3 &mdash; The narrative: the one AI layer, on a short leash</h2>
+  <p><strong>Two reads per commodity &mdash; the only place AI is used, and it&rsquo;s fenced in.</strong> An AI writer turns the six
+  layers into two plain-English narratives under the same closed-context discipline as the stock desk, and then some:</p>
+  <ul>
+    <li><strong>It sees only a data section of named keys</strong> computed this run &mdash; no outside knowledge, no remembered prices. Every number must be tagged to the exact data point it came from.</li>
+    <li><strong>Every draft must clear three gates, in order:</strong>
+      <ol>
+        <li><strong>Not truncated</strong> &mdash; the text must end on a finished sentence (a cut-off read still fails).</li>
+        <li><strong>Fact-check &ge; 0.85</strong> &mdash; a deterministic checker confirms every tagged number traces to a real data key and matches it.</li>
+        <li><strong>Critic audit</strong> &mdash; a <em>second</em> AI model checks for three things: a claim the data doesn&rsquo;t support, <strong>any advice language</strong> (&ldquo;buy / sell / hold / should&rdquo;), and <strong>horizon leakage</strong>.</li>
+      </ol>
+    </li>
+    <li><strong>Each failure feeds its findings back into the next try.</strong> After three attempts the read is <strong>discarded and reported absent &mdash; never backfilled</strong> from the model&rsquo;s memory. An honest blank beats a confident guess.</li>
+  </ul>
+  <p class="small muted">Because the tactical and structural narratives are two separate calls on two disjoint data sets, a horizon can
+  fail its check on its own &mdash; and one read being absent never fabricates the other.</p>
+</section>
+
+<!-- ============================ PAGE 5 — CROSS-LINK + CADENCE + MOAT ============================ -->
+<section class="page last">
+  <h2>Step 4 &mdash; The cross-link: what commodities tell the stock side</h2>
+  <p><strong>Three structural signals. Deterministic, no AI, no new data.</strong> Copper, gold and oil are read-outs on the whole
+  economy, so the engine distils three clean signals for the stock side&rsquo;s macro analysis:</p>
+  <table>
+    <thead><tr><th style="width:24%">Signal</th><th style="width:18%">From</th><th>What it reads</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Industrial / growth</strong></td><td>Copper trend</td><td>Copper demand <em>is</em> industrial production &mdash; a global-growth proxy (tailwind / headwind)</td></tr>
+      <tr><td><strong>Risk appetite</strong></td><td>Gold trend</td><td>A sustained gold bid is hedge / haven demand &mdash; a risk-off tilt</td></tr>
+      <tr><td><strong>Inflation impulse</strong></td><td>Oil (WTI) trend</td><td>Crude feeds headline inflation with a short lag</td></tr>
+    </tbody>
+  </table>
+  <p class="small muted">Three rules keep this clean: the signals are <strong>structural by construction</strong> (50/200-day trend,
+  not day moves); they are <strong>purely advisory</strong> &mdash; they <em>colour</em> the stock macro agent&rsquo;s reasoning, never
+  override its thresholds; and a missing or stale scan degrades to &ldquo;no signal,&rdquo; never a guess (stale after five days). Neither
+  side imports the other&rsquo;s code.</p>
+
+  <h2>Cadence &mdash; a daily tactical pulse, a weekly structural refresh</h2>
+  <p>Each weekday a lightweight <strong>tactical</strong> run refreshes the one-week read. Once a week (Monday) a full run regenerates
+  everything, including the <strong>structural</strong> read &mdash; carried forward through the daily runs until the next Monday. The
+  fundamentals behind it (EIA weekly, CFTC weekly, USDA/IMF monthly) don&rsquo;t change fast enough to recompute intraday, so we
+  don&rsquo;t.</p>
+
+  <div class="callout warn"><strong>Research intelligence, not advice.</strong> The standing disclaimer is unmissable: commodities carry
+  higher risk than equities (leverage, volatility, geopolitical shocks); all reference levels are statistical, not forecasts; data is
+  delayed and partially incomplete, with gaps labelled, never filled; and a qualified human must review any decision made downstream.</div>
+
+  <h2>Why this is the moat</h2>
+  <ol>
+    <li><strong>Two clocks, never crossed</strong> &mdash; separating the trade from the thesis <em>architecturally</em> stops a one-week signal masquerading as a multi-year view.</li>
+    <li><strong>Verify-or-label, never fabricate</strong> &mdash; every number tagged to a live source; gaps labelled; the AI may cite only data we have; a read that can&rsquo;t clear three gates is dropped.</li>
+    <li><strong>Zero-drift honesty on the levels</strong> &mdash; bands describe volatility, not a disguised momentum forecast.</li>
+    <li><strong>A real cross-asset signal</strong> &mdash; copper, gold and oil feed the stock engine&rsquo;s macro read through one clean, structural, deterministic interface.</li>
+    <li><strong>Risk-first by construction</strong> &mdash; every read carries its horizon warning and the reminder that commodities are riskier than equities.</li>
+  </ol>
+
+  <div class="oneliner">
+    <span class="label">The bottom line</span>
+    Ten commodities, read on two separate clocks and kept architecturally apart so neither contaminates the other. Six deterministic
+    layers feed two independent AI narratives that may cite only live, tagged data and must pass a fact-check and a critic that bans
+    advice and horizon leakage; levels are zero-drift cones, not forecasts; gaps are labelled, never filled; and three signals &mdash;
+    copper, gold, oil &mdash; feed the stock side. Research intelligence, not advice.
+  </div>
+</section>
+</body>
+</html>

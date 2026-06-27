@@ -27,7 +27,9 @@ export function TickerTape({
   items: TapeItem[]
   className?: string
 }) {
-  // Two copies make the loop seamless; the duplicate is decorative.
+  // Two copies make the loop seamless. The duplicate is aria-hidden and kept
+  // out of the tab order, but it is still on screen as the tape scrolls, so it
+  // stays mouse-clickable (see the link branch below).
   const strips: { copy: TapeItem[]; hidden: boolean }[] = [
     { copy: items, hidden: false },
     { copy: items, hidden: true },
@@ -63,10 +65,16 @@ export function TickerTape({
               )
               const itemCls =
                 "text-data inline-flex items-center gap-2.5 px-7 py-3 text-[13px]"
-              return item.href && !strip.hidden ? (
+              // Both strips are visible as the tape scrolls, so BOTH must be
+              // clickable. The duplicate strip stays out of the a11y tree (its
+              // container is aria-hidden) and out of the tab order (tabIndex=-1),
+              // but remains mouse-clickable so a click never lands on a dead
+              // span when the duplicate copy is under the cursor.
+              return item.href ? (
                 <Link
                   key={`${s}-${item.ticker}`}
                   href={item.href}
+                  tabIndex={strip.hidden ? -1 : undefined}
                   className={cn(
                     itemCls,
                     "transition-premium hover:bg-secondary/50",

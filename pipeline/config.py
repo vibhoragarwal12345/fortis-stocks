@@ -43,6 +43,7 @@ FINNHUB_API_KEY: str = os.environ.get("FINNHUB_API_KEY", "")
 FRED_API_KEY: str = os.environ.get("FRED_API_KEY", "")  # St. Louis Fed — economic data
 FMP_API_KEY: str  = os.environ.get("FMP_API_KEY", "")   # Financial Modeling Prep — analyst peers, financials
 TIINGO_API_KEY: str = os.environ.get("TIINGO_API_KEY", "")  # Tiingo — historical fundamentals, prices, news
+TIINGO_API_KEY_2: str = os.environ.get("TIINGO_API_KEY_2", "")  # second free Tiingo account — backtest delisted fetch + general backup
 API_NINJAS_KEY: str = os.environ.get("API_NINJAS_KEY", "")  # API Ninjas — earnings call transcripts (free tier)
 # Commodities pipeline (pipeline/commodities/) — both free, instant signup
 EIA_API_KEY: str = os.environ.get("EIA_API_KEY", "")            # eia.gov/opendata/register.php — energy inventories

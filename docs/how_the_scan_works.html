@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>How a CEFA Scan Works</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=DM+Serif+Display&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+  @page { size: A4; margin: 0; }
+  *{ box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  :root{
+    --bg:#0b0a12; --fg:#ece9f5; --card:#15131f; --overlay:#1c1930;
+    --muted:#9a93b5; --soft:#d7d2e8; --border:rgba(255,255,255,0.09);
+    --accent:#a78bfa; --accent-soft:#c4b5fd; --accent-deep:#7c5cd6;
+    --f-display:'Fraunces',Georgia,serif;
+    --f-edit:'DM Serif Display',Georgia,serif;
+    --f-ui:'Geist','Segoe UI',Arial,sans-serif;
+    --f-mono:'Geist Mono',ui-monospace,Consolas,monospace;
+  }
+  html,body{ margin:0; padding:0; background:var(--bg); }
+  body::before{ content:""; position:fixed; inset:0; background:var(--bg); z-index:-1; }
+  body{ font-family:var(--f-ui); color:var(--soft); font-size:10.2pt; line-height:1.5;
+        font-feature-settings:"kern","ss01"; -webkit-font-smoothing:antialiased; }
+
+  /* one physical A4 page; padding is the safe inner margin, dark bleeds to edges */
+  .page{ padding:13mm 14mm; break-after:page; }
+  .page.last{ break-after:auto; }
+
+  h1,h2,h3{ font-family:var(--f-display); color:var(--fg); font-weight:600; }
+  h1{ font-size:24pt; letter-spacing:-0.025em; line-height:1.05; margin:0 0 4pt; }
+  h2{ font-size:14.5pt; letter-spacing:-0.02em; margin:13pt 0 5pt; padding-bottom:4pt;
+      border-bottom:1px solid var(--border); }
+  h2:first-of-type{ margin-top:0; }
+  h3{ font-size:11.5pt; letter-spacing:-0.012em; color:var(--accent-soft); margin:11pt 0 2pt; }
+  p{ margin:0 0 6pt; }
+  strong,b{ color:#f6f3fc; font-weight:600; }
+  em{ color:var(--muted); font-style:italic; }
+  code{ font-family:var(--f-mono); font-size:0.86em; background:var(--overlay);
+        color:var(--accent-soft); padding:.06em .32em; border-radius:4px; }
+
+  .eyebrow{ font-family:var(--f-ui); font-size:8.2pt; font-weight:500; letter-spacing:.2em;
+            text-transform:uppercase; color:var(--muted); margin-bottom:8pt; }
+  .lede{ font-family:var(--f-edit); font-size:12pt; line-height:1.46; color:#efedf7; }
+  .muted{ color:var(--muted); }
+  .small{ font-size:8.8pt; }
+
+  table{ border-collapse:collapse; width:100%; margin:8pt 0 10pt; font-size:9.1pt; }
+  thead th{ font-family:var(--f-ui); text-transform:uppercase; letter-spacing:.1em;
+            font-size:7.7pt; font-weight:600; color:var(--accent-soft); text-align:left;
+            padding:5pt 8pt; border-bottom:1px solid rgba(167,139,250,.35); }
+  td{ padding:5pt 8pt; border-bottom:1px solid rgba(255,255,255,.07); vertical-align:top; color:var(--soft); }
+  tr:nth-child(even) td{ background:rgba(255,255,255,.02); }
+  td.num{ text-align:right; white-space:nowrap; font-family:var(--f-mono); font-variant-numeric:tabular-nums; color:var(--fg); }
+
+  ul,ol{ margin:3pt 0 8pt; padding-left:16pt; }
+  li{ margin:0 0 3pt; }
+  li::marker{ color:var(--accent); }
+
+  .callout{ background:var(--card); border:1px solid var(--border); border-left:2px solid var(--accent);
+            padding:9pt 13pt; margin:10pt 0; border-radius:10px;
+            box-shadow:inset 0 1px 0 0 rgba(255,255,255,.04); }
+
+  .oneliner{ font-family:var(--f-edit); font-size:10.6pt; line-height:1.48;
+             color:var(--fg); background:linear-gradient(180deg,#1d1933,#15131f);
+             border:1px solid rgba(167,139,250,.30); border-radius:14px; padding:14pt 17pt; margin:12pt 0;
+             box-shadow:inset 0 1px 0 0 rgba(255,255,255,.05), 0 16px 48px -24px rgba(167,139,250,.55); }
+  .oneliner .label{ display:block; font-family:var(--f-ui); font-weight:600; letter-spacing:.16em;
+                    text-transform:uppercase; font-size:8pt; color:var(--accent-soft); margin-bottom:5pt; }
+
+  /* cover */
+  .cover-head{ border-bottom:1px solid var(--border); padding-bottom:10pt; margin-bottom:12pt; }
+  .cover-head .sub{ font-family:var(--f-edit); color:var(--muted); font-size:10.8pt; }
+  .figwrap svg{ width:158mm; height:auto; display:block; margin:6pt auto 2pt; }
+  .fignote{ text-align:center; color:var(--muted); font-size:8.2pt; font-style:italic;
+            font-family:var(--f-edit); margin-top:3pt; }
+  .glance{ display:flex; gap:10pt; margin:13pt 0 0; }
+  .glance .col{ flex:1; background:var(--card); border:1px solid var(--border); border-radius:12px;
+                padding:10pt 12pt; box-shadow:inset 0 1px 0 0 rgba(255,255,255,.04); }
+  .glance .h{ font-family:var(--f-ui); color:var(--fg); font-weight:600; font-size:9.4pt; margin-bottom:4pt; }
+  .glance .h::before{ content:""; display:inline-block; width:6px; height:6px; border-radius:50%;
+                      background:var(--accent); margin-right:6px; vertical-align:middle; }
+  .glance .b{ font-size:8.5pt; line-height:1.42; color:var(--soft); }
+  .closer{ text-align:center; color:var(--muted); font-size:8.4pt; font-style:italic;
+           font-family:var(--f-edit); margin-top:13pt; }
+</style>
+</head>
+<body>
+
+<!-- ============================ PAGE 1 — COVER ============================ -->
+<section class="page">
+  <div class="cover-head">
+    <div class="eyebrow">Christopher Edwards Financial Associates &middot; Confidential</div>
+    <h1>How a CEFA Scan Works</h1>
+    <div class="sub">From ~3,300 stocks to a board of fully-researched, fact-checked conviction picks &mdash; twice every trading day.</div>
+  </div>
+
+  <p class="lede"><strong style="color:#fff">The whole investable US market goes through one funnel.</strong> Fast, objective
+  math touches <em>every</em> stock to surface the ~35 that are genuinely moving; a full institutional-grade AI research desk is then
+  spent <em>only</em> on those 35. Every number in every dossier traces back to data we collected that morning &mdash; anything we
+  can&rsquo;t verify is deleted, not shown.</p>
+
+  <div class="figwrap">
+  <svg viewBox="0 0 1100 470" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The CEFA funnel">
+    <defs>
+      <linearGradient id="fg" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#241f3a"/><stop offset="50%" stop-color="#5b3fb0"/><stop offset="100%" stop-color="#a78bfa"/>
+      </linearGradient>
+    </defs>
+    <polygon points="40,30 620,30 571,124 89,124"     fill="url(#fg)"/>
+    <polygon points="93,130 568,130 518,224 142,224"  fill="url(#fg)"/>
+    <polygon points="145,230 515,230 466,324 194,324" fill="url(#fg)"/>
+    <polygon points="198,330 463,330 413,424 247,424" fill="url(#fg)"/>
+
+    <text x="330" y="74"  text-anchor="middle" fill="#fff" font-family="Geist,Segoe UI,Arial" font-size="31" font-weight="700">~3,300 STOCKS</text>
+    <text x="330" y="100" text-anchor="middle" fill="#d8d2ea" font-family="Geist,Segoe UI,Arial" font-size="15">entire liquid US market</text>
+    <text x="330" y="173" text-anchor="middle" fill="#fff" font-family="Geist,Segoe UI,Arial" font-size="27" font-weight="700">TOP 35</text>
+    <text x="330" y="196" text-anchor="middle" fill="#e6e0f6" font-family="Geist,Segoe UI,Arial" font-size="14">composite-score cut</text>
+    <text x="330" y="272" text-anchor="middle" fill="#fff" font-family="Geist,Segoe UI,Arial" font-size="22" font-weight="700">DEEP RESEARCH</text>
+    <text x="330" y="293" text-anchor="middle" fill="#efeafb" font-family="Geist,Segoe UI,Arial" font-size="13">6-agent AI desk + grade</text>
+    <text x="330" y="373" text-anchor="middle" fill="#140f28" font-family="Geist,Segoe UI,Arial" font-size="22" font-weight="700">15&ndash;25 PICKS</text>
+    <text x="330" y="394" text-anchor="middle" fill="#2a2150" font-family="Geist,Segoe UI,Arial" font-size="13" font-weight="500">complete, verified dossiers</text>
+
+    <g stroke="#a78bfa" stroke-width="1.3">
+      <line x1="595" y1="77" x2="650" y2="77"/><line x1="543" y1="177" x2="650" y2="177"/>
+      <line x1="490" y1="277" x2="650" y2="277"/><line x1="438" y1="377" x2="650" y2="377"/>
+    </g>
+    <g><circle cx="650" cy="77" r="3" fill="#6f6791"/><circle cx="650" cy="177" r="3" fill="#6f6791"/>
+       <circle cx="650" cy="277" r="3.4" fill="#a78bfa"/><circle cx="650" cy="377" r="3" fill="#6f6791"/></g>
+
+    <text x="664" y="72"  fill="#ece9f5" font-family="Geist,Segoe UI,Arial" font-size="16" font-weight="600">STAGE 1 &middot; FAST SCAN</text>
+    <text x="664" y="91"  fill="#9a93b5" font-family="Geist,Segoe UI,Arial" font-size="13.5">Pure math on every stock &middot; no AI &middot; ~3 min</text>
+    <text x="664" y="172" fill="#ece9f5" font-family="Geist,Segoe UI,Arial" font-size="16" font-weight="600">STAGE 2 &middot; RANK &amp; CUT</text>
+    <text x="664" y="191" fill="#9a93b5" font-family="Geist,Segoe UI,Arial" font-size="13.5">One composite score 0&ndash;100 &middot; keep the top 35</text>
+    <text x="664" y="272" fill="#ece9f5" font-family="Geist,Segoe UI,Arial" font-size="16" font-weight="600">STAGES 3&ndash;5 &middot; RESEARCH</text>
+    <text x="664" y="291" fill="#9a93b5" font-family="Geist,Segoe UI,Arial" font-size="13.5">Price cones &rarr; 6-agent AI desk &rarr; conviction grade</text>
+    <text x="664" y="372" fill="#ece9f5" font-family="Geist,Segoe UI,Arial" font-size="16" font-weight="600">QUALITY GATES</text>
+    <text x="664" y="391" fill="#9a93b5" font-family="Geist,Segoe UI,Arial" font-size="13.5">Fact-check &middot; completeness &middot; promote (or hold last board)</text>
+  </svg>
+  </div>
+  <div class="fignote">Two-speed funnel: the math lets us scan the whole market every day; the AI turns the 35 survivors into research.</div>
+
+  <div class="glance">
+    <div class="col"><div class="h">Not one screen &mdash; an assembly line</div><div class="b">Six AI specialists, each a <em>different</em> job, each building on the last: find anomalies &rarr; confirm across sources &rarr; name the catalyst &rarr; read smart money &rarr; write the thesis &rarr; attack it.</div></div>
+    <div class="col"><div class="h">Verified, or it isn&rsquo;t shown</div><div class="b">Every figure is tagged to its source and checked by code to within 2%. Unverifiable claims are rejected automatically; a pick displays only with a complete dossier.</div></div>
+    <div class="col"><div class="h">Risk can only subtract</div><div class="b">A skeptical critic runs on a <em>different</em> AI model and can only lower a grade. If a scan can&rsquo;t produce 15 clean dossiers, the last good board stays up.</div></div>
+  </div>
+
+  <div class="oneliner">
+    <span class="label">In one line</span>
+    We score all ~3,300 liquid US stocks with pure math, rank them to the top 35, then run a six-specialist AI research desk on those
+    35 &mdash; anomaly detection, cross-source triangulation, the catalyst, smart-money positioning, a full bull/bear thesis, and a
+    skeptical critic on a different AI. Every number is fact-checked against that morning&rsquo;s data, every dossier must be complete,
+    risk can only lower a grade, and only a genuinely-verified board is ever shown.
+  </div>
+
+  <div class="closer">The full mechanics &mdash; including exactly how the composite score is built &mdash; follow &rarr;</div>
+</section>
+
+<!-- ============================ PAGE 2 — HARVEST + FAST SCAN ============================ -->
+<section class="page">
+  <div class="eyebrow">The CEFA Engine &middot; Full detail</div>
+  <h1 style="font-size:20pt; margin-bottom:8pt;">From 3,300 Stocks to 15 Conviction Picks</h1>
+  <p class="lede" style="margin-bottom:4pt;">Twice every weekday the entire liquid US market runs through one two-speed funnel:
+  ~3,300 &rarr; 35 &rarr; a displayed board of 15&ndash;25. The math lets us look at every stock; the AI turns the survivors into
+  research. Neither half works alone.</p>
+
+  <h2>Step 0 &mdash; Fresh intelligence, gathered before the scan</h2>
+  <p>About <strong>90 minutes before</strong> the pre-market scan, a separate harvest refreshes the facts the analysis stands on.
+  It runs apart from the scan, so a flaky source degrades <em>freshness</em> but never breaks the run.</p>
+  <table>
+    <thead><tr><th style="width:26%">What we pull</th><th style="width:30%">Source</th><th>Why it matters</th></tr></thead>
+    <tbody>
+      <tr><td><strong>News</strong> &mdash; every headline, last 24h</td><td>Yahoo / Google RSS + Finnhub</td><td>The &ldquo;why now&rdquo; behind a move</td></tr>
+      <tr><td><strong>Headline verification</strong></td><td>tracked ticker-master list</td><td>Confirms each story is about the <em>right</em> company &mdash; mis-tagged news never reaches a dossier</td></tr>
+      <tr><td><strong>SEC filings</strong> &mdash; 8-Ks, Form 4, 13F/13D</td><td>SEC EDGAR</td><td>Material events and what insiders are actually doing</td></tr>
+      <tr><td><strong>Options activity</strong></td><td>chains on the most liquid names</td><td>Where large, informed money is positioning</td></tr>
+      <tr><td><strong>Crowd &amp; sentiment</strong></td><td>social sources + FinBERT</td><td>Attention, consensus shifts &mdash; model-scored, not guessed</td></tr>
+    </tbody>
+  </table>
+  <p class="small muted">The principle throughout: if the data isn&rsquo;t there, the system records &ldquo;no data&rdquo; &mdash; it never invents one.</p>
+
+  <h2>Stage 1 &mdash; The fast scan: pure math on the whole market</h2>
+  <p><strong>~3,300 stocks &rarr; all measured. No AI. ~3 minutes.</strong> Objective and identical for every stock. A name must
+  trade at least <strong>$1M average daily volume</strong> to qualify (the universe rebuilds weekly). From one year of daily prices
+  we compute:</p>
+  <ul>
+    <li><strong>Price action</strong> &mdash; today&rsquo;s move and the overnight <strong>gap</strong></li>
+    <li><strong>Momentum</strong> &mdash; 5- and 20-day return</li>
+    <li><strong>Relative volume</strong> &mdash; vs. the stock&rsquo;s own 20-day average</li>
+    <li><strong>RSI (14-day)</strong> &mdash; the Wilder momentum oscillator</li>
+    <li><strong>52-week position</strong> &mdash; distance from its 52-week high and low</li>
+    <li><strong>Breakout / breakdown</strong> &mdash; closed above the prior 20-day high, or below the low</li>
+  </ul>
+  <p>This is <strong>measuring, not judging</strong> &mdash; and robust to thin data: a recent IPO returns &ldquo;not enough
+  data&rdquo; rather than a misleading number.</p>
+</section>
+
+<!-- ============================ PAGE 3 — COMPOSITE SCORE ============================ -->
+<section class="page">
+  <h2>Stage 2 &mdash; The composite score: ranking the whole market into a top 35</h2>
+  <p><strong>~3,300 scored &rarr; top 35 kept. No AI. ~10 seconds.</strong> <em>The first major cut, and the gate to everything that
+  follows &mdash; so it&rsquo;s worth seeing exactly how it&rsquo;s built.</em></p>
+  <p>Each stock collapses to <strong>one number from 0 to 100</strong>. Every factor first becomes its own 0&ndash;100 sub-score,
+  then blends with fixed weights that encode our view of a high-quality momentum setup:</p>
+  <table>
+    <thead><tr><th>Factor</th><th class="num">Weight</th><th>What it rewards</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Momentum</strong> (20-day return)</td><td class="num">25%</td><td>Stocks that are actually trending up</td></tr>
+      <tr><td><strong>Relative volume</strong></td><td class="num">25%</td><td>Conviction <em>behind</em> the move &mdash; volume confirms price</td></tr>
+      <tr><td><strong>Breakout</strong></td><td class="num">20%</td><td>A clean technical event, not just drift</td></tr>
+      <tr><td><strong>52-week proximity</strong></td><td class="num">15%</td><td>Strength &mdash; nearness to new highs</td></tr>
+      <tr><td><strong>RSI</strong></td><td class="num">15%</td><td>Healthy momentum, not exhaustion</td></tr>
+    </tbody>
+  </table>
+  <p>The detail that matters &mdash; <strong>each sub-score is shaped, not linear:</strong></p>
+  <ul>
+    <li><strong>Momentum</strong> runs through a <code>tanh</code> curve (0% &rarr; 50, +25% &rarr; ~85, &minus;25% &rarr; ~15) that <strong>saturates</strong> &mdash; so a stock up 200% on a one-off can&rsquo;t dominate the board on a single number.</li>
+    <li><strong>Relative volume</strong> is also <code>tanh</code>-shaped (1&times; &rarr; 50, 2&times; &rarr; ~75, 5&times; &rarr; 95+): rewarded, but capped so one anomalous day can&rsquo;t run away with it.</li>
+    <li><strong>Breakout</strong> is binary and decisive: fresh breakout = 100, breakdown = 20, neither = 50.</li>
+    <li><strong>52-week proximity</strong> is linear: at the high &rarr; 80, a new high &rarr; 100, down 50% &rarr; 0.</li>
+    <li><strong>RSI uses a sweet spot, not &ldquo;higher is better.&rdquo;</strong> 50&ndash;70 scores best; <strong>oversold (&lt;30) earns a bounce bonus</strong>; <strong>overbought (&gt;70) decays</strong> &mdash; exhaustion is a risk, not a virtue. This is the line between a momentum screen and a momentum-<em>quality</em> screen.</li>
+  </ul>
+  <p>The five blend, the market sorts, and <strong>the top 35 advance.</strong> Everything below is still scored and stored, but no
+  further resources are spent on it.</p>
+  <div class="callout"><strong>Why 35?</strong> Tuned, not arbitrary. After the fact-check gate trims names whose theses can&rsquo;t
+  be fully verified (~30&ndash;35% on a strict bar), we still land on a <strong>displayed board of 20&ndash;25 fully-verified
+  dossiers</strong> &mdash; comfortably above our floor of 15.</div>
+
+  <h2>Stage 3 &mdash; Honest price levels (before any AI touches the name)</h2>
+  <p><strong>All 35 &rarr; a price cone each. Deterministic statistics. No AI.</strong> A <strong>20,000-path Monte Carlo
+  simulation</strong> over ~one month yields a <strong>downside (5th pct)</strong>, <strong>midpoint</strong>, and
+  <strong>upside (95th pct)</strong>. The discipline: <strong>we zero out the drift.</strong> A na&iuml;ve simulation bakes a recent
+  rally into the forecast &mdash; momentum wearing a lab coat. Zeroing drift makes the cone describe <em>volatility only</em>;
+  direction lives in the thesis. Pure math, so every name gets honest levels even when the AI budget is tight.</p>
+</section>
+
+<!-- ============================ PAGE 4 — RESEARCH DESK + GRADE ============================ -->
+<section class="page">
+  <h2>Stage 4 &mdash; The research desk: six specialists, an assembly line</h2>
+  <p>Easy to misread as &ldquo;the same research six times.&rdquo; It isn&rsquo;t. Each specialist does <em>one</em> job, consumes the
+  output before it, and adds something none of the others produce:</p>
+  <table>
+    <thead><tr><th style="width:18%">Specialist</th><th style="width:22%">Reads</th><th style="width:25%">Its one job</th><th>Produces</th></tr></thead>
+    <tbody>
+      <tr><td><strong>1 &middot; Anomaly Detector</strong><br><span class="muted small">pure stats</span></td><td>the harvested tables</td><td>Flag <strong>everything unusual today</strong>; grade each 0&ndash;100</td><td>Gaps, volume/IV spikes, insider clusters, 8-Ks, 13D stakes, 13F pivots, attention spikes</td></tr>
+      <tr><td><strong>2 &middot; Cross-Validator</strong><br><span class="muted small">triangulation</span></td><td>the flags + six source categories</td><td>Decide <strong>real vs. noise</strong> via independent confirmation</td><td>A validated-strength score; agreement lifts it, contradiction cuts it</td></tr>
+      <tr><td><strong>3 &middot; Catalyst Agent</strong></td><td>validated signals, filings, news</td><td>Pin <strong>the one reason</strong> it&rsquo;s moving now</td><td>A catalyst with evidence: beat, 8-K, breakout, options sweep</td></tr>
+      <tr><td><strong>4 &middot; Smart-Money Intel</strong><br><span class="muted small">institutional desk</span></td><td>filings, transcripts, FINRA, analysts</td><td>Read what <strong>informed money</strong> is doing</td><td>4 signals &rarr; one of 10 named patterns (e.g. <em>Full Conviction Long</em>)</td></tr>
+      <tr><td><strong>5 &middot; Debate Synthesizer</strong><br><span class="muted small">portfolio manager</span></td><td><strong>everything above</strong></td><td>Write the <strong>institutional thesis</strong></td><td>Thesis / bull / bear / what-to-watch, every number cited to data</td></tr>
+      <tr><td><strong>6 &middot; Critic Agent</strong><br><span class="muted small">devil&rsquo;s advocate</span></td><td>the bull case + smart-money</td><td><strong>Attack</strong> it; sharpen the bear case</td><td>Weaknesses + an objection level that can only <em>lower</em> the grade</td></tr>
+    </tbody>
+  </table>
+  <h3>Three things make this hard to copy</h3>
+  <p><strong>Triangulation.</strong> A single dramatic signal is what fools retail screeners. We count one only when independent
+  categories &mdash; price, volume, news, SEC/insider, options, crowd &mdash; confirm it; contradiction cuts the score 30%, and any
+  source older than two days counts as absent. <strong>Several modest, confirming signals beat one spectacular but unconfirmed spike.</strong></p>
+  <p><strong>Smart money, four ways.</strong> Earnings-call tone vs. the prior four quarters, insider Form 4s (scheduled 10b5-1 sales
+  down-weighted 5&times;), short-squeeze potential, and analyst-revision velocity &mdash; even Congressional trades. Notes that read as
+  advice (&ldquo;buy/sell/you must&rdquo;) are rejected: this is research.</p>
+  <p><strong>The critic runs on a different AI.</strong> The bull case is written by one model, the critique by another &mdash; no model
+  marks its own homework &mdash; and its objection can pull a grade down, never up.</p>
+
+  <h2>Stage 5 &mdash; The conviction grade (A / B / C / D)</h2>
+  <p><strong>Rules + quant models. No AI, no discretion.</strong> The grade starts from the composite score and earns
+  <strong>bonuses</strong> only from corroborating models &mdash; Monte Carlo probability-up, Value-at-Risk outside the worst quartile,
+  significant positive <strong>alpha</strong> (Fama-French), a DCF with sensible 20&ndash;50% upside (a DCF showing <strong>&gt;50% earns
+  nothing</strong> &mdash; treated as suspicious). Names grade on a curve &mdash; then <strong>hard caps bite, one direction only:</strong>
+  a STRONG critic objection caps at B; a crisis volatility regime caps at C; poor simulation calibration or a cross-validation
+  contradiction blocks an A. <strong>A grade can only move down. Nothing inflates one</strong> &mdash; a credibility guarantee.</p>
+</section>
+
+<!-- ============================ PAGE 5 — GATES + MOAT ============================ -->
+<section class="page last">
+  <h2>The quality gates &mdash; why you never see a half-built pick</h2>
+  <ol>
+    <li><strong>Fact-check (mechanical, not AI judgment).</strong> Every number in the thesis must be tagged to the exact data point
+    it came from; a deterministic checker confirms each claim has a tag, points to a key that exists, and matches within 2%. Invented
+    or mis-cited numbers are caught automatically &mdash; the dossier is graded Verified, Partially Verified, or Unverified, and only
+    the first two pass. <strong>This is our hallucination spine.</strong></li>
+    <li><strong>Completeness.</strong> Catalyst + thesis + bull + bear + critic verdict + grade + price levels, with the bull and bear
+    cases reading as <em>finished</em> &mdash; never truncated.</li>
+    <li><strong>Verification grade.</strong> The verdict must be Verified or Partially Verified.</li>
+  </ol>
+  <p>Fail any gate and the name is <strong>hidden</strong> &mdash; a shorter clean board beats a padded one. If a pass leaves us short,
+  the engine <strong>re-runs research only on the unfinished names</strong> until the board fills (it can only ever <em>add</em>
+  complete dossiers), and a fresh scan replaces the dashboard only with <strong>at least 15 complete dossiers</strong> &mdash; otherwise
+  <strong>the last good board stays up.</strong> Never empty, never thin, never broken.</p>
+
+  <h2>What the client sees &mdash; and why it&rsquo;s the moat</h2>
+  <p>The dashboard shows the surviving board (typically <strong>15&ndash;25 names</strong>), each with a complete dossier: catalyst,
+  bull and bear, smart-money read, honest price levels, conviction grade. A separate page reports <strong>honest forward returns</strong>
+  on past picks &mdash; winners and losers alike.</p>
+  <ol>
+    <li><strong>Whole-market coverage, every day.</strong> Fast math on 3,300, in-depth AI on 35 &mdash; most tools do one or the other; we do both.</li>
+    <li><strong>Triangulation, not single-signal screening</strong> &mdash; with stale data treated as no data and contradictions penalised.</li>
+    <li><strong>A mechanical anti-hallucination spine</strong> &mdash; closed context, every number verified to its source; the biggest reason the research can be trusted.</li>
+    <li><strong>Separation of powers</strong> &mdash; thesis and critique on different models; verdict, completeness and grade enforced by deterministic code.</li>
+    <li><strong>Risk can only subtract</strong> &mdash; every cap moves a grade down; nothing talks one up.</li>
+    <li><strong>Honest by construction</strong> &mdash; zero-drift cones, &ldquo;no data&rdquo; over a guess, the last good board over a broken one, a track record that shows the misses.</li>
+  </ol>
+
+  <div class="oneliner">
+    <span class="label">The bottom line</span>
+    Pure math on the whole market, a six-AI research desk on the 35 that earn it, every number fact-checked against that
+    morning&rsquo;s data &mdash; and only a complete, verified board is ever shown. When a scan can&rsquo;t produce 15 clean dossiers,
+    the last good board stays up rather than ship anything half-built.
+  </div>
+</section>
+</body>
+</html>

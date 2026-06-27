@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>How the CEFA Emerging-Opportunities Engine Works</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=DM+Serif+Display&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+  @page { size: A4; margin: 0; }
+  *{ box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  :root{
+    --bg:#0b0a12; --fg:#ece9f5; --card:#15131f; --overlay:#1c1930;
+    --muted:#9a93b5; --soft:#d7d2e8; --border:rgba(255,255,255,0.09);
+    --accent:#a78bfa; --accent-soft:#c4b5fd; --accent-deep:#7c5cd6;
+    --f-display:'Fraunces',Georgia,serif;
+    --f-edit:'DM Serif Display',Georgia,serif;
+    --f-ui:'Geist','Segoe UI',Arial,sans-serif;
+    --f-mono:'Geist Mono',ui-monospace,Consolas,monospace;
+  }
+  html,body{ margin:0; padding:0; background:var(--bg); }
+  body::before{ content:""; position:fixed; inset:0; background:var(--bg); z-index:-1; }
+  body{ font-family:var(--f-ui); color:var(--soft); font-size:10.2pt; line-height:1.5;
+        font-feature-settings:"kern","ss01"; -webkit-font-smoothing:antialiased; }
+
+  /* one physical A4 page; padding is the safe inner margin, dark bleeds to edges */
+  .page{ padding:13mm 14mm; break-after:page; }
+  .page.last{ break-after:auto; }
+
+  h1,h2,h3{ font-family:var(--f-display); color:var(--fg); font-weight:600; }
+  h1{ font-size:24pt; letter-spacing:-0.025em; line-height:1.05; margin:0 0 4pt; }
+  h2{ font-size:14.5pt; letter-spacing:-0.02em; margin:13pt 0 5pt; padding-bottom:4pt;
+      border-bottom:1px solid var(--border); }
+  h2:first-of-type{ margin-top:0; }
+  h3{ font-size:11.5pt; letter-spacing:-0.012em; color:var(--accent-soft); margin:11pt 0 2pt; }
+  p{ margin:0 0 6pt; }
+  strong,b{ color:#f6f3fc; font-weight:600; }
+  em{ color:var(--muted); font-style:italic; }
+  code{ font-family:var(--f-mono); font-size:0.86em; background:var(--overlay);
+        color:var(--accent-soft); padding:.06em .32em; border-radius:4px; }
+
+  .eyebrow{ font-family:var(--f-ui); font-size:8.2pt; font-weight:500; letter-spacing:.2em;
+            text-transform:uppercase; color:var(--muted); margin-bottom:8pt; }
+  .lede{ font-family:var(--f-edit); font-size:12pt; line-height:1.46; color:#efedf7; }
+  .muted{ color:var(--muted); }
+  .small{ font-size:8.8pt; }
+
+  table{ border-collapse:collapse; width:100%; margin:8pt 0 10pt; font-size:9.1pt; }
+  thead th{ font-family:var(--f-ui); text-transform:uppercase; letter-spacing:.1em;
+            font-size:7.7pt; font-weight:600; color:var(--accent-soft); text-align:left;
+            padding:5pt 8pt; border-bottom:1px solid rgba(167,139,250,.35); }
+  td{ padding:5pt 8pt; border-bottom:1px solid rgba(255,255,255,.07); vertical-align:top; color:var(--soft); }
+  tr:nth-child(even) td{ background:rgba(255,255,255,.02); }
+  td.num{ text-align:right; white-space:nowrap; font-family:var(--f-mono); font-variant-numeric:tabular-nums; color:var(--fg); }
+
+  ul,ol{ margin:3pt 0 8pt; padding-left:16pt; }
+  li{ margin:0 0 3pt; }
+  li::marker{ color:var(--accent); }
+
+  .callout{ background:var(--card); border:1px solid var(--border); border-left:2px solid var(--accent);
+            padding:9pt 13pt; margin:10pt 0; border-radius:10px;
+            box-shadow:inset 0 1px 0 0 rgba(255,255,255,.04); }
+  .warn{ border-left-color:#f0a35e; }
+
+  .oneliner{ font-family:var(--f-edit); font-size:10.6pt; line-height:1.48;
+             color:var(--fg); background:linear-gradient(180deg,#1d1933,#15131f);
+             border:1px solid rgba(167,139,250,.30); border-radius:14px; padding:14pt 17pt; margin:12pt 0;
+             box-shadow:inset 0 1px 0 0 rgba(255,255,255,.05), 0 16px 48px -24px rgba(167,139,250,.55); }
+  .oneliner .label{ display:block; font-family:var(--f-ui); font-weight:600; letter-spacing:.16em;
+                    text-transform:uppercase; font-size:8pt; color:var(--accent-soft); margin-bottom:5pt; }
+
+  /* cover */
+  .cover-head{ border-bottom:1px solid var(--border); padding-bottom:10pt; margin-bottom:12pt; }
+  .cover-head .sub{ font-family:var(--f-edit); color:var(--muted); font-size:10.8pt; }
+  .figwrap svg{ width:158mm; height:auto; display:block; margin:6pt auto 2pt; }
+  .fignote{ text-align:center; color:var(--muted); font-size:8.2pt; font-style:italic;
+            font-family:var(--f-edit); margin-top:3pt; }
+  .glance{ display:flex; gap:10pt; margin:13pt 0 0; }
+  .glance .col{ flex:1; background:var(--card); border:1px solid var(--border); border-radius:12px;
+                padding:10pt 12pt; box-shadow:inset 0 1px 0 0 rgba(255,255,255,.04); }
+  .glance .h{ font-family:var(--f-ui); color:var(--fg); font-weight:600; font-size:9.4pt; margin-bottom:4pt; }
+  .glance .h::before{ content:""; display:inline-block; width:6px; height:6px; border-radius:50%;
+                      background:var(--accent); margin-right:6px; vertical-align:middle; }
+  .glance .b{ font-size:8.5pt; line-height:1.42; color:var(--soft); }
+  .closer{ text-align:center; color:var(--muted); font-size:8.4pt; font-style:italic;
+           font-family:var(--f-edit); margin-top:13pt; }
+</style>
+</head>
+<body>
+
+<!-- ============================ PAGE 1 — COVER ============================ -->
+<section class="page">
+  <div class="cover-head">
+    <div class="eyebrow">Christopher Edwards Financial Associates &middot; Confidential</div>
+    <h1>How the CEFA Emerging Engine Works</h1>
+    <div class="sub">From ~4,000 small &amp; micro-caps to a hand of fully-researched, honestly-tracked asymmetric bets &mdash; once a week.</div>
+  </div>
+
+  <p class="lede"><strong style="color:#fff">This engine does the opposite job to the daily scan.</strong> Instead of finding the
+  strongest, most-confirmed large-caps, it hunts the small names <em>nobody is looking at yet</em> &mdash; scoring each for the
+  structural DNA of a historical 100-bagger. It is <em>structured speculation, not prediction</em>: most of these names will not become
+  multibaggers, and the engine is built to say so out loud.</p>
+
+  <div class="figwrap">
+  <svg viewBox="0 0 1100 470" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The CEFA emerging-opportunities funnel">
+    <defs>
+      <linearGradient id="fg" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#241f3a"/><stop offset="50%" stop-color="#5b3fb0"/><stop offset="100%" stop-color="#a78bfa"/>
+      </linearGradient>
+    </defs>
+    <polygon points="40,30 620,30 571,124 89,124"     fill="url(#fg)"/>
+    <polygon points="93,130 568,130 518,224 142,224"  fill="url(#fg)"/>
+    <polygon points="145,230 515,230 466,324 194,324" fill="url(#fg)"/>
+    <polygon points="198,330 463,330 413,424 247,424" fill="url(#fg)"/>
+
+    <text x="330" y="74"  text-anchor="middle" fill="#fff" font-family="Geist,Segoe UI,Arial" font-size="30" font-weight="700">~4,000 SMALL-CAPS</text>
+    <text x="330" y="100" text-anchor="middle" fill="#d8d2ea" font-family="Geist,Segoe UI,Arial" font-size="15">the cheap end &middot; $50M&ndash;$10B</text>
+    <text x="330" y="173" text-anchor="middle" fill="#fff" font-family="Geist,Segoe UI,Arial" font-size="25" font-weight="700">DNA SCREEN</text>
+    <text x="330" y="196" text-anchor="middle" fill="#e6e0f6" font-family="Geist,Segoe UI,Arial" font-size="14">six multibagger traits</text>
+    <text x="330" y="272" text-anchor="middle" fill="#fff" font-family="Geist,Segoe UI,Arial" font-size="25" font-weight="700">TOP 30</text>
+    <text x="330" y="294" text-anchor="middle" fill="#efeafb" font-family="Geist,Segoe UI,Arial" font-size="13">score + caps &rarr; deep thesis</text>
+    <text x="330" y="373" text-anchor="middle" fill="#140f28" font-family="Geist,Segoe UI,Arial" font-size="21" font-weight="700">WATCHLIST</text>
+    <text x="330" y="394" text-anchor="middle" fill="#2a2150" font-family="Geist,Segoe UI,Arial" font-size="13" font-weight="500">tiered &middot; tracked honestly</text>
+
+    <g stroke="#a78bfa" stroke-width="1.3">
+      <line x1="595" y1="77" x2="650" y2="77"/><line x1="543" y1="177" x2="650" y2="177"/>
+      <line x1="490" y1="277" x2="650" y2="277"/><line x1="438" y1="377" x2="650" y2="377"/>
+    </g>
+    <g><circle cx="650" cy="77" r="3" fill="#6f6791"/><circle cx="650" cy="177" r="3" fill="#6f6791"/>
+       <circle cx="650" cy="277" r="3.4" fill="#a78bfa"/><circle cx="650" cy="377" r="3" fill="#6f6791"/></g>
+
+    <text x="664" y="72"  fill="#ece9f5" font-family="Geist,Segoe UI,Arial" font-size="16" font-weight="600">STAGE 1 &middot; UNIVERSE</text>
+    <text x="664" y="91"  fill="#9a93b5" font-family="Geist,Segoe UI,Arial" font-size="13.5">Small &amp; micro-cap, $50M&ndash;$10B &middot; rebuilt periodically</text>
+    <text x="664" y="172" fill="#ece9f5" font-family="Geist,Segoe UI,Arial" font-size="16" font-weight="600">STAGE 2 &middot; DNA SCREEN</text>
+    <text x="664" y="191" fill="#9a93b5" font-family="Geist,Segoe UI,Arial" font-size="13.5">Six traits, each 0&ndash;100 &middot; rewards the undiscovered</text>
+    <text x="664" y="272" fill="#ece9f5" font-family="Geist,Segoe UI,Arial" font-size="16" font-weight="600">STAGES 3&ndash;4 &middot; SCORE + THESIS</text>
+    <text x="664" y="291" fill="#9a93b5" font-family="Geist,Segoe UI,Arial" font-size="13.5">Caps only subtract &rarr; balanced, verify-or-drop thesis</text>
+    <text x="664" y="372" fill="#ece9f5" font-family="Geist,Segoe UI,Arial" font-size="16" font-weight="600">STAGES 5&ndash;6 &middot; WATCHLIST + TRACK</text>
+    <text x="664" y="391" fill="#9a93b5" font-family="Geist,Segoe UI,Arial" font-size="13.5">Tiered &middot; graduate at $10B &middot; honest outcomes</text>
+  </svg>
+  </div>
+  <div class="fignote">The math finds the <em>shape</em> of a multibagger cheaply; the AI writes the <em>theory</em> &mdash; and, as hard, the <em>threats</em>.</div>
+
+  <div class="glance">
+    <div class="col"><div class="h">The deliberate inverse</div><div class="b">The daily scan rewards <em>confirmation</em>; this engine rewards <em>obscurity</em>. A stock that lights up every signal is already discovered &mdash; and no longer cheap. So it fishes where the daily scan won&rsquo;t.</div></div>
+    <div class="col"><div class="h">&ldquo;What kills it&rdquo; is a deliverable</div><div class="b">Every thesis writes the failure case as rigorously as the 10x path. Hype phrases (&ldquo;next Nvidia&rdquo;, &ldquo;guaranteed&rdquo;) cause the whole thesis to be discarded and rewritten.</div></div>
+    <div class="col"><div class="h">Honest, even about losers</div><div class="b">Any name we can&rsquo;t justify is dropped, not dressed up. Every name ever added is tracked forever &mdash; the 2x/5x/10x hits <em>and</em> the failures.</div></div>
+  </div>
+
+  <div class="oneliner">
+    <span class="label">In one line</span>
+    Once a week we screen ~4,000 small &amp; micro-cap US stocks for the six structural traits of a historical multibagger &mdash;
+    deliberately rewarding the obscure names a confirmation-based scan would ignore &mdash; score them with checks that can only ever
+    lower a score, then write a balanced AI thesis on the top 30 in which &ldquo;what kills it&rdquo; is as rigorous as the &ldquo;10x
+    path.&rdquo; Every number is fact-checked, any name we can&rsquo;t justify is dropped, and every name we ever add is tracked
+    honestly &mdash; winners and losers.
+  </div>
+
+  <div class="closer">The full mechanics &mdash; the six traits, the caps, and the verify-or-drop thesis &mdash; follow &rarr;</div>
+</section>
+
+<!-- ============================ PAGE 2 — PHILOSOPHY + UNIVERSE + SCREEN ============================ -->
+<section class="page">
+  <div class="eyebrow">The Emerging Engine &middot; Full detail</div>
+  <h1 style="font-size:20pt; margin-bottom:8pt;">A different machine, on purpose</h1>
+  <p class="lede" style="margin-bottom:6pt;">This is not the daily scan pointed at smaller stocks. It is built on the opposite
+  philosophy &mdash; and that single choice explains everything that follows.</p>
+
+  <table>
+    <thead><tr><th style="width:20%"></th><th style="width:40%">Daily conviction scan</th><th>Emerging-opportunities engine</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Universe</strong></td><td>~3,300 liquid, mostly large/mid-cap US stocks</td><td>~4,000 small &amp; micro-caps, $50M&ndash;$10B</td></tr>
+      <tr><td><strong>It rewards</strong></td><td><strong>Confirmation</strong> &mdash; many sources agreeing <em>now</em></td><td><strong>Obscurity</strong> &mdash; structurally promising but <em>undiscovered</em></td></tr>
+      <tr><td><strong>Horizon</strong></td><td>Days to weeks (a catalyst moving today)</td><td>Years (a base that can compound)</td></tr>
+      <tr><td><strong>Coverage</strong></td><td>Helps &mdash; it&rsquo;s part of the confirmation</td><td><strong>The less, the better</strong> &mdash; heavy coverage <em>lowers</em> the score</td></tr>
+    </tbody>
+  </table>
+  <p class="small muted">The reason for the split: a stock that lights up every confirmation signal is, by definition, already
+  discovered &mdash; and no longer cheap. The multibagger math lives where the daily scan refuses to fish. It keeps its own screener,
+  scoring, research desk and dashboard, and never borrows the daily engine&rsquo;s conviction grader.</p>
+
+  <h2>Stage 1 &mdash; Build the universe (the cheap end of the market)</h2>
+  <p><strong>A few thousand names &rarr; kept. No AI. Rebuilt periodically.</strong> The engine builds its own list from authoritative,
+  stable sources:</p>
+  <ul>
+    <li><strong>The NASDAQ screener</strong> &mdash; every US-listed common stock across NYSE / NASDAQ / AMEX (~7,000 names) with market cap, sector and IPO year.</li>
+    <li><strong>The recent-IPO calendar</strong> &mdash; the last three years of new listings, to catch fresh names the screener hasn&rsquo;t fully tagged.</li>
+  </ul>
+  <p>We keep only names valued between <strong>$50M and $10B</strong>. Below $50M is too illiquid to research responsibly; above $10B
+  the &ldquo;small base&rdquo; that makes 10&times; math possible is already gone.</p>
+
+  <h2>Stage 2 &mdash; The DNA screen: six traits of a historical multibagger</h2>
+  <p><strong>Every name &rarr; six 0&ndash;100 scores. Pure math. No AI.</strong> Decades of 100-baggers share a recognisable shape.
+  Each trait &ldquo;passes&rdquo; at <strong>60</strong>; a name passing <strong>5 of 6</strong> advances, <strong>4</strong> lands on a watch list.</p>
+</section>
+
+<!-- ============================ PAGE 3 — THE SIX TRAITS + SCORE & CAPS ============================ -->
+<section class="page">
+  <h3 style="margin-top:0">Stage 2 &mdash; the six multibagger traits</h3>
+  <table>
+    <thead><tr><th style="width:5%">#</th><th style="width:23%">Trait</th><th>What earns a high score</th></tr></thead>
+    <tbody>
+      <tr><td class="num">1</td><td><strong>Small base</strong></td><td>A cap in the <strong>$200M&ndash;$2B sweet spot</strong> scores 100 (room to grow 10&times;). $100M&ndash;$200M &rarr; 80; $2B&ndash;$5B &rarr; 60; $5B&ndash;$10B &rarr; 30.</td></tr>
+      <tr><td class="num">2</td><td><strong>Durable revenue growth</strong></td><td>A <strong>3-year revenue growth rate (CAGR) &ge; 40%</strong> scores 95; &ge; 25% &rarr; 80; &ge; 15% &rarr; 50. Growth that&rsquo;s <strong>decelerating</strong> is penalised &mdash; fast <em>and slowing</em> is a warning.</td></tr>
+      <tr><td class="num">3</td><td><strong>Improving unit economics</strong></td><td>High and/or <em>rising</em> gross and operating margins. A margin still negative but <strong>clearly improving</strong> scores well &mdash; the signature of a business nearing escape velocity.</td></tr>
+      <tr><td class="num">4</td><td><strong>Large addressable market</strong></td><td>A coarse structural prior from sector and size (tiny company, big growing sector = more runway). The AI analyst refines the real TAM later.</td></tr>
+      <tr><td class="num">5</td><td><strong>Aligned owner-operators</strong></td><td><strong>Real insider ownership</strong>: &ge; 20% held by insiders &rarr; 95; &ge; 10% &rarr; 80. Recent insider <em>buying</em> (SEC Form 4) tilts up; heavy <em>selling</em> tilts down. Skin in the game.</td></tr>
+      <tr><td class="num">6</td><td><strong>Under-discovered</strong></td><td><strong>The inverted signal.</strong> Fewer analysts = a <em>higher</em> score: 0&ndash;2 &rarr; 95, above ~7 &rarr; 20. This is what makes the engine the mirror image of the daily scan.</td></tr>
+    </tbody>
+  </table>
+  <div class="callout"><strong>Why trait 5 was worth rebuilding.</strong> Insider-ownership data isn&rsquo;t on the vendor&rsquo;s free
+  tier, so this trait once sat at its neutral default for <em>every</em> company &mdash; alignment was effectively switched off. It now
+  reads live ownership data, so a founder-led company with 50% insider ownership finally scores like one, and a company insiders are
+  quietly exiting is finally marked down.</div>
+
+  <h2>Stage 3 &mdash; The multibagger score (caps that can only subtract)</h2>
+  <p><strong>The screened names &rarr; one 0&ndash;100 score &rarr; the top 30 advance. Rules + math. No AI.</strong> The six traits roll
+  up with fixed weights that encode what actually compounds:</p>
+  <table>
+    <thead><tr><th>Component</th><th class="num">Weight</th><th>What it captures</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Growth quality</strong></td><td class="num">30%</td><td>Real, durable revenue growth &mdash; the engine of the thesis</td></tr>
+      <tr><td><strong>Reinvestment runway</strong></td><td class="num">25%</td><td>Room and economics to redeploy capital at high returns</td></tr>
+      <tr><td><strong>Unit economics</strong></td><td class="num">20%</td><td>Margins that work, or are clearly on their way</td></tr>
+      <tr><td><strong>Alignment</strong></td><td class="num">15%</td><td>Owner-operators betting alongside you</td></tr>
+      <tr><td><strong>Discovery gap</strong></td><td class="num">10%</td><td>How undiscovered it still is</td></tr>
+    </tbody>
+  </table>
+  <p>Then &mdash; exactly as in the daily grader &mdash; <strong>the risk checks can only move a score <em>down</em>:</strong></p>
+  <ul>
+    <li><strong>Cash-burning, under a year of runway, not yet profitable</strong> &rarr; capped at 50 (dilution risk).</li>
+    <li><strong>Debt-to-equity above 2.0</strong> &rarr; capped at 40 (too levered for a long, bumpy road).</li>
+    <li><strong>Revenue decelerating</strong> &rarr; capped at 50.</li>
+  </ul>
+  <p class="small muted"><strong style="color:#f6f3fc">Accounting red flags</strong> (restatements, auditor changes, going-concern
+  language) are treated as disqualifiers and surfaced in the deep-research stage&rsquo;s &ldquo;what kills it&rdquo; analysis. The same
+  credibility guarantee as the daily scan applies throughout: nothing can <em>talk a score up</em> &mdash; only evidence of quality lifts
+  it, and known risks can only hold it back. The top 30 by capped score advance to deep research.</p>
+</section>
+
+<!-- ============================ PAGE 4 — THE DEEP THESIS ============================ -->
+<section class="page">
+  <h2>Stage 4 &mdash; The deep thesis: balanced, closed-context, verify-or-drop</h2>
+  <p><strong>The top 30 &rarr; one full thesis each. This is the AI work.</strong> An AI analyst writes a deliberately
+  <strong>balanced</strong> dossier under the same anti-hallucination discipline as the daily desk: a <strong>closed data section</strong>
+  it may not stray from, every specific number tagged to the exact data point it came from. Nine parts:</p>
+  <table>
+    <thead><tr><th style="width:26%">Section</th><th>What it must do</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Selection rationale</strong><br><span class="muted small">the spine</span></td><td>In 2&ndash;4 sentences, why the screen surfaced this name &mdash; which DNA traits scored highest, and the theory for how that profile compounds.</td></tr>
+      <tr><td><strong>Business model</strong></td><td>Plainly: what they do and how they make money.</td></tr>
+      <tr><td><strong>The 10x path</strong></td><td>The concrete route to a 10&times; outcome &mdash; TAM capture, margin expansion, re-rating &mdash; grounded in the metrics.</td></tr>
+      <tr><td><strong>Moat assessment</strong></td><td>Network effects / switching costs / brand / IP &mdash; or honestly, <em>none verifiable yet</em>.</td></tr>
+      <tr><td><strong>Founder assessment</strong></td><td>Who runs it and how aligned they are.</td></tr>
+      <tr><td><strong>What has to go right</strong></td><td>The 3&ndash;4 load-bearing assumptions.</td></tr>
+      <tr><td><strong>What kills it</strong><br><span class="muted small">co-equal</span></td><td>3&ndash;4 specific, rigorous failure modes &mdash; written as hard as the 10x path. A first-class deliverable, never an asterisk.</td></tr>
+      <tr><td><strong>Key metrics to track</strong></td><td>Four specific, human-readable things to watch for <em>this</em> company.</td></tr>
+      <tr><td><strong>Risk + conviction tier</strong></td><td>An honest label: speculative / high-risk / moderate, and tier 1 / 2 / 3.</td></tr>
+    </tbody>
+  </table>
+  <h3>Two rules make this trustworthy, not promotional</h3>
+  <p><strong>&#9312; The rationale must verify, or the name is dropped.</strong> A deterministic checker confirms every number in the
+  selection rationale traces to real data. If it can&rsquo;t be verified, <strong>the name is removed from the run entirely</strong>
+  &mdash; we never show a name we can&rsquo;t justify. Every <em>other</em> section that fails isn&rsquo;t faked: it&rsquo;s replaced
+  with an honest line naming exactly what couldn&rsquo;t be confirmed (e.g. <em>&ldquo;No analyst coverage and few filings &mdash; moat
+  not verifiable from connected sources.&rdquo;</em>). For these under-covered names, thin data is the <em>norm</em>, and the engine says
+  &ldquo;we don&rsquo;t know&rdquo; instead of inventing.</p>
+  <p><strong>&#9313; Hype is mechanically banned.</strong> Phrases like <em>&ldquo;to the moon,&rdquo; &ldquo;guaranteed,&rdquo;
+  &ldquo;next Nvidia,&rdquo; &ldquo;no-brainer,&rdquo;</em> and <em>&ldquo;easy 10x&rdquo;</em> cause the entire thesis to be
+  <strong>discarded and rewritten.</strong> The voice is plain, balanced and risk-forward &mdash; the opposite of a stock-promotion newsletter.</p>
+</section>
+
+<!-- ============================ PAGE 5 — WATCHLIST + TRACK + MOAT ============================ -->
+<section class="page last">
+  <h2>Stage 5 &mdash; The watchlist (tiers, graduation, honest retirement)</h2>
+  <p><strong>Verified theses &rarr; a persistent, tiered watchlist. Rules. No AI.</strong> A name joins only with a complete,
+  fact-checked dossier (when several theses exist for one name, the engine keeps the <em>best-verified</em> one, not the most recent if
+  it&rsquo;s weaker). <strong>Tier 1 (higher conviction)</strong> and <strong>Tier 2 (promising)</strong> always join;
+  <strong>Tier 3 (speculative)</strong> joins only if its score clears 60. Prices, returns, peak gains and drawdowns refresh weekly.
+  Two lifecycle rules keep it clean: a name whose market cap crosses <strong>$10B &ldquo;graduates&rdquo;</strong> out into the daily
+  pipeline (it&rsquo;s no longer small), and a name whose <strong>thesis breaks is archived</strong>, not quietly deleted.</p>
+
+  <h2>Stage 6 &mdash; Honest outcome tracking (including the failures)</h2>
+  <p><strong>Every name ever added &rarr; a permanent return record. Pure math.</strong> For winners, losers and the dead alike, we keep
+  a long-tail record and report engine-level statistics plainly: the share that hit <strong>2&times; / 5&times; / 10&times;</strong>
+  (with milestone dates), the share <strong>archived as broken</strong>, the <strong>average current return</strong>, and the
+  <strong>median time to double</strong> for the names that doubled. A strategy that expects most names to fail has no credibility unless
+  it shows the failures &mdash; so it does.</p>
+
+  <div class="callout warn"><strong>The risk framing isn&rsquo;t a footnote &mdash; it&rsquo;s the product.</strong> Every report and the
+  dashboard carry it: <em>&ldquo;Emerging candidates are speculative, long-horizon, high-risk positions. Most will not become
+  multibaggers. Small bets, long horizons, expect many failures and a few large winners. For licensed-advisor review &mdash; not
+  investment advice.&rdquo;</em> The winners can return many multiples; the losers can only ever return &minus;100%. The engine is sized
+  around that asymmetry and never pretends otherwise.</p></div>
+
+  <h2>Why this is the moat</h2>
+  <ol>
+    <li><strong>It fishes where confirmation-based screeners can&rsquo;t.</strong> By <em>rewarding</em> obscurity it surfaces names before the crowd &mdash; the only place asymmetric returns live.</li>
+    <li><strong>The same anti-hallucination spine as the daily desk</strong> &mdash; closed context, every number checked, the core rationale verified-or-dropped. Where fabrication is easiest, it refuses to guess.</li>
+    <li><strong>&ldquo;What kills it&rdquo; is a deliverable, not a disclaimer</strong> &mdash; the failure case is as rigorous as the upside.</li>
+    <li><strong>Risk can only subtract</strong> &mdash; cash-burn, leverage, deceleration and accounting flags can only cap or exclude.</li>
+    <li><strong>It keeps score honestly, forever</strong> &mdash; every name it ever touched, hit-rate and failures published.</li>
+  </ol>
+
+  <div class="oneliner">
+    <span class="label">The bottom line</span>
+    A weekly screen of ~4,000 small-caps for the six traits of a historical multibagger &mdash; rewarding the obscure names a
+    confirmation scan ignores &mdash; scored by checks that can only lower a score, then a balanced AI thesis on the top 30 where
+    &ldquo;what kills it&rdquo; is as rigorous as the &ldquo;10x path.&rdquo; Any name we can&rsquo;t justify is dropped; every name we
+    ever add is tracked honestly forever. Structured speculation: small bets, long horizons, most will fail, a few can return many
+    multiples &mdash; and we never pretend otherwise.
+  </div>
+</section>
+</body>
+</html>

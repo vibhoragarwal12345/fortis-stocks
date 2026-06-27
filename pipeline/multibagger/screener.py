@@ -46,6 +46,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from config import FINNHUB_API_KEY, SUPABASE_SERVICE_KEY, SUPABASE_URL  # noqa: E402
 from supabase import create_client  # noqa: E402
 
+# India fundamentals adapter — emits Finnhub-shaped blobs from yfinance for
+# NSE/BSE tickers, so the trait functions below feed off it unchanged. Guarded
+# so the US-only path still imports if the module is ever absent.
+try:
+    from data import india_fundamentals as india  # noqa: E402
+except Exception:  # noqa: BLE001
+    india = None
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s  %(levelname)-7s  %(message)s",
@@ -123,6 +131,9 @@ def _finnhub_get(path: str, **params):
 
 
 def _fetch_metric(ticker: str) -> dict:
+    # NSE/BSE tickers: serve the Finnhub-shaped blob from yfinance (free, no key).
+    if india is not None and india.is_indian(ticker):
+        return india.metric_blob(ticker)
     cached = _cache_get(ticker, "metric")
     if cached is not None:
         return cached
@@ -132,6 +143,8 @@ def _fetch_metric(ticker: str) -> dict:
 
 
 def _fetch_recommendation(ticker: str) -> list:
+    if india is not None and india.is_indian(ticker):
+        return india.recommendation(ticker)
     cached = _cache_get(ticker, "rec")
     if cached is not None:
         return cached
@@ -145,6 +158,10 @@ def _fetch_yf_stats(ticker: str) -> dict:
     (heldPercentInsiders / heldPercentInstitutions / cash / cashflow), pulled
     from yfinance. Cached on disk (same 14-day TTL) so the weekly run is cheap.
     Degrades to {} on failure -- the caller then treats the fields as unknown."""
+    # NSE/BSE: reuse the adapter's bundle (same yfinance source, one cache,
+    # handles .NSE/.BSE → .NS/.BO normalisation).
+    if india is not None and india.is_indian(ticker):
+        return india.yf_stats(ticker)
     cached = _cache_get(ticker, "yf")
     if cached is not None:
         return cached
