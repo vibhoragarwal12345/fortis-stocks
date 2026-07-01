@@ -1,0 +1,30 @@
+{
+  "projectId": "e0a49a9a-1562-4fd2-8ceb-df2a2d427b42",
+  "shape": "package",
+  "pkg": "fortis-stocks",
+  "globalName": "CEFA",
+  "srcDir": "ds-ui",
+  "cssEntry": "_compiled.css",
+  "componentSrcMap": {
+    "CardAction": null,
+    "CardContent": null,
+    "CardDescription": null,
+    "CardFooter": null,
+    "CardHeader": null,
+    "CardTitle": null,
+    "FormControl": null,
+    "FormDescription": null,
+    "FormField": null,
+    "FormItem": null,
+    "FormLabel": null,
+    "FormMessage": null,
+    "TableBody": null,
+    "TableCaption": null,
+    "TableCell": null,
+    "TableFooter": null,
+    "TableHead": null,
+    "TableHeader": null,
+    "TableRow": null
+  },
+  "readmeHeader": ".design-sync/conventions.md"
+}

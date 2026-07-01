@@ -75,3 +75,8 @@ scan_test.log
 
 # Commodities pipeline: generated smoke-test dumps + manual USGS imports stay local
 /pipeline/commodities/data/
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules
