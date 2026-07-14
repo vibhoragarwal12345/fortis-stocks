@@ -46,6 +46,18 @@ jobs:
             echo "Not first-of-month window ($DAY) -- skipping monthly"
           fi
 
+      - name: Persist generated reports
+        # generate_performance_report writes markdown to pipeline/reports/ on
+        # the ephemeral runner; without this upload the report is lost when
+        # the job ends (this bit us for every monthly report before July 2026).
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-reports-${{ github.run_id }}
+          path: pipeline/reports/
+          if-no-files-found: ignore
+          retention-days: 90
+
   notify_failure:
     needs: [rollup]
     if: failure()

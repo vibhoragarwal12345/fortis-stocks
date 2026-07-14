@@ -362,6 +362,34 @@ export default async function ResearchPage({
         </Reveal>
       )}
 
+      {/* Entry-timing disclosure for hot-momentum names. Backtest v2 factor
+          analysis (docs/BACKTEST_REBUILD_PLAN.md) found 20d momentum inversely
+          related to 5-day forward alpha WITHIN the shortlist (Spearman IC
+          -0.22). This is our own statistical observation computed from scan
+          metrics — not LLM dossier prose — so the dossier-gate rule doesn't
+          apply and it renders whenever the tape is this hot. Threshold +25%
+          matches the composite's tanh midpoint (+25% over 20d ≈ 85/100
+          momentum points). */}
+      {scan?.return_20d_pct != null && scan.return_20d_pct >= 25 && (
+        <Reveal as="section">
+          <div className="rounded-lg border border-warning/25 bg-warning/5 p-5">
+            <p className="text-eyebrow text-warning">Entry timing note</p>
+            <p className="mt-2 text-small text-muted-foreground leading-relaxed">
+              {ticker} arrives here after a{" "}
+              <span className="text-foreground">
+                +{scan.return_20d_pct.toFixed(1)}%
+              </span>{" "}
+              move over the past 20 trading days. In our own tracked results,
+              focus-list names with run-ups of this size have tended to
+              consolidate against the S&amp;P 500 over the following week.
+              That is a statistical tendency from a young sample — not a sell
+              signal — but it argues for entry discipline (scaling in over
+              days rather than chasing the open) on names this extended.
+            </p>
+          </div>
+        </Reveal>
+      )}
+
       {pick?.catalyst_description &&
         (pick.catalyst_category ?? "none").toLowerCase() !== "none" &&
         !/there is no specific catalyst|MIXED_SIGNALS/i.test(
