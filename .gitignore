@@ -57,6 +57,9 @@ next-env.d.ts
 # Generated performance / track-record reports
 /pipeline/reports/
 
+# Backtest v2 PIT price-panel cache (parquet, regenerated on demand)
+/pipeline/data/backtest_v2_cache/
+
 # Step 7.5 -- daily feedback diagnostics + retraining proposals. Uploaded
 # as workflow artifacts in feedback_aggregator.yml; not source.
 /pipeline/proposals/*.json

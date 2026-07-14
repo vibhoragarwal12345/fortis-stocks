@@ -506,17 +506,19 @@ def _regime_breakdown(db, outcomes: list[dict]) -> dict:
     """Group outcomes by macro_context.regime_classification at recommended_date
     (or nearest prior). Returns {regime: {n, avg_alpha_20d, win_rate_5d}}."""
     try:
+        # macro_context keys its snapshots on snapshot_time (timestamptz) --
+        # there is no snapshot_date column (the old select 400'd silently).
         macro = _fetch_all(lambda: db.table("macro_context")
-                            .select("snapshot_date,regime_classification")
-                            .order("snapshot_date", desc=True))
+                            .select("snapshot_time,regime_classification")
+                            .order("snapshot_time", desc=True))
     except Exception as exc:
         log.debug("macro_context unavailable: %s", exc)
         return {}
     if not macro:
         return {}
     # Build a sorted list and find nearest-prior date for each outcome.
-    macro_sorted = sorted(macro, key=lambda r: r["snapshot_date"])
-    macro_dates = [_to_date(r["snapshot_date"]) for r in macro_sorted]
+    macro_sorted = sorted(macro, key=lambda r: r["snapshot_time"])
+    macro_dates = [_to_date(r["snapshot_time"][:10]) for r in macro_sorted]
     by_regime: dict[str, list[dict]] = {}
     for o in outcomes:
         rd = _to_date(o["recommended_date"])
