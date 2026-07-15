@@ -325,8 +325,11 @@ the data keys above (e.g. "RSI at 62 [DATA REF: rsi]").
 End the section with 2-3 lines, each starting "- ", stating the strongest
 bull points one sentence each, ending with "(confidence: high)" or
 "(confidence: medium)". A point without cited data behind it does not get
-"high". If the catalyst has a date or window, state it explicitly and say
-plainly whether this is a DATED catalyst or an open-ended narrative.
+"high". The [DATA REF: key] rule applies to these lines too — every number
+in a summary bullet repeats its tag (e.g. "- Volume running 3.2x average
+[DATA REF: volume] with a dated catalyst ahead (confidence: high)").
+If the catalyst has a date or window, state it explicitly and say plainly
+whether this is a DATED catalyst or an open-ended narrative.
 
 BEAR_CASE:
 Two specific paragraphs arguing the short thesis. What could go wrong. Name the
@@ -336,7 +339,8 @@ interest, downgrade cluster). Apply the same [DATA REF: key] rule to every
 numeric or specific claim.
 End the section with 1-2 lines, each starting "- ", naming the scenario(s)
 that would most plausibly INVALIDATE the bull thesis entirely -- honest
-kill-conditions, not token caveats.
+kill-conditions, not token caveats. Tag every number in these lines with
+[DATA REF: key] like everywhere else.
 
 PRICE_TARGET:
 Reasonable 3-month upside target with reasoning, and the downside risk level.
@@ -351,8 +355,11 @@ WHAT_TO_WATCH:
 Three specific data points or events, each its own line starting with "- ".
 At least one must be a CONFIRMATION signal and at least one an INVALIDATION
 signal, and each must carry a specific trigger level or date where the data
-supports one (e.g. "- INVALIDATION: closes below $42.10 support" rather than
-"- watch the price action")."""
+supports one -- with its [DATA REF: key] tag, like every other number
+(e.g. "- INVALIDATION: closes below $42.10 support [DATA REF: support]"
+rather than "- watch the price action"). Do not invent trigger levels the
+data does not contain; an event-based trigger with no number is better
+than a fabricated one."""
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -364,7 +371,7 @@ def _generate(prompt: str) -> tuple[str | None, str]:
     # 2-paragraph BEAR + price/sizing/what-to-watch, AND the reasoning models
     # (gpt-oss) spend tokens thinking before emitting -- 1600 truncated a case
     # mid-sentence on longer names. Generous headroom keeps every section whole.
-    return complete(prompt, system=_SYSTEM, temperature=0.5, max_tokens=3000)
+    return complete(prompt, system=_SYSTEM, temperature=0.5, max_tokens=3600)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

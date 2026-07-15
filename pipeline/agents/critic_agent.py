@@ -145,7 +145,9 @@ Output one of: STRONG_OBJECTION, MODERATE_OBJECTION, NO_MATERIAL_OBJECTION.
 
 REWRITTEN_BEAR_CASE:
 Now write the bear case as it should be written if it were as well-argued as
-the bull case typically is. Be specific."""
+the bull case typically is. Be specific. The [DATA REF: key] rule applies to
+EVERY line of your output, including severity annotations' sentences and any
+number you repeat from the bull case."""
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -153,7 +155,7 @@ the bull case typically is. Be specific."""
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _generate(prompt: str) -> tuple[str | None, str]:
-    return complete(prompt, system=_SYSTEM, temperature=0.5, max_tokens=1600)
+    return complete(prompt, system=_SYSTEM, temperature=0.5, max_tokens=2000)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
