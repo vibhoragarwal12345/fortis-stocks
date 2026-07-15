@@ -139,6 +139,18 @@ def run(
     db = _db()
     t_total = time.time()
 
+    # Preflight (added 2026-07-15, pattern from HKUDS/Vibe-Trading): verify
+    # every dependency BEFORE opening a scan row / burning workflow minutes.
+    # Critical failure (Supabase/yfinance) aborts with a clear reason;
+    # degradable failures (Finnhub/LLM keys) are recorded and the scan runs.
+    from scan.preflight import run_preflight
+    pf_ok, pf_notes = run_preflight()
+    if not pf_ok:
+        reason = "; ".join(n for n in pf_notes if "FAIL" in n) or "preflight failed"
+        log.error("PREFLIGHT ABORT: %s", reason)
+        _set_scan_state(db, current_status="failed", last_error=f"preflight: {reason}")
+        return 1
+
     # Reap orphaned scans: a prior run hard-killed mid-flight (CI timeout,
     # crash) leaves market_scans stuck at status='running' forever -- it
     # clutters scan history and shows as a permanent "running" row. Mark any
@@ -247,6 +259,17 @@ def run(
         ok, msg = _run_step(
             "Price reference bands",
             [PY, "-m", "pipeline.scan.price_bands", "--scan-id", str(scan_id)],
+        )
+        if not ok:
+            soft_failures += 1
+            notes.append(f"[non-fatal] {msg}")
+
+        # Options positioning context (2026-07-15, absorbed from Vibe-Trading's
+        # options tools): put/call OI + ATM IV per pick via yfinance chains.
+        # Deterministic, best-effort — thin names simply carry no context.
+        ok, msg = _run_step(
+            "Options context",
+            [PY, "-m", "pipeline.agents.options_context", "--scan-id", str(scan_id)],
         )
         if not ok:
             soft_failures += 1

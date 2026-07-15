@@ -322,6 +322,11 @@ whether the smart-money signals (earnings, insider, short, revisions) support
 or contradict the thesis -- name the supporting signals. Every numeric or
 specific claim MUST be immediately followed by [DATA REF: key] using one of
 the data keys above (e.g. "RSI at 62 [DATA REF: rsi]").
+End the section with 2-3 lines, each starting "- ", stating the strongest
+bull points one sentence each, ending with "(confidence: high)" or
+"(confidence: medium)". A point without cited data behind it does not get
+"high". If the catalyst has a date or window, state it explicitly and say
+plainly whether this is a DATED catalyst or an open-ended narrative.
 
 BEAR_CASE:
 Two specific paragraphs arguing the short thesis. What could go wrong. Name the
@@ -329,6 +334,9 @@ risk factors specifically. EXPLICITLY address whether any smart-money signal
 contradicts the bull thesis (e.g. discretionary insider selling, building short
 interest, downgrade cluster). Apply the same [DATA REF: key] rule to every
 numeric or specific claim.
+End the section with 1-2 lines, each starting "- ", naming the scenario(s)
+that would most plausibly INVALIDATE the bull thesis entirely -- honest
+kill-conditions, not token caveats.
 
 PRICE_TARGET:
 Reasonable 3-month upside target with reasoning, and the downside risk level.
@@ -340,8 +348,11 @@ Suggested portfolio weight (low conviction 0-1%, medium 1-3%, high 3-5%).
 Note: this is sizing guidance, not advice.
 
 WHAT_TO_WATCH:
-Three specific data points or events that would confirm or invalidate the
-thesis. Format each as its own line starting with "- "."""
+Three specific data points or events, each its own line starting with "- ".
+At least one must be a CONFIRMATION signal and at least one an INVALIDATION
+signal, and each must carry a specific trigger level or date where the data
+supports one (e.g. "- INVALIDATION: closes below $42.10 support" rather than
+"- watch the price action")."""
 
 
 # ══════════════════════════════════════════════════════════════════════════════

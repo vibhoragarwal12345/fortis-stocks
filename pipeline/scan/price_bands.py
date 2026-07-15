@@ -119,12 +119,40 @@ def run(scan_id: int) -> tuple[int, int]:
         return 0, 0
 
     series = _download(tickers)
+
+    # Inverse-volatility relative sizing (2026-07-15, absorbed from
+    # Vibe-Trading's equal-volatility optimizer): suggested size relative to
+    # an equal-weight slot, = list-median 60d vol / own vol, clipped to
+    # [0.5, 1.5]. Math instead of LLM prose for position_size_guidance —
+    # quieter names earn a fuller slot, wilder names a smaller one.
+    vols: dict[str, float] = {}
+    for t, s in series.items():
+        r = s.dropna().pct_change().iloc[-60:]
+        if len(r) >= 30 and float(r.std()) > 0:
+            vols[t] = float(r.std())
+    med_vol = float(pd.Series(vols).median()) if vols else None
+
+    from scan.patterns import support_resistance, trend_slope_20d
+
     done = 0
     for t in tickers:
         band = _band(series[t]) if t in series else None
         if band is None:
             log.info("price_bands %s: no band (insufficient history)", t)
             continue
+
+        # Chart structure (deterministic, from scan/patterns.py): where the
+        # tape has historically stalled, alongside the cone's how-far.
+        sr = support_resistance(series[t])
+        if sr:
+            band["support_resistance"] = sr
+        slope = trend_slope_20d(series[t])
+        if slope is not None:
+            band["trend_slope_20d_pct"] = slope
+        if med_vol and t in vols:
+            band["suggested_relative_size"] = round(
+                float(min(1.5, max(0.5, med_vol / vols[t]))), 2)
+            band["sizing_basis"] = "inverse_volatility_vs_list_median_60d"
         try:
             (db.table("ranked_focus_list")
                .update({"price_reference": band})

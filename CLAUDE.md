@@ -12,10 +12,26 @@ pipeline/data/build_full_universe.py        weekly
   → pipeline/data/full_universe.csv          ~3,300 tickers ($1M ADV floor)
 
 pipeline/scan/run_scan.py                    2x/weekday (pre-market + midday)
+  Preflight preflight          dependency checks, fail-fast    ~10 s
   Layer 1   layer1_fast_scan   pure math on EVERY ticker      ~3-4 min
+                               (yfinance + Sina fallback; Benford volume
+                                tripwire; alpha-bench factor columns)
   Layer 2   layer2_rank        composite score, top 30         ~10 s
+                               (weights adopted 2026-07-15: momentum zeroed,
+                                low_proximity cross-sectional factor added —
+                                see WEIGHTS in layer2_rank.py for evidence)
+  Bands     price_bands        Monte Carlo cone + support/resistance +
+                               inverse-vol relative sizing (deterministic)
+  Options   options_context    put/call + ATM IV per pick (best-effort)
   Layer 3   catalyst, smart_money_intel, debate, critic       ~20 min (top 30)
-  Layer 4   conviction_grader + factcheck                      ~5 s
+  Layer 4   conviction_grader + factcheck (+ financial_rigor   ~5 s
+                               exact-arithmetic audit of dossier data)
+
+pipeline/backtest_v2/                        the validation spine (2026-07)
+  PIT replay of THIS funnel (imports the real layer-1/2 functions), run
+  cards, factor bench + decay states, weight sweeps with evidence gates,
+  hypothesis registry (pipeline/data/hypotheses.json — the experiment
+  logbook; update it when strategy experiments change status).
 
   → market_scans         row per scan; dashboard reads LATEST status='complete'
   → scan_results         per-ticker Layer-1 metrics + composite_score (ALL ~3,300)

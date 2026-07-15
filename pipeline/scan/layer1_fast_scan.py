@@ -116,6 +116,10 @@ def _per_ticker_metrics(close: pd.Series, volume: pd.Series, open_px: pd.Series)
         avg20 = float(vol.iloc[-21:-1].mean())
         if avg20 > 0:
             out["relative_volume"] = round(float(vol.iloc[-1]) / avg20, 3)
+    if len(vol):
+        # Raw latest volume for the Benford feed-integrity tripwire.
+        # Underscore prefix: in-memory only, persist() never writes it.
+        out["_latest_volume"] = float(vol.iloc[-1])
 
     # Alpha-bench factors (added 2026-07-15; absorbed from the Vibe-Trading
     # zoo bench — see pipeline/backtest_v2/factor_bench.py). All three were
@@ -187,6 +191,74 @@ def _to_yahoo(t: str) -> str:
     return t.replace("/", "-").replace(".", "-")
 
 
+# ── Sina fallback (added 2026-07-15) ──────────────────────────────────────
+# Absorbed from HKUDS/Vibe-Trading's ban-risk-ordered loader chain: when the
+# primary (yfinance) drops a ticker — Yahoo throttling, symbol quirks — we
+# retry it against Sina Finance's free, no-auth US daily-K JSONP endpoint
+# instead of accepting a hole in the universe. (Stooq, their other US
+# fallback, now sits behind a JS browser check — verified 2026-07-15.)
+# Capped + throttled so a bad day at Yahoo can't blow the Layer-1 budget.
+
+FALLBACK_MAX = 150          # bound the extra runtime (~0.5s each)
+FALLBACK_THROTTLE_SEC = 0.5
+_SINA_URL = ("https://stock.finance.sina.com.cn/usstock/api/jsonp_v2.php/"
+             "var%20x=/US_MinKService.getDailyK?symbol={sym}")
+
+
+def _fetch_sina_one(ticker: str) -> pd.DataFrame | None:
+    """~1y of daily OHLCV from Sina's US daily-K JSONP, or None.
+    Response: `var x=([{"d":"YYYY-MM-DD","o":..,"h":..,"l":..,"c":..,"v":..},…])`."""
+    import json as _json
+    import urllib.request
+    sym = ticker.lower().replace("/", ".")   # BRK/B style → brk.b
+    req = urllib.request.Request(
+        _SINA_URL.format(sym=sym),
+        headers={"User-Agent": "Mozilla/5.0",
+                 "Referer": "https://stock.finance.sina.com.cn/"})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            raw = r.read().decode("utf-8", errors="replace")
+        start, end = raw.find("(["), raw.rfind("])")
+        if start < 0 or end < 0:
+            return None
+        bars = _json.loads(raw[start + 1: end + 1])
+        if len(bars) < 25:
+            return None
+        df = pd.DataFrame(bars).rename(columns={
+            "d": "Date", "o": "Open", "h": "High", "l": "Low",
+            "c": "Close", "v": "Volume"})
+        df["Date"] = pd.to_datetime(df["Date"])
+        df = df.set_index("Date").sort_index().tail(260)
+        for col in ("Open", "High", "Low", "Close", "Volume"):
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+        return df.dropna(subset=["Close"])
+    except Exception:
+        return None
+
+
+def _sina_fallback(failed: list[str]) -> list[dict]:
+    """Recover Layer-1 metrics for yfinance-failed tickers via Sina."""
+    out: list[dict] = []
+    batch = failed[:FALLBACK_MAX]
+    if not batch:
+        return out
+    log.info("Sina fallback: retrying %d yfinance-failed tickers…", len(batch))
+    for t in batch:
+        df = _fetch_sina_one(t)
+        time.sleep(FALLBACK_THROTTLE_SEC)
+        if df is None or len(df) < 25:
+            continue
+        try:
+            metrics = _per_ticker_metrics(df["Close"], df["Volume"], df["Open"])
+        except (KeyError, TypeError):
+            continue
+        if metrics:
+            metrics["ticker"] = t
+            out.append(metrics)
+    log.info("Sina fallback recovered %d/%d tickers", len(out), len(batch))
+    return out
+
+
 def fetch_and_score(
     tickers: list[str],
     batch_size: int = 100,
@@ -206,6 +278,7 @@ def fetch_and_score(
     out: list[dict] = []
     t0 = time.time()
     failures = 0
+    failed_tickers: list[str] = []
     for i in range(0, len(tickers), batch_size):
         chunk = tickers[i : i + batch_size]
         yahoo_chunk = [_to_yahoo(t) for t in chunk]
@@ -223,6 +296,7 @@ def fetch_and_score(
         except Exception as exc:
             log.warning("  batch %d-%d failed entirely: %s", i, i + len(chunk), exc)
             failures += len(chunk)
+            failed_tickers.extend(chunk)
             continue
 
         for yt in yahoo_chunk:
@@ -235,11 +309,13 @@ def fetch_and_score(
                 metrics = _per_ticker_metrics(close, volume, open_px)
                 if not metrics:
                     failures += 1
+                    failed_tickers.append(orig)
                     continue
                 metrics["ticker"] = orig
                 out.append(metrics)
             except (KeyError, TypeError):
                 failures += 1
+                failed_tickers.append(orig)
 
         time.sleep(0.3)
         if (i // batch_size + 1) % 5 == 0:
@@ -254,12 +330,38 @@ def fetch_and_score(
                 failures,
                 eta,
             )
+    # Second chance for anything Yahoo dropped.
+    if failed_tickers:
+        recovered = _sina_fallback(failed_tickers)
+        out.extend(recovered)
+        failures -= len(recovered)
+
     log.info(
         "Layer 1 fetch complete: %d kept, %d failed (%.1f%% kept)",
         len(out),
         failures,
         100 * len(out) / max(len(tickers), 1),
     )
+
+    # Feed-integrity tripwire (2026-07-15, financial_rigor): Benford's-law
+    # first-digit check over the universe's latest daily volumes. Volumes
+    # span orders of magnitude, so a healthy feed conforms; NONCONFORMITY
+    # means the price/volume feed itself is suspect (synthetic, truncated,
+    # or corrupted data). Log-only — a tripwire, not a gate.
+    try:
+        from agents.financial_rigor import benford
+        raw_vols = [r["_latest_volume"] for r in out if r.get("_latest_volume")]
+        if raw_vols:
+            b = benford(raw_vols)
+            if b.get("verdict") == "NONCONFORMITY":
+                log.warning("BENFORD TRIPWIRE: universe volume distribution "
+                            "nonconforming (MAD=%s, n=%s) — inspect the feed",
+                            b.get("mad"), b.get("n"))
+            else:
+                log.info("Benford feed check: %s (MAD=%s, n=%s)",
+                         b.get("verdict"), b.get("mad"), b.get("n"))
+    except Exception as exc:   # noqa: BLE001 -- tripwire must never break the scan
+        log.debug("benford tripwire skipped: %s", exc)
     return out
 
 

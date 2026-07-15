@@ -1,0 +1,77 @@
+[
+  {
+    "id": "hyp-10442627",
+    "title": "20d momentum reverses at 5d horizon inside the shortlist",
+    "thesis": "Layer-2's momentum input (25% weight at launch) carried Spearman IC -0.22 (t -4.4) vs 5d forward alpha within the top-35. Zeroing momentum and redistributing to volume improved 5d alpha in both test windows (IS -0.93 vs -1.97; OOS +0.11 vs -0.88). Consistent with Jegadeesh short-term reversal.",
+    "status": "adopted",
+    "created_at": "2026-07-15T07:16:31+00:00",
+    "updated_at": "2026-07-15T07:16:46+00:00",
+    "evidence": [
+      {
+        "at": "2026-07-15T07:16:46+00:00",
+        "artifact": "pipeline/reports/backtest_v2/sweep_2026-07-14_2129.json",
+        "note": "in-sample sweep"
+      },
+      {
+        "at": "2026-07-15T07:16:46+00:00",
+        "artifact": "pipeline/reports/backtest_v2/sweep_2026-07-14_2133.json",
+        "note": "OOS sweep"
+      }
+    ],
+    "history": [
+      {
+        "at": "2026-07-15T07:16:31+00:00",
+        "status": "adopted",
+        "note": "created"
+      }
+    ]
+  },
+  {
+    "id": "hyp-509d235f",
+    "title": "20d-low proximity (rebound) adds alpha on top of momentum-zero config",
+    "thesis": "low20_ratio = min(close,20d)/close was HEALTHY in both bench windows (IC +0.077). Added as cross-sectional percentile at weight 0.15: beat the momentum-zero champion in BOTH windows (IS -0.17 vs -0.93; OOS +0.42 vs +0.11) with lower half-to-half variance.",
+    "status": "adopted",
+    "created_at": "2026-07-15T07:16:31+00:00",
+    "updated_at": "2026-07-15T07:16:46+00:00",
+    "evidence": [
+      {
+        "at": "2026-07-15T07:16:46+00:00",
+        "artifact": "pipeline/reports/backtest_v2/factor_bench_2026-07-15_0647.json",
+        "note": "two-window factor bench"
+      },
+      {
+        "at": "2026-07-15T07:16:46+00:00",
+        "artifact": "pipeline/reports/backtest_v2/sweep_2026-07-15_0652.json",
+        "note": "extended sweep"
+      },
+      {
+        "at": "2026-07-15T07:16:46+00:00",
+        "artifact": "pipeline/reports/backtest_v2/sweep_2026-07-15_0653.json",
+        "note": "extended sweep"
+      }
+    ],
+    "history": [
+      {
+        "at": "2026-07-15T07:16:31+00:00",
+        "status": "adopted",
+        "note": "created"
+      }
+    ]
+  },
+  {
+    "id": "hyp-4705be77",
+    "title": "Volume churn (vstd20) and price-volume correlation (pv_corr_20d) predict 5d underperformance",
+    "thesis": "Both HEALTHY negative in the two-window bench (IC -0.079 / -0.075) but did not beat the champion when added to the composite in the extended sweep. Wired into the funnel at weight 0.0; persisted every scan for nightly measurement; promote only if a future sweep clears the gates.",
+    "status": "monitoring",
+    "created_at": "2026-07-15T07:16:31+00:00",
+    "updated_at": "2026-07-15T07:16:31+00:00",
+    "evidence": [],
+    "history": [
+      {
+        "at": "2026-07-15T07:16:31+00:00",
+        "status": "monitoring",
+        "note": "created"
+      }
+    ]
+  }
+]

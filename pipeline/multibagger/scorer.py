@@ -161,6 +161,26 @@ def apply_caps(score: float, row: dict) -> tuple[float, list[dict]]:
     # Accounting red flags would normally come from sec_filings text mining
     # (restatement, auditor change, going concern). Stub: not wired yet --
     # the deep_research stage will flag these via LLM. Document the contract.
+
+    # Data-integrity cross-check (2026-07-15, financial_rigor absorbed from
+    # Vibe-Trading): when the row carries a market cap from more than one
+    # source (NASDAQ screener vs Finnhub), a >5% disagreement means at least
+    # one feed is wrong — cap at 60 until deep research sorts out which.
+    # A candidate built on inconsistent data is not a candidate.
+    try:
+        from agents.financial_rigor import cross_validate
+        sources = {k: row.get(k) for k in
+                   ("market_cap", "market_cap_finnhub", "market_cap_screener")
+                   if row.get(k) is not None}
+        if len(sources) >= 2:
+            cv = cross_validate(sources, tolerance_pct=5.0)
+            if cv.get("verdict") == "DIVERGENT" and score > 60:
+                caps.append({"cap": 60,
+                             "reason": f"market-cap sources diverge: "
+                                       f"{cv['outliers_pct_dev']}"})
+                score = 60
+    except Exception:   # noqa: BLE001 -- rigor must never break scoring
+        pass
     return score, caps
 
 

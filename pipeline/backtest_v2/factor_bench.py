@@ -101,34 +101,44 @@ def forward_alpha(m: dict[str, pd.DataFrame], horizon: int = HORIZON) -> pd.Data
     return (fwd.sub(spy, axis=0)) * 100    # SPY-relative, %
 
 
+HORIZON_CURVE = (1, 5, 10, 20)   # IC measured at each; gates key off HORIZON=5
+
+
 def bench_window(name: str) -> pd.DataFrame:
     fname, start, end = WINDOWS[name]
     m = load_wide(CACHE / fname)
-    fa = forward_alpha(m)
+    fas = {h: forward_alpha(m, h) for h in HORIZON_CURVE}
     lib = factor_library(m)
     days = [d for d in m["close"].index
             if start <= d.strftime("%Y-%m-%d") <= end]
     rows = []
     for fac_name, fac in lib.items():
-        ics = []
-        for d in days:
-            if d not in fac.index or d not in fa.index:
+        row: dict = {"factor": fac_name}
+        for h in HORIZON_CURVE:
+            fa = fas[h]
+            ics = []
+            for d in days:
+                if d not in fac.index or d not in fa.index:
+                    continue
+                x, y = fac.loc[d], fa.loc[d]
+                ok = x.notna() & y.notna()
+                if ok.sum() < MIN_NAMES_PER_DAY:
+                    continue
+                ic = x[ok].rank().corr(y[ok].rank())
+                if np.isfinite(ic):
+                    ics.append(ic)
+            if len(ics) < 5:
                 continue
-            x, y = fac.loc[d], fa.loc[d]
-            ok = x.notna() & y.notna()
-            if ok.sum() < MIN_NAMES_PER_DAY:
-                continue
-            ic = x[ok].rank().corr(y[ok].rank())
-            if np.isfinite(ic):
-                ics.append(ic)
-        if len(ics) < 5:
-            continue
-        arr = np.array(ics)
-        t = arr.mean() / (arr.std(ddof=1) / np.sqrt(len(arr)) + 1e-12)
-        rows.append({"factor": fac_name, f"ic_{name}": round(float(arr.mean()), 4),
-                     f"t_{name}": round(float(t), 2),
-                     f"pos_{name}": round(float((arr > 0).mean()), 2),
-                     f"days_{name}": len(arr)})
+            arr = np.array(ics)
+            t = arr.mean() / (arr.std(ddof=1) / np.sqrt(len(arr)) + 1e-12)
+            if h == HORIZON:      # gate horizon keeps the original column names
+                row.update({f"ic_{name}": round(float(arr.mean()), 4),
+                            f"t_{name}": round(float(t), 2),
+                            f"pos_{name}": round(float((arr > 0).mean()), 2),
+                            f"days_{name}": len(arr)})
+            row[f"ic{h}d_{name}"] = round(float(arr.mean()), 4)
+        if f"ic_{name}" in row:
+            rows.append(row)
     return pd.DataFrame(rows).set_index("factor")
 
 

@@ -123,7 +123,11 @@ must be immediately followed by [DATA REF: key] naming where it came from
 THESIS_WEAKNESSES:
 Identify the 3 weakest links in the bull case. Be specific -- name which claim
 is weakest and why. If the smart-money signals contradict the bull thesis,
-name the specific divergence.
+name the specific divergence. Grade each weakness in-line as (severity: fatal),
+(severity: material), or (severity: minor) -- "fatal" means the thesis does
+not survive if this weakness is real. Do not inflate: three "minor" weaknesses
+on a shaky thesis is a failed review. Stay independent of the bull narrative's
+framing -- challenge the consensus reading of the same data.
 
 DISCONFIRMING_DATA:
 What data, if it appeared in the next 30 days, would invalidate this thesis? Be
