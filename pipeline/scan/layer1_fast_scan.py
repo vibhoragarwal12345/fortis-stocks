@@ -117,6 +117,25 @@ def _per_ticker_metrics(close: pd.Series, volume: pd.Series, open_px: pd.Series)
         if avg20 > 0:
             out["relative_volume"] = round(float(vol.iloc[-1]) / avg20, 3)
 
+    # Alpha-bench factors (added 2026-07-15; absorbed from the Vibe-Trading
+    # zoo bench — see pipeline/backtest_v2/factor_bench.py). All three were
+    # HEALTHY with the same sign in both test windows:
+    #   volume_vol_20d  std of daily volume %-change, 20d  (IC −: churn bad)
+    #   low20_ratio     min(close,20d)/close               (IC +: near-lows good)
+    #   pv_corr_20d     corr(close, log1p(volume)), 20d    (IC −: rally-on-volume bad)
+    if len(vol) >= 21 and len(close) >= 21:
+        vchg = vol.iloc[-21:].pct_change().dropna()
+        if len(vchg) >= 10 and float(vchg.std()) == float(vchg.std()):  # not NaN
+            out["volume_vol_20d"] = round(float(vchg.std()), 4)
+        out["low20_ratio"] = round(float(close.iloc[-20:].min()) / out["price"], 4) \
+            if out["price"] > 0 else None
+        c20 = close.iloc[-20:]
+        v20 = np.log1p(vol.iloc[-20:].astype(float))
+        if c20.std() > 0 and v20.std() > 0:
+            pv = float(c20.corr(v20))
+            if pv == pv:  # not NaN
+                out["pv_corr_20d"] = round(pv, 4)
+
     # RSI(14)
     rsi = _rsi(close, 14)
     if rsi is not None:
@@ -268,6 +287,9 @@ def persist(rows: list[dict], scan_id: int) -> int:
             "return_52w_pct":    r.get("return_52w_pct"),
             "is_breakout":       r.get("is_breakout"),
             "is_breakdown":      r.get("is_breakdown"),
+            "volume_vol_20d":    r.get("volume_vol_20d"),
+            "low20_ratio":       r.get("low20_ratio"),
+            "pv_corr_20d":       r.get("pv_corr_20d"),
             "data_as_of":        r.get("data_as_of"),
         }
         for r in rows

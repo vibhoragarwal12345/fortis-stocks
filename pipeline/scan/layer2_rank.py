@@ -7,13 +7,14 @@ composite score per ticker, picks the top N, and writes them to
 ranked_focus_list with the same scan_id stamped on each row so layer-3
 agents can pick them up as the day's focus list.
 
-COMPOSITE SCORE (0-100) — weights adopted 2026-07-15 via backtest_v2 sweep
-  momentum    0.00   -- 20d return; ZEROED (REVERSED IC within shortlist)
-  volume      0.39   -- relative_volume above 1.0 is good
-  breakout    0.24   -- binary, 100 if is_breakout
-  proximity   0.18   -- closer to 52w high = better
-  rsi         0.18   -- sweet spot 50-70; oversold <30 = bonus
-  (cap)              -- hard cap if 52w stats missing (recent IPO)
+COMPOSITE SCORE (0-100) — weights adopted 2026-07-15 via backtest_v2 sweeps
+  momentum       0.00   -- 20d return; ZEROED (REVERSED IC within shortlist)
+  volume         0.33   -- relative_volume above 1.0 is good
+  breakout       0.21   -- binary, 100 if is_breakout
+  proximity      0.15   -- closer to 52w high = better
+  rsi            0.15   -- sweet spot 50-70; oversold <30 = bonus
+  low_proximity  0.15   -- pct-rank of min(close,20d)/close (alpha bench)
+  (cap)                 -- hard cap if 52w stats missing (recent IPO)
   (see WEIGHTS below for evidence + prior values)
 
 CLI
@@ -63,11 +64,51 @@ def _clip(v: float, lo: float = 0, hi: float = 100) -> float:
 # track-record rows — the strategy changed here.
 WEIGHTS = {
     "momentum":  0.0,
-    "volume":    0.3939,
-    "breakout":  0.2424,
-    "proximity": 0.1818,
-    "rsi":       0.1818,
+    "volume":    0.3348,
+    "breakout":  0.2061,
+    "proximity": 0.1545,
+    "rsi":       0.1545,
+    # Alpha-bench factors (2026-07-15, two-window factor bench in
+    # backtest_v2/factor_bench.py). low_proximity ADOPTED same day via the
+    # extended sweep: beat the momentum-zero champion in BOTH windows
+    # (IS −0.17 vs −0.93; OOS +0.42 vs +0.11 avg 5d alpha) with lower
+    # half-to-half variance. quiet_volume / calm_tape stay wired at 0.0 —
+    # measured nightly, activated only if a future sweep earns them weight.
+    "quiet_volume":  0.0,   # 1 − pct-rank of volume_vol_20d   (bench IC −0.079)
+    "low_proximity": 0.15,  # pct-rank of low20_ratio          (bench IC +0.077)
+    "calm_tape":     0.0,   # 1 − pct-rank of pv_corr_20d      (bench IC −0.075)
 }
+
+# Cross-sectional factors: scored as percentile ranks within the day's scan
+# (matching how their IC was measured — Spearman is rank-based). Sign −1
+# means LOW raw value earns a HIGH score.
+CROSS_SECTIONAL = {
+    "quiet_volume":  ("volume_vol_20d", -1),
+    "low_proximity": ("low20_ratio",    +1),
+    "calm_tape":     ("pv_corr_20d",    -1),
+}
+
+
+def add_cross_sectional_scores(rows: list[dict]) -> None:
+    """Attach <component>_pts (0-100 percentile scores) in place.
+
+    Called by rank_and_persist on the full scan cross-section, and by
+    backtest_v2 replay/sweep on each day's replayed cross-section — the
+    same code path in both, so backtests can't diverge from production.
+    Rows missing a raw value get a neutral 50.
+    """
+    for comp, (raw_key, sign) in CROSS_SECTIONAL.items():
+        vals = [(i, r[raw_key]) for i, r in enumerate(rows)
+                if r.get(raw_key) is not None]
+        for r in rows:
+            r[f"{comp}_pts"] = 50.0
+        if len(vals) < 30:
+            continue
+        vals.sort(key=lambda t: t[1])
+        n = len(vals) - 1 or 1
+        for rank_pos, (i, _) in enumerate(vals):
+            pct = rank_pos / n
+            rows[i][f"{comp}_pts"] = round(100 * (pct if sign > 0 else 1 - pct), 2)
 
 
 def _score(row: dict, weights: dict[str, float] = WEIGHTS) -> float | None:
@@ -123,6 +164,12 @@ def _score(row: dict, weights: dict[str, float] = WEIGHTS) -> float | None:
         + weights["proximity"] * px_pts
         + weights["rsi"] * rsi_pts
     )
+    # Cross-sectional components (percentile pts from
+    # add_cross_sectional_scores; neutral 50 when absent).
+    for comp in CROSS_SECTIONAL:
+        w = weights.get(comp, 0.0)
+        if w:
+            composite += w * float(row.get(f"{comp}_pts", 50.0))
     return round(composite, 2)
 
 
@@ -154,6 +201,7 @@ def rank_and_persist(scan_id: int, top_n: int = 80) -> int:
         return 0
     log.info("Layer 2: scoring %d scan_results rows", len(rows))
 
+    add_cross_sectional_scores(rows)
     scored: list[tuple[str, float, dict]] = []
     for r in rows:
         s = _score(r)
