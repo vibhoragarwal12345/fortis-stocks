@@ -39,8 +39,8 @@ from backtest_v2.loader import BENCHMARK, PITPriceLoader  # noqa: E402
 from backtest_v2.run_card import REPORTS_DIR, _git_sha  # noqa: E402
 from backtest_v2.run_backtest import trading_days  # noqa: E402
 from scan.layer1_fast_scan import _per_ticker_metrics, load_universe  # noqa: E402
-from scan.layer2_rank import WEIGHTS as PROD_WEIGHTS  # noqa: E402
-from scan.layer2_rank import _score  # noqa: E402
+from scan.layer2_rank import CROSS_SECTIONAL, WEIGHTS as PROD_WEIGHTS  # noqa: E402
+from scan.layer2_rank import _score, add_cross_sectional_scores  # noqa: E402
 
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s  %(levelname)-7s  %(message)s",
@@ -72,6 +72,8 @@ def candidate_grid() -> list[dict[str, float]]:
     _add(dict(PROD_WEIGHTS))                       # baseline first
     for factor in PROD_WEIGHTS:
         for s in SCALES:
+            if PROD_WEIGHTS[factor] == 0:
+                continue
             w = dict(PROD_WEIGHTS)
             w[factor] = PROD_WEIGHTS[factor] * s
             _add(w)
@@ -82,6 +84,26 @@ def candidate_grid() -> list[dict[str, float]]:
         w["momentum"] = PROD_WEIGHTS["momentum"] * ms
         w["volume"] = PROD_WEIGHTS["volume"] * vs
         _add(w)
+    # Alpha-bench cross-sectional components: single additions at fixed
+    # absolute weights (existing weights shrink via renormalization), plus
+    # pair/triple combos at modest weights.
+    for comp in CROSS_SECTIONAL:
+        for wt in (0.08, 0.15, 0.25):
+            w = dict(PROD_WEIGHTS)
+            w[comp] = wt / (1 - wt) * sum(v for k, v in w.items()
+                                          if k not in CROSS_SECTIONAL)
+            _add(w)
+    for combo in itertools.combinations(CROSS_SECTIONAL, 2):
+        w = dict(PROD_WEIGHTS)
+        base = sum(v for k, v in w.items() if k not in CROSS_SECTIONAL)
+        for comp in combo:
+            w[comp] = 0.10 / 0.80 * base
+        _add(w)
+    w = dict(PROD_WEIGHTS)
+    base = sum(v for k, v in w.items() if k not in CROSS_SECTIONAL)
+    for comp in CROSS_SECTIONAL:
+        w[comp] = 0.10 / 0.70 * base
+    _add(w)
     return cands
 
 
@@ -109,6 +131,7 @@ def precompute(loader: PITPriceLoader, days: list[date],
             else:
                 m["alpha_5d"] = None
             rows.append(m)
+        add_cross_sectional_scores(rows)   # same step as production layer2
         out[key] = rows
         log.info("%s: %d tickers precomputed", key, len(rows))
     return out

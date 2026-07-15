@@ -12,7 +12,7 @@ import logging
 from datetime import date
 
 from scan.layer1_fast_scan import _per_ticker_metrics
-from scan.layer2_rank import _score
+from scan.layer2_rank import _score, add_cross_sectional_scores
 
 from .loader import PITPriceLoader
 
@@ -30,7 +30,7 @@ def replay_funnel(loader: PITPriceLoader, as_of: date,
     [{ticker, rank, composite_score, metrics…}, …]
     """
     tickers = universe if universe is not None else loader.universe()
-    scored: list[tuple[str, float, dict]] = []
+    day_rows: list[dict] = []
     for t in tickers:
         hist = loader.asof(t, as_of)
         if hist is None or len(hist) < 25:
@@ -38,10 +38,17 @@ def replay_funnel(loader: PITPriceLoader, as_of: date,
         metrics = _per_ticker_metrics(hist["Close"], hist["Volume"], hist["Open"])
         if not metrics:
             continue
-        s = _score(_layer2_row(metrics))
+        metrics["ticker"] = t
+        day_rows.append(metrics)
+
+    # Same cross-sectional scoring step production layer2 runs.
+    add_cross_sectional_scores(day_rows)
+    scored: list[tuple[str, float, dict]] = []
+    for m in day_rows:
+        s = _score(_layer2_row(m))
         if s is None:
             continue
-        scored.append((t, s, metrics))
+        scored.append((m["ticker"], s, m))
 
     scored.sort(key=lambda x: x[1], reverse=True)
     out = []
