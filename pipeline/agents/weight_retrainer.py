@@ -7,9 +7,14 @@ mutating pipeline/agents/ranking_engine.py.
 
 Workflow:
     1. `should_retrain()` gates on three hard prerequisites:
-         - 90+ calendar days between the earliest and latest pick_outcomes row
+         - 21+ calendar days of pick_outcomes history (one full 20d
+           maturation cycle; the blanket 90-day rule was retired 2026-07-15
+           by owner decision -- evidence gates replace calendar gates, see
+           pipeline/backtest_v2/sweep.py for the fast path)
          - 100+ A-grade picks tracked
-         - t-statistic of mean(alpha_20d) > 1.5 on existing A-grade picks
+         - t-statistic of mean(alpha_20d) > 2.0 on existing A-grade picks
+           (raised from 1.5 when the calendar gate was dropped: with less
+           seasoning time, the statistical bar goes up, not down)
        Any one missing -> the retrainer returns "not yet" and writes nothing.
 
     2. `propose_new_weights(run_type)` re-uses each pick's persisted per-
@@ -59,9 +64,13 @@ PROPOSALS_DIR = Path(__file__).resolve().parent.parent / "proposals"
 PROPOSALS_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── Gates ─────────────────────────────────────────────────────────────────
-MIN_HISTORY_DAYS    = 90
+# Calendar gate retired 2026-07-15 (owner decision): 21 days is the floor at
+# which alpha_20d can exist at all. The safety burden moves to evidence:
+# a higher t-stat bar here, and split-half + Monte Carlo gates in
+# backtest_v2/sweep.py for anything faster than this path.
+MIN_HISTORY_DAYS    = 21
 MIN_A_GRADE_PICKS   = 100
-MIN_T_STAT          = 1.5
+MIN_T_STAT          = 2.0
 
 # ── Search shape ──────────────────────────────────────────────────────────
 WEIGHT_MULTIPLIERS  = [0.80, 0.85, 0.90, 0.95, 1.00, 1.05, 1.10, 1.15, 1.20]

@@ -45,7 +45,20 @@ def _clip(v: float, lo: float = 0, hi: float = 100) -> float:
     return max(lo, min(hi, v))
 
 
-def _score(row: dict) -> float | None:
+# Production composite weights. _score(row) with no weights argument uses
+# exactly these; backtest_v2 weight sweeps pass candidate weights through
+# this same function so experiments can never diverge from what production
+# would compute with those weights.
+WEIGHTS = {
+    "momentum":  0.25,
+    "volume":    0.25,
+    "breakout":  0.20,
+    "proximity": 0.15,
+    "rsi":       0.15,
+}
+
+
+def _score(row: dict, weights: dict[str, float] = WEIGHTS) -> float | None:
     """Composite 0-100. Returns None if the row is too thin to score."""
     mom = row.get("return_20d_pct")
     rv  = row.get("relative_volume")
@@ -92,11 +105,11 @@ def _score(row: dict) -> float | None:
         rsi_pts = _clip(rsi_pts)
 
     composite = (
-        0.25 * mom_pts
-        + 0.25 * vol_pts
-        + 0.20 * br_pts
-        + 0.15 * px_pts
-        + 0.15 * rsi_pts
+        weights["momentum"] * mom_pts
+        + weights["volume"] * vol_pts
+        + weights["breakout"] * br_pts
+        + weights["proximity"] * px_pts
+        + weights["rsi"] * rsi_pts
     )
     return round(composite, 2)
 

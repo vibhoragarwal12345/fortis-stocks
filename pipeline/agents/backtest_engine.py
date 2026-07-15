@@ -21,8 +21,9 @@ Three jobs:
        the historical universe, and reports the weight combo that would have
        maximized historical 5d / 20d alpha and Sharpe. THIS DOES NOT WRITE
        BACK TO PRODUCTION. Output is advisory only -- a backtest is not the
-       future, and the spec requires >= 90 days of forward data before any
-       weight change.
+       future. Weight changes go through the evidence gates in
+       backtest_v2/sweep.py (Monte Carlo + split-half consistency); the
+       blanket 90-day calendar rule was retired 2026-07-15.
 
   3. generate_performance_report(out_dir=pipeline/reports/)
        Pulls from system_performance_rollup + pick_outcomes and writes a
@@ -491,8 +492,8 @@ def weight_optimization(start_date, end_date, run_type: str = "midday",
         print(f"  {s['weight_key']:<22} {s['delta_pct']:+.1f}%  "
               f"-> new_weight={s['new_weight']:.3f}  "
               f"alpha_20d={s['avg_alpha_20d']}  sharpe={s['sharpe_alpha_20d']}")
-    print("\nAdvisory only. Spec requires >= 90 days of forward data before "
-          "modifying production weights.")
+    print("\nAdvisory only. Production weight changes go through the evidence "
+          "gates in backtest_v2/sweep.py (MC p-value + split-half consistency).")
     print("=" * 78 + "\n")
 
     return {"baseline": baseline_perf, "suggestions": suggestions}
@@ -783,8 +784,8 @@ def generate_performance_report(db=None) -> Path:
                  "regime, numbers are not generalizable.")
     if len(matured) < MIN_SAMPLE_FOR_SIGNIFICANCE:
         lines.append(f"- **Track record building** -- only {len(matured)} picks "
-                     "with matured 20d data. At least 90 days of forward data "
-                     "recommended before drawing conclusions.")
+                     "with matured 20d data. Conclusions firm up as the "
+                     "matured sample grows; validate via backtest_v2 gates.")
     lines.append("")
 
     out_path = REPORTS_DIR / f"performance_{today}.md"
