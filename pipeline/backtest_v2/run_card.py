@@ -76,6 +76,15 @@ def _markdown(card: dict) -> str:
                          f"{d['beat_benchmark_pct']:.0f}% |")
         else:
             lines.append(f"| {h}d | 0 | — | — | — | — (not matured) |")
+    if s.get("slippage_bps_per_side") is not None:
+        lines.append(f"\n_Net of {s['slippage_bps_per_side']} bps slippage per side._")
+    ch, lc = s.get("churn", {}), s.get("list_correlation", {})
+    if ch.get("avg_daily_churn_pct") is not None:
+        lines.append(f"\n- **List churn:** {ch['avg_daily_churn_pct']}% avg daily "
+                     f"turnover (max {ch['max_daily_churn_pct']}%)")
+    if lc.get("avg_pairwise_corr") is not None:
+        lines.append(f"- **List correlation:** {lc['avg_pairwise_corr']} avg pairwise "
+                     f"(max day {lc['max_day_corr']}). {lc.get('note', '')}")
 
     f = card["fidelity"]
     lines += ["", "## Fidelity (replay vs live picks)", ""]

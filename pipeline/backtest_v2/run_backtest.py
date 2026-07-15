@@ -98,6 +98,9 @@ def main() -> int:
     for p in all_picks:
         picks_by_day.setdefault(p["backtest_date"], []).append(p)
     summary = forward.summarize(all_picks)
+    summary["slippage_bps_per_side"] = forward.SLIPPAGE_BPS_PER_SIDE
+    summary["churn"] = forward.churn(picks_by_day)
+    summary["list_correlation"] = forward.list_correlation(loader, picks_by_day)
 
     # ── Fidelity vs live ──────────────────────────────────────────────────
     live = fidelity.live_focus_lists(db, args.start, args.end)

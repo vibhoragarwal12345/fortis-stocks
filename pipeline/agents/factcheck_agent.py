@@ -126,7 +126,7 @@ def factcheck(text: str, data: dict[str, Any]) -> dict:
         return {"verification_score": 1.0, "quality_grade": "VERIFIED",
                 "total_claims": 0, "verified_claims": 0,
                 "unattributed": [], "hallucinated_refs": [],
-                "value_mismatches": []}
+                "value_mismatches": [], "rigor_flags": []}
 
     flat = _flatten_data(data or {})
     text_l = text
@@ -186,6 +186,20 @@ def factcheck(text: str, data: dict[str, Any]) -> dict:
     else:
         grade = "UNVERIFIED"
 
+    # Financial-rigor audit (2026-07-15, adapted from Vibe-Trading): exact
+    # Decimal cross-checks of derivable relationships (cap = price×shares,
+    # PE = price/EPS) inside the closed-context data ITSELF — catches bad
+    # upstream data regardless of what the LLM wrote. Additive result key;
+    # a MISMATCH also demotes a perfect grade one notch, because prose built
+    # on inconsistent inputs is not fully verified no matter how well cited.
+    try:
+        from agents.financial_rigor import audit_context
+        rigor_flags = audit_context(flat)
+    except Exception:   # noqa: BLE001 -- rigor must never break factcheck
+        rigor_flags = []
+    if rigor_flags and grade == "VERIFIED":
+        grade = "PARTIALLY_VERIFIED"
+
     return {
         "verification_score": round(score, 4),
         "quality_grade":      grade,
@@ -194,6 +208,7 @@ def factcheck(text: str, data: dict[str, Any]) -> dict:
         "unattributed":       unattributed,
         "hallucinated_refs":  hallucinated,
         "value_mismatches":   mismatches,
+        "rigor_flags":        rigor_flags,
     }
 
 
