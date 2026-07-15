@@ -7,13 +7,14 @@ composite score per ticker, picks the top N, and writes them to
 ranked_focus_list with the same scan_id stamped on each row so layer-3
 agents can pick them up as the day's focus list.
 
-COMPOSITE SCORE (0-100)
-  momentum    0.25   -- 20d return, log-shaped + capped
-  volume      0.25   -- relative_volume above 1.0 is good
-  breakout    0.20   -- binary, 100 if is_breakout
-  proximity   0.15   -- closer to 52w high = better
-  rsi         0.15   -- sweet spot 50-70; oversold <30 = bonus
+COMPOSITE SCORE (0-100) — weights adopted 2026-07-15 via backtest_v2 sweep
+  momentum    0.00   -- 20d return; ZEROED (REVERSED IC within shortlist)
+  volume      0.39   -- relative_volume above 1.0 is good
+  breakout    0.24   -- binary, 100 if is_breakout
+  proximity   0.18   -- closer to 52w high = better
+  rsi         0.18   -- sweet spot 50-70; oversold <30 = bonus
   (cap)              -- hard cap if 52w stats missing (recent IPO)
+  (see WEIGHTS below for evidence + prior values)
 
 CLI
   python -m pipeline.scan.layer2_rank --scan-id 123
@@ -49,12 +50,23 @@ def _clip(v: float, lo: float = 0, hi: float = 100) -> float:
 # exactly these; backtest_v2 weight sweeps pass candidate weights through
 # this same function so experiments can never diverge from what production
 # would compute with those weights.
+#
+# ADOPTED 2026-07-15 (owner decision) from the backtest_v2 sweep, replacing
+# the launch weights (mom .25 / vol .25 / br .20 / px .15 / rsi .15).
+# Evidence: momentum-zero configs won BOTH test windows independently —
+# in-sample Jun 18–Jul 15 (avg 5d alpha −0.93% vs baseline −1.97%) and
+# out-of-sample May 19–Jun 17 (+0.11% vs −0.88%), split-half consistent in
+# both; 20d momentum had REVERSED IC (−0.22) within the shortlist. This is
+# the best JOINT performer across windows, not either window's champion.
+# Sweep artifacts: pipeline/reports/backtest_v2/sweep_2026-07-14_*.json.
+# Picks from this date forward are not directly comparable to earlier
+# track-record rows — the strategy changed here.
 WEIGHTS = {
-    "momentum":  0.25,
-    "volume":    0.25,
-    "breakout":  0.20,
-    "proximity": 0.15,
-    "rsi":       0.15,
+    "momentum":  0.0,
+    "volume":    0.3939,
+    "breakout":  0.2424,
+    "proximity": 0.1818,
+    "rsi":       0.1818,
 }
 
 
