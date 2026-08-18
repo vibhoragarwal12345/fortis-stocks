@@ -374,15 +374,34 @@ def _parse_dt(value) -> datetime | None:
         return None
 
 
-def _fetch_all(query_fn, page: int = 1000) -> list[dict]:
-    """Page through a Supabase select (PostgREST caps a response at ~1000 rows)."""
-    rows, start = [], 0
+def _fetch_all(query_fn, page: int = 1000, key: str = "id") -> list[dict]:
+    """Page through a Supabase select (PostgREST caps a response at ~1000 rows).
+
+    Uses keyset (cursor) pagination -- `order(key) + key > last_seen` -- NOT
+    .range(). LIMIT/OFFSET makes Postgres walk and discard every row before the
+    offset, so a full pass is O(n^2); once news_items passed ~500k rows that
+    blew through Supabase's 2-minute statement_timeout and raised 57014,
+    killing this agent silently every day from 2026-07-15 to 2026-08-17 and
+    freezing ticker_sentiment_rollup. Keyset paging is constant-time per page
+    and independent of table size.
+
+    `key` must be selected by query_fn and be unique+ordered (the id PK).
+    """
+    rows: list[dict] = []
+    last = None
     while True:
-        chunk = query_fn().range(start, start + page - 1).execute().data or []
+        q = query_fn().order(key).limit(page)
+        if last is not None:
+            q = q.gt(key, last)
+        chunk = q.execute().data or []
         rows.extend(chunk)
         if len(chunk) < page:
             return rows
-        start += page
+        if key not in chunk[-1]:
+            raise KeyError(
+                f"_fetch_all: keyset column {key!r} missing from the select list; "
+                "add it to .select() or pass key=<column>")
+        last = chunk[-1][key]
 
 
 def _write_scores(db, table: str, score_col: str, updates: list[tuple[int, float]]) -> int:
@@ -487,7 +506,7 @@ def _build_rollups(db, run_type: str, now: datetime) -> list[dict]:
     # Only verified rows enter the rollup; 'unresolved' rows are excluded so
     # mis-tagged news (e.g. VST Tillers under NYSE:VST) doesn't poison sentiment.
     rows = _fetch_all(lambda: db.table("news_items")
-                      .select("ticker,headline,source,url,published_at,sentiment_score")
+                      .select("id,ticker,headline,source,url,published_at,sentiment_score")
                       .gte("published_at", since)
                       .eq("resolution_status", "verified"))
     log.info("rollup: %d news items in the last %d days", len(rows), BASELINE_DAYS)
