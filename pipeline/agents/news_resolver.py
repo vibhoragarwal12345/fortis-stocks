@@ -40,6 +40,15 @@ FOREIGN_KEYWORDS = re.compile(
 _ALIAS_BLOCKLIST = {"the", "and", "for", "co", "corp", "inc", "ltd", "plc",
                     "group", "trust", "holdings", "se", "ag", "sa", "nv"}
 
+# Hard cap on rows written per run. Every UPDATE writes a NEW row version, so
+# draining a large backlog in one pass inflates news_items by roughly
+# rows x 680 bytes before autovacuum can reclaim it -- a 127k-row backlog is
+# ~86 MB, which on its own would push this database through the Supabase
+# free-tier 500 MB ceiling and into read-only. Capping the per-run write drains
+# any backlog over consecutive runs instead of one unbounded burst. The steady
+# state is only ~5k new rows/day, so the cap never binds in normal operation.
+MAX_ROWS_PER_RUN = 25_000
+
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s  %(levelname)-7s  %(message)s",
                     datefmt="%H:%M:%S")
@@ -86,7 +95,8 @@ def _stage2_foreign_context(headline: str) -> bool:
 # Backfill
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _fetch_all_news(db, page: int = 1000, only_unclassified: bool = True) -> list[dict]:
+def _fetch_all_news(db, page: int = 1000, only_unclassified: bool = True,
+                    max_rows: int | None = MAX_ROWS_PER_RUN) -> list[dict]:
     """Page through news_items with keyset (cursor) pagination.
 
     NOT .range(): LIMIT/OFFSET forces Postgres to walk and discard every row
@@ -117,6 +127,10 @@ def _fetch_all_news(db, page: int = 1000, only_unclassified: bool = True) -> lis
         out.extend(chunk)
         if len(chunk) < page:
             return out
+        if max_rows is not None and len(out) >= max_rows:
+            log.warning("news_items: reached MAX_ROWS_PER_RUN=%d; the rest of "
+                        "the backlog is left for the next run", max_rows)
+            return out[:max_rows]
         last = chunk[-1]["id"]
 
 
@@ -142,12 +156,14 @@ def _bulk_update(db, rows: list[dict], patch: dict, chunk: int = 500) -> int:
     return done
 
 
-def run(only_unclassified: bool = True) -> None:
+def run(only_unclassified: bool = True,
+        max_rows: int | None = MAX_ROWS_PER_RUN) -> None:
     db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
     master = _load_master()
     log.info("ticker_master: %d verified US tickers loaded", len(master))
 
-    rows = _fetch_all_news(db, only_unclassified=only_unclassified)
+    rows = _fetch_all_news(db, only_unclassified=only_unclassified,
+                           max_rows=max_rows)
     log.info("news_items: %d rows to verify", len(rows))
 
     verified, unresolved_noalias, unresolved_foreign, not_in_master = [], [], [], []
