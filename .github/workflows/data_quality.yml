@@ -24,6 +24,12 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        # fetch-depth: 0 so health_check can read the ticker_master commit date.
+        # With the default shallow clone `git log -- <path>` returns nothing and
+        # the staleness check silently degrades to mtime, which checkout resets
+        # to now -- i.e. the check could never fail.
+        with:
+          fetch-depth: 0
       - uses: ./.github/actions/setup-pipeline
 
       - name: Run pipeline health checks
