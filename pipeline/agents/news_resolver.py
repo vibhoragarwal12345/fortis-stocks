@@ -23,7 +23,6 @@ import csv
 import logging
 import re
 import sys
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -40,7 +39,15 @@ FOREIGN_KEYWORDS = re.compile(
 # Aliases this short or this generic would false-positive on too many headlines.
 _ALIAS_BLOCKLIST = {"the", "and", "for", "co", "corp", "inc", "ltd", "plc",
                     "group", "trust", "holdings", "se", "ag", "sa", "nv"}
-UPDATE_WORKERS = 8
+
+# Hard cap on rows written per run. Every UPDATE writes a NEW row version, so
+# draining a large backlog in one pass inflates news_items by roughly
+# rows x 680 bytes before autovacuum can reclaim it -- a 127k-row backlog is
+# ~86 MB, which on its own would push this database through the Supabase
+# free-tier 500 MB ceiling and into read-only. Capping the per-run write drains
+# any backlog over consecutive runs instead of one unbounded burst. The steady
+# state is only ~5k new rows/day, so the cap never binds in normal operation.
+MAX_ROWS_PER_RUN = 25_000
 
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s  %(levelname)-7s  %(message)s",
@@ -88,24 +95,75 @@ def _stage2_foreign_context(headline: str) -> bool:
 # Backfill
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _fetch_all_news(db, page: int = 1000) -> list[dict]:
-    out, start = [], 0
+def _fetch_all_news(db, page: int = 1000, only_unclassified: bool = True,
+                    max_rows: int | None = MAX_ROWS_PER_RUN) -> list[dict]:
+    """Page through news_items with keyset (cursor) pagination.
+
+    NOT .range(): LIMIT/OFFSET forces Postgres to walk and discard every row
+    before the offset, so a full pass is O(n^2). Once news_items passed ~500k
+    rows this raised 57014 (statement timeout) at offset ~465000 and killed the
+    resolver every day from 2026-07-15 onward. Because the resolver died, rows
+    kept resolution_status = NULL, and sentiment_scorer -- which only accepts
+    'verified' rows -- then had nothing to score or roll up. Keyset paging is
+    constant-time per page and independent of table size.
+
+    only_unclassified=True honours this module's own stated intent ("mark
+    verified rows so a future run doesn't re-check them"), which the old
+    unfiltered fetch never actually implemented -- every run re-read and
+    re-wrote all ~600k rows. Pass False (CLI: --all) for a full re-scan, e.g.
+    after the ticker master changes -- run_resync.py passes --all because its
+    job is to clean the whole table, not just the new rows.
+    """
+    out, last = [], None
     while True:
-        chunk = (db.table("news_items")
-                 .select("id,ticker,headline,sentiment_score,resolution_status")
-                 .range(start, start + page - 1).execute().data or [])
+        q = (db.table("news_items")
+             .select("id,ticker,headline,sentiment_score,resolution_status")
+             .order("id").limit(page))
+        if only_unclassified:
+            q = q.is_("resolution_status", "null")
+        if last is not None:
+            q = q.gt("id", last)
+        chunk = q.execute().data or []
         out.extend(chunk)
         if len(chunk) < page:
             return out
-        start += page
+        if max_rows is not None and len(out) >= max_rows:
+            log.warning("news_items: reached MAX_ROWS_PER_RUN=%d; the rest of "
+                        "the backlog is left for the next run", max_rows)
+            return out[:max_rows]
+        last = chunk[-1]["id"]
 
 
-def run() -> None:
+def _bulk_update(db, rows: list[dict], patch: dict, chunk: int = 500) -> int:
+    """Apply `patch` to every row id, one request per `chunk` ids.
+
+    The previous implementation issued one HTTP UPDATE per row through a
+    ThreadPoolExecutor -- ~600k round-trips on a full pass. Each UPDATE also
+    writes a new row version, so a large pass inflates the table (and the
+    Supabase free-tier 500 MB budget) fast. Batching by id keeps the row-version
+    count identical but collapses the request count by ~500x, and returns the
+    number of rows actually written so the caller can report honestly.
+    """
+    done = 0
+    for i in range(0, len(rows), chunk):
+        ids = [r["id"] for r in rows[i:i + chunk]]
+        try:
+            db.table("news_items").update(patch).in_("id", ids).execute()
+            done += len(ids)
+        except Exception as exc:
+            log.warning("bulk update failed for %d ids (%s): %s",
+                        len(ids), ids[:3], exc)
+    return done
+
+
+def run(only_unclassified: bool = True,
+        max_rows: int | None = MAX_ROWS_PER_RUN) -> None:
     db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
     master = _load_master()
     log.info("ticker_master: %d verified US tickers loaded", len(master))
 
-    rows = _fetch_all_news(db)
+    rows = _fetch_all_news(db, only_unclassified=only_unclassified,
+                           max_rows=max_rows)
     log.info("news_items: %d rows to verify", len(rows))
 
     verified, unresolved_noalias, unresolved_foreign, not_in_master = [], [], [], []
@@ -134,38 +192,16 @@ def run() -> None:
     log.info("Flagging %d rows as resolution_status='unresolved' and nulling "
              "their sentiment_score", len(to_flag))
 
-    def _update(row):
-        try:
-            db.table("news_items").update({
-                "resolution_status": "unresolved",
-                "sentiment_score": None,
-            }).eq("id", row["id"]).execute()
-            return True
-        except Exception:
-            return False
-
     nulled = 0
     if to_flag:
-        with ThreadPoolExecutor(max_workers=UPDATE_WORKERS) as pool:
-            for ok in pool.map(_update, to_flag):
-                nulled += 1 if ok else 0
+        nulled = _bulk_update(db, to_flag,
+                              {"resolution_status": "unresolved",
+                               "sentiment_score": None})
         log.info("Updated %d/%d rows", nulled, len(to_flag))
 
     # Mark verified rows so a future run doesn't re-check them.
-    def _mark_verified(row):
-        try:
-            db.table("news_items").update({
-                "resolution_status": "verified"
-            }).eq("id", row["id"]).execute()
-            return True
-        except Exception:
-            return False
-
     if verified:
-        marked = 0
-        with ThreadPoolExecutor(max_workers=UPDATE_WORKERS) as pool:
-            for ok in pool.map(_mark_verified, verified):
-                marked += 1 if ok else 0
+        marked = _bulk_update(db, verified, {"resolution_status": "verified"})
         log.info("Marked %d/%d rows as 'verified'", marked, len(verified))
 
     # Final report
@@ -180,4 +216,5 @@ def run() -> None:
 
 
 if __name__ == "__main__":
-    run()
+    # --all forces a full re-scan of every row (default: only unclassified).
+    run(only_unclassified="--all" not in sys.argv)

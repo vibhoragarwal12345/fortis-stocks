@@ -31,7 +31,9 @@ PY = sys.executable
 STEP_TIMEOUT = 3600                                  # 60 min hard cap per step
 
 STEPS = [
-    ("news_resolver",                 "pipeline/agents/news_resolver.py", []),
+    # --all: resync exists to clean the WHOLE table, so it must re-check every
+    # row. The daily harvest run takes the default (unclassified rows only).
+    ("news_resolver",                 "pipeline/agents/news_resolver.py", ["--all"]),
     ("sentiment_scorer (rollup)",     "pipeline/processors/sentiment_scorer.py", ["midday"]),
     ("anomaly_detector",              "pipeline/agents/anomaly_detector.py", ["midday"]),
     ("run_factor_dcf (top 30)",       "pipeline/quant/run_factor_dcf.py", ["30"]),
