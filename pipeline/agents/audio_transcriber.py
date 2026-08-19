@@ -64,7 +64,7 @@ DISCOVERY_TTL_DAYS = 14          # re-probe a "no audio" result after this long
 DISCOVERY_FOUND_TTL_DAYS = 365   # a known-good audio URL is reusable for a year
 AUDIO_RETENTION_DAYS = 90        # prune cached audio files older than this
 MAX_AUDIO_MB = 400               # sanity cap on a single download
-GROQ_MODEL = "llama-3.3-70b-versatile"   # matches the rest of the pipeline
+GROQ_MODEL = "openai/gpt-oss-120b"   # matches the rest of the pipeline
 
 AUDIO_EXT_RE = re.compile(r"\.(mp3|m4a|wav|mp4)(?:[?#]|$)", re.IGNORECASE)
 _QA_TRIGGER_RE = re.compile(

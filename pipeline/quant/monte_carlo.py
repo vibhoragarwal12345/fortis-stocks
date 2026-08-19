@@ -23,7 +23,7 @@ from quant.models_config import MC_HORIZONS, MONTE_CARLO_SIMS  # noqa: E402
 from quant.utils import safe_log_returns  # noqa: E402
 
 log = logging.getLogger(__name__)
-GROQ_MODEL = "llama-3.3-70b-versatile"
+GROQ_MODEL = "openai/gpt-oss-120b"
 
 
 class MonteCarloSimulator:
@@ -202,7 +202,9 @@ class MonteCarloSimulator:
                     model=GROQ_MODEL,
                     messages=[{"role": "system", "content": system},
                               {"role": "user", "content": user}],
-                    temperature=0.2, max_tokens=160)
+                    # 512 (not 160): reasoning models spend tokens thinking
+                    # first, so a tight cap truncates mid-sentence.
+                    temperature=0.2, max_tokens=512)
                 txt = (resp.choices[0].message.content or "").strip()
                 if txt:
                     return txt

@@ -46,7 +46,7 @@ from llm import complete  # noqa: E402 -- shared provider-waterfall gateway
 
 DEFAULT_N    = 20              # matches run_scan.DEFAULT_TOP_N (LLM budget)
 RANK_SOURCE  = "midday"        # which ranked_focus_list run to read
-GROQ_MODEL   = "llama-3.3-70b-versatile"
+GROQ_MODEL   = "openai/gpt-oss-120b"
 GEMINI_MODEL = "gemini-2.5-flash"
 
 logging.basicConfig(

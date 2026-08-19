@@ -54,7 +54,7 @@ from supabase import create_client  # noqa: E402
 from llm import complete  # noqa: E402 -- shared provider-waterfall gateway
 
 HTTP_TIMEOUT       = 20
-GROQ_MODEL         = "llama-3.3-70b-versatile"
+GROQ_MODEL         = "openai/gpt-oss-120b"
 SEC_WINDOW_HOURS   = 48
 NEWS_WINDOW_HOURS  = 24
 NEWS_CLUSTER_MIN   = 3        # headlines in the window to count as a news cluster

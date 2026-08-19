@@ -25,7 +25,7 @@ from config import GROQ_API_KEY  # noqa: E402
 from quant.models_config import TRADING_DAYS_PER_YEAR  # noqa: E402
 
 log = logging.getLogger(__name__)
-GROQ_MODEL = "llama-3.3-70b-versatile"
+GROQ_MODEL = "openai/gpt-oss-120b"
 
 ANNUALIZE = np.sqrt(TRADING_DAYS_PER_YEAR)
 MIN_RELIABLE_DAYS = 504
@@ -272,7 +272,9 @@ class GARCHModel:
                     model=GROQ_MODEL,
                     messages=[{"role": "system", "content": system},
                               {"role": "user", "content": user}],
-                    temperature=0.2, max_tokens=150)
+                    # 512 (not 150): reasoning models spend tokens thinking
+                    # first, so a tight cap truncates mid-sentence.
+                    temperature=0.2, max_tokens=512)
                 txt = (resp.choices[0].message.content or "").strip()
                 if txt:
                     return txt
