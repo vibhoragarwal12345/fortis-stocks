@@ -158,8 +158,16 @@ def _download_history(tickers: list[str], start: date,
     Returns {ticker: DataFrame with lowercased columns}. Empty if all fail."""
     if not tickers:
         return {}
+    # Yahoo writes share classes with a hyphen (BRK-B), our universe carries the
+    # slash form (BRK/B). layer1_fast_scan._to_yahoo already did this for the
+    # scan, but this module never did, so every dual-class name -- BRK/A, BRK/B,
+    # BF/A, BF/B, HEI/A, both Berkshire classes among them -- failed its price
+    # pull with "possibly delisted; no timezone found" and simply never had its
+    # outcome recorded. 9 ranked_focus_list rows carry these tickers, so picks
+    # were being made whose results silently never landed in pick_outcomes.
+    yahoo_of = {t.replace("/", "-").replace(".", "-"): t for t in tickers}
     try:
-        raw = yf.download(tickers, start=start.isoformat(),
+        raw = yf.download(list(yahoo_of), start=start.isoformat(),
                           end=(end + timedelta(days=1)).isoformat(),
                           interval="1d", auto_adjust=True, progress=False,
                           group_by="ticker", threads=True)
@@ -170,9 +178,11 @@ def _download_history(tickers: list[str], start: date,
         return {}
     result: dict[str, pd.DataFrame] = {}
     multi = isinstance(raw.columns, pd.MultiIndex)
-    for t in tickers:
+    # yfinance keys its columns by the symbol we SENT (hyphen form), but every
+    # caller here indexes results by our own ticker (slash form), so map back.
+    for ysym, t in yahoo_of.items():
         try:
-            df = (raw[t] if multi else raw).dropna(how="all")
+            df = (raw[ysym] if multi else raw).dropna(how="all")
         except KeyError:
             continue
         if df.empty:

@@ -39,6 +39,16 @@ function fmtTimestamp(iso: string | null): string {
 }
 
 export function LastScanned({ rows }: { rows: Row[] }) {
+  // react-hooks/purity flags Date.now() during render because in a CLIENT
+  // component an incidental re-render would silently change the value and can
+  // desync from server-rendered HTML. This is a SERVER component, and both
+  // pages that mount it (dashboard/commodities, dashboard/emerging) declare
+  // `export const dynamic = "force-dynamic"`, so this runs exactly once per
+  // request on the server and ships as static HTML -- there is no re-render
+  // and no hydration to mismatch. Reading the clock here is the intended
+  // behaviour; converting to useEffect would force this into a client
+  // component for no benefit.
+  // eslint-disable-next-line react-hooks/purity
   const now = Date.now()
   return (
     <div className="space-y-2 rounded-lg border border-border bg-card px-4 py-3 text-small shadow-[var(--shadow-card)]">

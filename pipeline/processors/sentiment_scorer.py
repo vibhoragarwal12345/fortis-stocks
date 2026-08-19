@@ -408,6 +408,9 @@ def _write_scores(db, table: str, score_col: str, updates: list[tuple[int, float
     """Write (id, score) pairs back to `table`.`score_col` concurrently."""
     done = 0
 
+    # One HTTP round-trip per row. The client is built with a 30s
+    # postgrest_client_timeout (see run()) so a hung request fails this single
+    # write instead of stalling the entire agent.
     def _one(pair):
         rid, score = pair
         try:
@@ -644,8 +647,16 @@ def run(run_type: str = "midday") -> None:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from config import SUPABASE_SERVICE_KEY, SUPABASE_URL
     from supabase import create_client
+    from supabase.lib.client_options import ClientOptions
 
-    db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    # Explicit per-request deadline. _write_scores issues one HTTP PATCH per
+    # row through a thread pool, and neither postgrest-py nor httpx applies a
+    # default timeout, so a single hung request stalls the whole agent
+    # indefinitely -- on 2026-08-18 that pinned a run at 0% CPU for 40 minutes
+    # until it was killed by hand. 30s turns an unbounded hang into one lost
+    # row that the caller already reports as a failed write.
+    db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY,
+                       options=ClientOptions(postgrest_client_timeout=30))
     now = datetime.now(timezone.utc)
     log.info("Sentiment Scorer agent -- backend=%s, run_type=%s", get_backend(), run_type)
 
