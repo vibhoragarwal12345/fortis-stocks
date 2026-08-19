@@ -267,12 +267,14 @@ def _build_prompt(data: dict) -> str:
     return "\n".join(lines)
 
 
-def _call_groq(prompt: str) -> str | None:
+def _call_groq(prompt: str) -> tuple[str | None, str | None]:
     # Name kept for call-site stability; now routes through the shared gateway
     # (Cerebras -> Groq -> NVIDIA -> Gemini) with JSON-object output.
-    text, _ = complete(prompt, system=SYSTEM_PROMPT, temperature=0.2,
-                       max_tokens=8000, json_mode=True)
-    return text
+    # Returns (text, provider): the provider is needed so the stored row can
+    # name the model that ACTUALLY answered, not the one we hoped for.
+    text, provider = complete(prompt, system=SYSTEM_PROMPT, temperature=0.2,
+                              max_tokens=8000, json_mode=True)
+    return text, provider
 
 
 def _parse_json(text: str) -> dict | None:
@@ -339,7 +341,7 @@ def research_candidate(db, candidate: dict) -> dict | None:
 
     data = build_data_section(db, candidate)
     prompt = _build_prompt(data)
-    raw = _call_groq(prompt)
+    raw, provider = _call_groq(prompt)
     if not raw:
         return None
     thesis = _parse_json(raw)
@@ -405,7 +407,12 @@ def research_candidate(db, candidate: dict) -> dict | None:
         "quality_grade":      fc["quality_grade"],
         "factcheck_details":  fc,
         "data_snapshot":      data,
-        "llm_model":          GROQ_MODEL,
+        # The gateway fails over to whichever provider answers, so stamping
+        # GROQ_MODEL unconditionally recorded a model that may never have run
+        # the call -- every row written 2026-08-17..19 says
+        # llama-3.3-70b-versatile, a model Groq had already retired. Record the
+        # provider that actually served it.
+        "llm_model":          provider or GROQ_MODEL,
     }
 
 
