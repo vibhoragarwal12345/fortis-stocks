@@ -55,7 +55,7 @@ from config import (  # noqa: E402
 from supabase import create_client  # noqa: E402
 
 HTTP_TIMEOUT       = 20
-GROQ_MODEL         = "llama-3.3-70b-versatile"
+GROQ_MODEL         = "openai/gpt-oss-120b"
 TICKER_MASTER_CSV  = Path(__file__).resolve().parent.parent / "data" / "ticker_master.csv"
 
 # Candidate-pool caps -- bound runtime.
@@ -255,11 +255,17 @@ def _correlation_top(target: str, candidates: list[str]) -> list[tuple[str, floa
 # LLM business-model method
 # ══════════════════════════════════════════════════════════════════════════════
 
+# Must ask for an OBJECT, not a bare array: the call below uses Groq's
+# response_format={"type": "json_object"}, and gpt-oss-120b enforces it
+# strictly -- returning a top-level array makes Groq reject the completion with
+# HTTP 400 json_validate_failed, which the except-handler turns into "no peers"
+# silently. The parser below still accepts either shape.
 _LLM_SYSTEM = (
     "You are an equity analyst. Given a target company's business description "
     "and a list of candidate peers with their business descriptions, identify "
     "which candidates have the most similar business model. Respond with a "
-    "JSON array of ticker symbols only. Do NOT introduce new tickers. Pick "
+    'JSON OBJECT of the form {"peers": ["TICK", ...]} containing ticker '
+    "symbols only. Do NOT introduce new tickers. Pick "
     f"between {LLM_PICKS_MIN} and {LLM_PICKS_MAX} candidates."
 )
 
@@ -286,7 +292,11 @@ def _llm_business_peers(target: str, target_summary: str,
             model=GROQ_MODEL,
             messages=[{"role": "system", "content": _LLM_SYSTEM},
                       {"role": "user",   "content": user_prompt}],
-            temperature=0.0, max_tokens=200,
+            # 512 (not 200): gpt-oss is a reasoning model and spends tokens
+            # thinking before emitting the JSON. At 200 Groq returns HTTP 400
+            # "Failed to validate JSON" because the object never closes, and
+            # the except-handler below would silently return no peers.
+            temperature=0.0, max_tokens=512,
             response_format={"type": "json_object"})
         raw = (resp.choices[0].message.content or "").strip()
     except Exception as exc:

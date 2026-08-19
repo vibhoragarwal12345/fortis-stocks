@@ -53,7 +53,7 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-GROQ_MODEL = "llama-3.3-70b-versatile"
+GROQ_MODEL = "openai/gpt-oss-120b"
 
 SYSTEM_PROMPT = """You are a small-cap growth analyst who has studied the
 traits of historical 100-baggers (small base, long runways, high returns on

@@ -14,8 +14,8 @@ budget and removes the single point of failure.
 
 PROVIDER TIERS (selection order):
 
-    tier 0  groq / cerebras / nvidia   -- llama-class primaries, balanced by
-                                          remaining daily budget
+    tier 0  groq / cerebras / nvidia   -- frontier-class primaries, balanced
+                                          by remaining daily budget
     tier 1  gemini                     -- different model family, sits behind
                                           the primaries
     tier 2  openrouter                 -- last-resort overflow router
@@ -29,9 +29,12 @@ survives across agent subprocesses and across the three daily CI scan jobs.
 Ledger access is best-effort: if the DB is unreachable the gateway falls back
 to in-process counting and keeps serving.
 
-Groq and NVIDIA serve ``llama-3.3-70b``; Cerebras serves ``gpt-oss-120b``
-(it no longer offers Llama); Gemini serves ``gemini-2.5-flash``; OpenRouter
-serves the free ``llama-3.3-70b-instruct`` slot. Everything except Gemini is
+Groq and Cerebras serve ``gpt-oss-120b``; NVIDIA still serves
+``llama-3.3-70b-instruct``; Gemini serves ``gemini-2.5-flash``; OpenRouter
+serves the free ``llama-3.3-70b-instruct`` slot. Groq retired
+``llama-3.3-70b-versatile`` around 2026-08-17 -- every call 404'd for two days
+before it was caught, so if a provider suddenly fails wholesale, check its
+model list first (``GET /v1/models``). Everything except Gemini is
 OpenAI-compatible (same ``/chat/completions`` shape) and goes through the
 ``openai`` SDK by swapping ``base_url``.
 
@@ -97,12 +100,16 @@ def _providers() -> list[_Provider]:
     provider that 429s earlier is still handled by the error path.
     """
     candidates = [
-        # Groq (llama) is the tuned default and serves short-output tasks
-        # (e.g. catalyst's 120-token calls) that the gpt-oss reasoning model
-        # can't. Its binding free-tier constraint is tokens (~100K/day), not
-        # the 1K requests/day.
+        # Groq serves gpt-oss-120b, the most capable model on its free tier.
+        # It replaced llama-3.3-70b-versatile, which Groq retired ~2026-08-17.
+        # NOTE: gpt-oss is a REASONING model -- it spends tokens thinking before
+        # the answer, so callers must not use tight max_tokens. Measured on
+        # Groq: a JSON-mode call at max_tokens=200 returns HTTP 400 "Failed to
+        # validate JSON" (the object never closes) and a prose call at 150 can
+        # come back empty; 512 is the safe floor. Its binding free-tier
+        # constraint is tokens (~100K/day), not the 1K requests/day.
         _Provider("groq", "openai", GROQ_API_KEY,
-                  "llama-3.3-70b-versatile", "https://api.groq.com/openai/v1",
+                  "openai/gpt-oss-120b", "https://api.groq.com/openai/v1",
                   tier=0, rpd=1000, tpd=100_000),
         # Cerebras has by far the biggest free token quota (~1M/day) and is
         # very fast; it absorbs the heavy load Groq's token cap can't carry.
@@ -116,7 +123,7 @@ def _providers() -> list[_Provider]:
                   "gpt-oss-120b", "https://api.cerebras.ai/v1",
                   tier=0, rpd=2000, tpd=1_000_000),
         _Provider("groq_2", "openai", GROQ_API_KEY_2,
-                  "llama-3.3-70b-versatile", "https://api.groq.com/openai/v1",
+                  "openai/gpt-oss-120b", "https://api.groq.com/openai/v1",
                   tier=0, rpd=1000, tpd=100_000),
         _Provider("nvidia", "openai", NVIDIA_API_KEY,
                   "meta/llama-3.3-70b-instruct", "https://integrate.api.nvidia.com/v1",

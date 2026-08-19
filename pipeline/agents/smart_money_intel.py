@@ -88,7 +88,7 @@ SENATE_WATCHER_URL = "https://senatestockwatcher.com/aggregate/all_transactions.
 HOUSE_WATCHER_URL  = "https://housestockwatcher.com/data/all_transactions.json"
 CONGRESS_CACHE_TTL_HOURS = 24
 
-GROQ_MODEL = "llama-3.3-70b-versatile"
+GROQ_MODEL = "openai/gpt-oss-120b"
 GROQ_TEMPERATURE = 0.3   # tighter than debate_synthesizer because we want
                          # closed-context language, not creative reasoning
 

@@ -59,7 +59,7 @@ from agents.factcheck_agent import factcheck, strip_data_refs  # noqa: E402
 from agents import industry_research as ind_res  # noqa: E402
 
 HTTP_TIMEOUT       = 25
-GROQ_MODEL         = "llama-3.3-70b-versatile"
+GROQ_MODEL         = "openai/gpt-oss-120b"
 FINNHUB_THROTTLE   = 1.1
 FMP_THROTTLE       = 0.3
 
