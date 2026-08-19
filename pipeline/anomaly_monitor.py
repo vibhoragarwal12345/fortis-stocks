@@ -254,10 +254,23 @@ def run_checks(db) -> list[Check]:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--json", action="store_true", help="machine-readable output")
+    ap.add_argument("--selftest", action="store_true",
+                    help="inject a synthetic CRITICAL to prove the alert path "
+                         "still reaches a human, without faking real data")
     args = ap.parse_args()
 
     db = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
     checks = run_checks(db)
+    if args.selftest:
+        # An alerting path nobody exercises is an alerting path nobody can
+        # trust -- SLACK_WEBHOOK_URL sat unconfigured for months and silently
+        # swallowed every alert. This injects a harmless synthetic CRITICAL so
+        # the full chain (monitor -> issue -> email) can be proven end to end
+        # on demand, without waiting for a real outage or faking data.
+        checks.append(Check("selftest", CRITICAL,
+                            "SYNTHETIC alert -- this is a drill, triggered by "
+                            "--selftest. If you are reading this in your inbox, "
+                            "anomaly alerting is working."))
     crit = [c for c in checks if c.severity == CRITICAL]
     warn = [c for c in checks if c.severity == WARNING]
 

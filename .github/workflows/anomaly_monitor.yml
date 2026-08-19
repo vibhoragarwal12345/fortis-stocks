@@ -29,6 +29,11 @@ on:
       - "Market scan · 2x per trading day"
     types: [completed]
   workflow_dispatch:
+    inputs:
+      selftest:
+        description: "Fire a synthetic alert to prove the email path works"
+        type: boolean
+        default: false
 
 concurrency:
   group: anomaly-monitor
@@ -62,7 +67,11 @@ jobs:
         id: check
         run: |
           set +e
-          python -m pipeline.anomaly_monitor > report.txt 2>&1
+          FLAGS=""
+          if [ "${{ github.event.inputs.selftest }}" = "true" ]; then
+            FLAGS="--selftest"
+          fi
+          python -m pipeline.anomaly_monitor $FLAGS > report.txt 2>&1
           echo "exit_code=$?" >> "$GITHUB_OUTPUT"
           cat report.txt
 
