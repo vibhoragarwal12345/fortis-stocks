@@ -271,7 +271,22 @@ def _call_openai(p: _Provider, prompt: str, system: str | None,
                  temperature: float, max_tokens: int,
                  json_mode: bool) -> tuple[str | None, int]:
     from openai import OpenAI
-    client = OpenAI(api_key=p.api_key, base_url=p.base_url)
+    # max_retries=0 is deliberate. The SDK defaults to 2 retries and HONOURS the
+    # provider's Retry-After header, so a rate-limited provider made it sleep
+    # ~10 minutes INSIDE this call -- before the gateway ever saw the 429 and
+    # could fail over. On 2026-08-19 that burned 20 of multibagger Stage 3's
+    # 30-minute budget on two sleeps and killed the job:
+    #     19:04:59 cerebras_2 daily cap hit
+    #     19:14:59 Retrying request...
+    #     19:25:00 Retrying request...
+    #     19:29:45 nvidia failed  -> job cancelled at 30 min
+    # This module already knows what to do with a 429: disable that provider and
+    # move to the next one. Retrying inside the SDK defeats the whole waterfall,
+    # because a provider that asks for 600 seconds is simply unavailable for
+    # this run. timeout bounds a single call so one slow provider cannot stall
+    # the chain either.
+    client = OpenAI(api_key=p.api_key, base_url=p.base_url,
+                    max_retries=0, timeout=90.0)
     messages: list[dict] = []
     if system:
         messages.append({"role": "system", "content": system})
