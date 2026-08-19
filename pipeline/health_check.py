@@ -53,16 +53,6 @@ def _hours_ago(hours: int) -> str:
     return (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
 
 
-def _count_since(db, table: str, column: str, hours: int) -> int:
-    res = (
-        db.table(table)
-        .select("*", count="exact", head=True)
-        .gte(column, _hours_ago(hours))
-        .execute()
-    )
-    return int(res.count or 0)
-
-
 def check_recent_scan(db) -> tuple[bool, str]:
     """A successful full scan completed recently (the core lean-pipeline signal)."""
     res = (
@@ -123,29 +113,42 @@ def check_sentiment_rollup(db) -> tuple[bool, str]:
     )
 
 
-def check_news_resolution(db) -> tuple[bool, str]:
+def check_news_resolution(db, sample: int = 500) -> tuple[bool, str]:
     """Fresh news_items are actually being classified by news_resolver.
 
     The rollup only accepts resolution_status='verified'. If the resolver stops,
     rows pile up as NULL and the rollup silently empties out even though news is
     still arriving -- the exact failure mode of the 2026-07 outage, caught one
     step earlier than check_sentiment_rollup.
+
+    Samples the newest `sample` rows by id instead of counting a time window.
+    The first version of this check used count="exact" over fetched_at, but
+    news_items has no index on fetched_at, so each call forced a full
+    sequential scan (~4.9s in Postgres, two of them per run). On 2026-08-19
+    that returned PostgREST 500 "JSON could not be generated" and failed the
+    whole Data Quality workflow -- a false alarm caused by the cost of the
+    check, not by anything being wrong. Ordering by the id primary key is an
+    index scan: ~7ms, and bounded regardless of table size.
+
+    Newest-first is also the right question: news_resolver drains oldest-first,
+    so if it is falling behind, the newest rows are exactly the ones left NULL.
     """
-    unclassified = _count_since(db, "news_items", "fetched_at", 48)
-    res = (
+    rows = (
         db.table("news_items")
-        .select("*", count="exact", head=True)
-        .gte("fetched_at", _hours_ago(48))
-        .is_("resolution_status", "null")
+        .select("id,resolution_status")
+        .order("id", desc=True)
+        .limit(sample)
         .execute()
-    )
-    n_null = int(res.count or 0)
-    # Tolerate the newest arrivals not yet resolved; alert if nearly all are.
-    ok = unclassified == 0 or (n_null / unclassified) < 0.9
-    pct = (n_null / unclassified * 100) if unclassified else 0.0
+    ).data or []
+    if not rows:
+        return False, "news_items: table is empty -- news_harvester not writing"
+    n_null = sum(1 for r in rows if r.get("resolution_status") is None)
+    pct = n_null / len(rows) * 100
+    # Tolerate a partial batch mid-harvest; alert only if nearly all are stuck.
+    ok = pct < 90
     return ok, (
-        f"news_items last 48h: {unclassified} rows, {n_null} still NULL "
-        f"({pct:.0f}%) ({'ok' if ok else 'FAIL -- news_resolver not classifying'})"
+        f"newest {len(rows)} news_items: {n_null} unclassified ({pct:.0f}%) "
+        f"({'ok' if ok else 'FAIL -- news_resolver not classifying'})"
     )
 
 
