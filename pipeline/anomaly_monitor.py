@@ -198,7 +198,7 @@ def check_db_size(db) -> Check:
     return Check("db_size", OK, f"database {mb:.0f} MB of {DB_QUOTA_MB} MB")
 
 
-def check_llm_providers() -> Check:
+def check_llm_providers(deadline_s: int = 75) -> Check:
     """At least one LLM provider actually answers.
 
     Groq retired llama-3.3-70b-versatile on ~2026-08-17 and every call 404'd for
@@ -206,13 +206,34 @@ def check_llm_providers() -> Check:
     canned template text; nothing surfaced it because failover logs a WARNING.
     A live call is the only check that catches a retired model.
     """
-    try:
+    # Hard wall-clock cap. A monitor that can hang is worse than no monitor:
+    # this very check stalled a run on 2026-08-19 because the OpenAI SDK slept
+    # ~10 minutes honouring a rate-limited provider's Retry-After. That is fixed
+    # in llm.py, but the monitor must not depend on any other module staying
+    # fast, so it enforces its own deadline in a daemon thread and reports
+    # rather than blocking.
+    from concurrent.futures import ThreadPoolExecutor, TimeoutError as FTimeout
+
+    def _probe():
         from llm import complete
-        text, provider = complete("Reply with the single word: ok",
-                                  system="Reply with exactly one word.",
-                                  temperature=0.0, max_tokens=512)
+        return complete("Reply with the single word: ok",
+                        system="Reply with exactly one word.",
+                        temperature=0.0, max_tokens=512)
+
+    pool = ThreadPoolExecutor(max_workers=1)
+    try:
+        text, provider = pool.submit(_probe).result(timeout=deadline_s)
+    except FTimeout:
+        # Slow is degraded, not proof of an outage -- the pipeline agents have
+        # far longer budgets than this probe does.
+        return Check("llm_providers", WARNING,
+                     f"no LLM provider answered within {deadline_s}s -- "
+                     "providers are slow, throttled, or capped")
     except Exception as exc:
         return Check("llm_providers", CRITICAL, f"LLM gateway raised: {exc}")
+    finally:
+        pool.shutdown(wait=False)
+
     if not text:
         return Check("llm_providers", CRITICAL,
                      "no LLM provider returned text -- every provider is down, "
