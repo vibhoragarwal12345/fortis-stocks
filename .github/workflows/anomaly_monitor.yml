@@ -1,0 +1,129 @@
+name: Anomaly monitor
+
+# WHY THIS EXISTS
+# ticker_sentiment_rollup stopped updating on 2026-07-15 and nobody knew for 33
+# days, because:
+#   * data_harvest.yml marks every step continue-on-error, so a crashed step
+#     still reported success -- 33 consecutive green checkmarks;
+#   * no check looked at the rollup;
+#   * the one staleness check that existed could not fail in CI;
+#   * and the failure notifier was gated on `if: env.WEBHOOK != ''` with
+#     SLACK_WEBHOOK_URL never configured, so it silently did nothing.
+#
+# This watches OUTCOMES (did rows actually land?) instead of exit codes, and
+# raises a GitHub issue assigned to the repo owner -- which GitHub emails --
+# rather than a webhook that can quietly no-op. The issue is reused while an
+# anomaly persists and auto-closed when the platform recovers, so a long
+# outage is one email thread, not one email every three hours.
+
+on:
+  schedule:
+    # Every 3 hours. The pipeline writes at 10:30 (harvest), 12:00 and 16:30
+    # (scans) UTC, so this always samples within ~3h of every producer.
+    - cron: "25 */3 * * *"
+  # Also check immediately after the producers finish, so a bad run surfaces in
+  # minutes rather than at the next 3-hourly tick.
+  workflow_run:
+    workflows:
+      - "Data harvest · pre-scan enrichment (news/SEC/options/crowd/sentiment)"
+      - "Market scan · 2x per trading day"
+    types: [completed]
+  workflow_dispatch:
+
+concurrency:
+  group: anomaly-monitor
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  NEXT_PUBLIC_SUPABASE_URL:  ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  GROQ_API_KEY:              ${{ secrets.GROQ_API_KEY }}
+  GROQ_API_KEY_2:            ${{ secrets.GROQ_API_KEY_2 }}
+  CEREBRAS_API_KEY:          ${{ secrets.CEREBRAS_API_KEY }}
+  CEREBRAS_API_KEY_2:        ${{ secrets.CEREBRAS_API_KEY_2 }}
+  NVIDIA_API_KEY:            ${{ secrets.NVIDIA_API_KEY }}
+  GEMINI_API_KEY:            ${{ secrets.GEMINI_API_KEY }}
+  OPENROUTER_API_KEY:        ${{ secrets.OPENROUTER_API_KEY }}
+
+jobs:
+  monitor:
+    name: "Check for anomalies"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-pipeline
+
+      - name: Run anomaly monitor
+        id: check
+        run: |
+          set +e
+          python -m pipeline.anomaly_monitor > report.txt 2>&1
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          cat report.txt
+
+      # ── Anomaly found: raise it where it will actually be seen ──────────
+      # One open issue at a time, reused while the anomaly persists, so a long
+      # outage is a single email thread rather than an email every 3 hours.
+      - name: Open or update the alert issue
+        if: steps.check.outputs.exit_code != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          BODY_FILE=body.md
+          {
+            echo "The anomaly monitor found a **CRITICAL** problem."
+            echo
+            echo '```'
+            cat report.txt
+            echo '```'
+            echo
+            echo "[View the run]($RUN_URL) · checked at $(date -u '+%Y-%m-%d %H:%M')Z"
+            echo
+            echo "This issue is reused while the anomaly persists and closes"
+            echo "automatically once every critical check passes again."
+          } > "$BODY_FILE"
+
+          EXISTING=$(gh issue list --label anomaly --state open \
+                       --json number --jq '.[0].number // empty')
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body-file "$BODY_FILE"
+            echo "commented on existing issue #$EXISTING"
+          else
+            gh label create anomaly --color B60205 \
+              --description "Automated platform anomaly alert" 2>/dev/null || true
+            gh issue create \
+              --title "🚨 CEFA anomaly detected ($(date -u '+%Y-%m-%d %H:%M')Z)" \
+              --body-file "$BODY_FILE" \
+              --label anomaly \
+              --assignee ${{ github.repository_owner }}
+            echo "opened a new anomaly issue"
+          fi
+
+      # ── Recovered: close the thread so the next failure is a fresh email ──
+      - name: Close the alert issue on recovery
+        if: steps.check.outputs.exit_code == '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          EXISTING=$(gh issue list --label anomaly --state open \
+                       --json number --jq '.[0].number // empty')
+          if [ -n "$EXISTING" ]; then
+            gh issue close "$EXISTING" \
+              --comment "✅ Recovered — every critical check passed at $(date -u '+%Y-%m-%d %H:%M')Z."
+            echo "closed issue #$EXISTING"
+          fi
+
+      # Fail the workflow too, so the run itself is red in the Actions list.
+      - name: Fail if any critical anomaly
+        if: steps.check.outputs.exit_code != '0'
+        run: |
+          echo "::error::Critical anomaly detected -- see the alert issue."
+          exit 1
