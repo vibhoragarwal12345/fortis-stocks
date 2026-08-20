@@ -269,8 +269,14 @@ def check_llm_capacity(deadline_s: int = 45) -> Check:
 
     def _probe(p):
         try:
-            if p.kind != "openai":       # gemini uses its own SDK; assume ok
-                return p.name, True
+            if p.kind == "gemini":
+                # Probe it for real rather than assuming. Gemini retires models
+                # too -- gemini-2.5-pro and gemini-2.5-flash-lite both went 404
+                # on 2026-08-20 -- and an assumed-healthy provider is exactly
+                # the blind spot that let a capacity collapse go unnoticed.
+                from llm import _call_gemini
+                txt, _ = _call_gemini(p, "ok", "One word only.", 0.0, 64, False)
+                return p.name, bool(txt)
             from openai import OpenAI
             c = OpenAI(api_key=p.api_key, base_url=p.base_url,
                        max_retries=0, timeout=float(deadline_s) / 2)

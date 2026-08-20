@@ -134,6 +134,18 @@ def _providers() -> list[_Provider]:
         _Provider("gemini", "gemini", GEMINI_API_KEY,
                   "gemini-2.5-flash",
                   tier=1, rpd=250),
+        # Gemini free quota is metered PER MODEL, so each additional model is a
+        # genuinely separate bucket rather than a relabelling of the same pool.
+        # That matters now that Cerebras is 402 (billing wall) and NVIDIA hangs:
+        # these two are real replacement capacity, both verified for prose AND
+        # JSON mode on 2026-08-20. gemini-3.1-pro-preview is NOT here -- it
+        # returns 429 on the free tier.
+        _Provider("gemini-3-flash", "gemini", GEMINI_API_KEY,
+                  "gemini-3-flash-preview",
+                  tier=1, rpd=250),
+        _Provider("gemini-3-lite", "gemini", GEMINI_API_KEY,
+                  "gemini-3.1-flash-lite",
+                  tier=1, speed=1, rpd=250),
         # OpenRouter free slots: last-resort overflow when the primaries are
         # rate-limited. The account-level FREE cap is ~50 req/day (shared
         # across these models) + ~20 req/min; two models give per-minute
@@ -265,6 +277,26 @@ def _is_daily_cap(exc: Exception) -> bool:
         "per day", "tpd", "rpd", "requests per day", "tokens per day",
         "daily", "resource_exhausted", "quota",
     ))
+
+
+def _is_unreachable(exc: Exception) -> bool:
+    """A provider that hangs or refuses the connection is unusable THIS run.
+
+    NVIDIA currently accepts the request and never answers: measured at 120s
+    with no response, on a model its own /v1/models still lists. Because the
+    generic failure path deliberately does not disable a provider ("may recover
+    next call"), every single LLM call was paying the full client timeout on
+    NVIDIA before moving on. Inside a scan with a 46-minute soft deadline that
+    is ruinous -- it is exactly how debate_synthesizer ended up with 180s and
+    produced zero dossiers.
+
+    A timeout is a strong signal, not a blip: disable for the process, same as a
+    daily cap. The next process starts clean, so a recovered provider comes back
+    on the next run.
+    """
+    m = str(exc).lower()
+    return ("timed out" in m or "timeout" in m or "connection error" in m
+            or "connection aborted" in m or "apiconnectionerror" in m)
 
 
 def _is_rate_limit(exc: Exception) -> bool:
@@ -405,6 +437,13 @@ def complete(
                              "and retrying", p.name, wait)
                     time.sleep(wait)
                     continue  # retry SAME provider
+                if _is_unreachable(exc):
+                    log.warning("LLM %s unreachable (%s) -- disabling for the "
+                                "rest of this run so it stops costing a full "
+                                "timeout on every call", p.name, exc)
+                    with _lock:
+                        _exhausted.add(p.name)
+                    break  # next provider
                 log.warning("LLM %s failed: %s -- trying next provider", p.name, exc)
                 break  # next provider (do not disable -- may recover next call)
 
