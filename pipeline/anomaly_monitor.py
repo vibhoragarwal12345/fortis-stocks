@@ -107,14 +107,22 @@ def _business_hours_ago(hours: int) -> datetime:
 
 
 def _latest(db, table: str, column: str) -> datetime | None:
-    """Newest value of a timestamp column. One indexed row, no COUNT."""
+    """Newest value of a timestamp column. One indexed row, no COUNT.
+
+    A DATE column carries no time, so a row written at 17:35 reads back as
+    00:00 that day -- and a naive comparison then reports it as ~18 hours older
+    than it is, which is enough to trip a 30h budget and cry wolf. DATE values
+    are therefore taken as END of that day: the latest moment the row could
+    actually have been written.
+    """
     rows = (db.table(table).select(column)
             .order(column, desc=True).limit(1).execute()).data or []
     if not rows or not rows[0].get(column):
         return None
     raw = str(rows[0][column])
     if len(raw) == 10:                                  # a DATE column
-        return datetime.fromisoformat(raw).replace(tzinfo=timezone.utc)
+        return (datetime.fromisoformat(raw).replace(tzinfo=timezone.utc)
+                + timedelta(hours=24) - timedelta(seconds=1))
     return datetime.fromisoformat(raw.replace("Z", "+00:00"))
 
 
@@ -241,6 +249,98 @@ def check_llm_providers(deadline_s: int = 75) -> Check:
     return Check("llm_providers", OK, f"{provider} responded")
 
 
+def check_llm_capacity(deadline_s: int = 45) -> Check:
+    """How many configured LLM providers actually answer.
+
+    check_llm_providers only proves SOMETHING answered, which is not the same
+    as having capacity. On 2026-08-20 it reported "groq_2 responded -- OK"
+    while 6 of 8 providers were dead:
+        cerebras, cerebras_2   HTTP 402 Payment required (free quota exhausted)
+        openrouter x2          HTTP 404, the free model ids had been rotated away
+        nvidia                 request timed out
+    That left ~200K tokens/day against a design of ~2.2M -- about 9% -- which
+    is why debate_synthesizer kept timing out and the dashboard froze on a
+    2026-08-14 scan for six days. Nothing reported it, because one working
+    provider looks identical to eight from the outside.
+
+    Probes every provider in parallel behind one wall-clock deadline.
+    """
+    from concurrent.futures import ThreadPoolExecutor, TimeoutError as FTimeout
+
+    def _probe(p):
+        try:
+            if p.kind != "openai":       # gemini uses its own SDK; assume ok
+                return p.name, True
+            from openai import OpenAI
+            c = OpenAI(api_key=p.api_key, base_url=p.base_url,
+                       max_retries=0, timeout=float(deadline_s) / 2)
+            c.chat.completions.create(model=p.model, max_tokens=16,
+                                      messages=[{"role": "user", "content": "ok"}])
+            return p.name, True
+        except Exception:
+            return p.name, False
+
+    try:
+        from llm import _providers
+        provs = _providers()
+    except Exception as exc:
+        return Check("llm_capacity", WARNING, f"could not enumerate providers: {exc}")
+    if not provs:
+        return Check("llm_capacity", CRITICAL, "no LLM providers configured at all")
+
+    pool = ThreadPoolExecutor(max_workers=len(provs))
+    try:
+        futs = [pool.submit(_probe, p) for p in provs]
+        results = []
+        for f in futs:
+            try:
+                results.append(f.result(timeout=deadline_s))
+            except FTimeout:
+                results.append(("?", False))
+    finally:
+        pool.shutdown(wait=False)
+
+    healthy = [n for n, ok in results if ok]
+    dead = [n for n, ok in results if not ok]
+    frac = len(healthy) / len(provs)
+    msg = (f"{len(healthy)}/{len(provs)} providers healthy"
+           + (f" -- down: {', '.join(dead)}" if dead else ""))
+    if frac <= 0.25:
+        return Check("llm_capacity", CRITICAL, msg + " -- dossier generation will fail")
+    if dead:
+        return Check("llm_capacity", WARNING, msg)
+    return Check("llm_capacity", OK, msg)
+
+
+def check_dashboard_promoted(db) -> Check:
+    """The board the user actually sees is showing a RECENT scan.
+
+    The dashboard renders scan_state.latest_scan_id, and a scan is only
+    promoted once it fields >= 15 complete dossiers. That guard is correct --
+    it refuses to show an empty board -- but it means dossier generation can
+    fail silently while the site serves a stale scan that still looks fine.
+    Exactly that happened: scans 136-140 completed with 0 dossiers, so the
+    dashboard sat on scan 135 from 2026-08-14 for six days and nothing said so.
+    This watches what the customer sees, not what the pipeline claims.
+    """
+    rows = (db.table("scan_state").select("latest_scan_id,latest_scan_completed_at")
+            .eq("id", 1).limit(1).execute()).data or []
+    if not rows or not rows[0].get("latest_scan_id"):
+        return Check("dashboard_promoted", CRITICAL,
+                     "scan_state has no promoted scan -- the board is empty")
+    completed = rows[0].get("latest_scan_completed_at")
+    if not completed:
+        return Check("dashboard_promoted", WARNING, "promoted scan has no completion time")
+    ts = datetime.fromisoformat(str(completed).replace("Z", "+00:00"))
+    age_h = (_now() - ts).total_seconds() / 3600
+    scan_id = rows[0]["latest_scan_id"]
+    if ts < _business_hours_ago(30):
+        return Check("dashboard_promoted", CRITICAL,
+                     f"dashboard is showing scan {scan_id} from {age_h:.0f}h ago "
+                     "-- newer scans completed but produced too few dossiers to promote")
+    return Check("dashboard_promoted", OK, f"showing scan {scan_id} ({age_h:.0f}h old)")
+
+
 def run_checks(db) -> list[Check]:
     return [
         # ── core product: if these are stale the dashboard is wrong ──────
@@ -267,8 +367,10 @@ def run_checks(db) -> list[Check]:
         check_freshness(db, "fundamentals",           "fetched_at",  24 * 10,
                         WARNING, business_days=False),
         # ── platform health ─────────────────────────────────────────────
+        check_dashboard_promoted(db),
         check_db_size(db),
         check_llm_providers(),
+        check_llm_capacity(),
     ]
 
 
