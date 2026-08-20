@@ -138,15 +138,22 @@ def _providers() -> list[_Provider]:
         # rate-limited. The account-level FREE cap is ~50 req/day (shared
         # across these models) + ~20 req/min; two models give per-minute
         # rotation so one model's throttle doesn't stall the chain. BOTH are
-        # FREE (`:free`) -- never a paid slot. gpt-oss-120b goes first (same
-        # family Cerebras runs here; verified responsive June 2026); Llama
-        # 70b:free is the heavily-throttled backup (speed=1 => tried last).
-        _Provider("openrouter-gptoss", "openai", OPENROUTER_API_KEY,
-                  "openai/gpt-oss-120b:free",
+        # FREE (`:free`) -- never a paid slot. nemotron-3-ultra-550b goes first
+        # (the most capable free slot on offer, prose + JSON verified);
+        # nemotron-3.5-lightning is the fast backup (speed=1 => tried last).
+        # Both previous slots (openai/gpt-oss-120b:free and
+        # meta-llama/llama-3.3-70b-instruct:free) now return
+        # 404 "This model is unavailable" -- OpenRouter rotated its free
+        # lineup, so this entire overflow tier had been silently dead. Verified
+        # against GET /api/v1/models and a live prose+JSON call on 2026-08-20.
+        # Re-check these ids whenever the last-resort tier looks unused: a free
+        # slot disappearing is normal and fails 404, not loudly.
+        _Provider("openrouter-nemotron", "openai", OPENROUTER_API_KEY,
+                  "nvidia/nemotron-3-ultra-550b-a55b:free",
                   "https://openrouter.ai/api/v1",
                   tier=2, rpd=50),
-        _Provider("openrouter-llama", "openai", OPENROUTER_API_KEY,
-                  "meta-llama/llama-3.3-70b-instruct:free",
+        _Provider("openrouter-lightning", "openai", OPENROUTER_API_KEY,
+                  "nvidia/nemotron-3.5-lightning:free",
                   "https://openrouter.ai/api/v1",
                   tier=2, speed=1, rpd=50),
     ]
