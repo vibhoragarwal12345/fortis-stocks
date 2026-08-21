@@ -36,6 +36,14 @@ CEREBRAS_API_KEY: str = os.environ.get("CEREBRAS_API_KEY", "")  # Cerebras Cloud
 # daily token budget and starved the critic/grader; a second key per provider
 # roughly doubles the daily ceiling. Missing = silently dropped from the chain.
 CEREBRAS_API_KEY_2: str = os.environ.get("CEREBRAS_API_KEY_2", "")
+# Replacement capacity for Cerebras, which went HTTP 402 (billing wall) on both
+# keys in Aug 2026. Both are OPTIONAL: the gateway drops any provider whose key
+# is unset, so leaving these blank changes nothing.
+#   Mistral La Plateforme "Experiment" -- free, no card, ~1B tokens/MONTH
+#     (~33M/day vs the 1M/day Cerebras gave). console.mistral.ai
+#   SambaNova Cloud -- free via email signup, Llama/Qwen models.
+MISTRAL_API_KEY: str = os.environ.get("MISTRAL_API_KEY", "")
+SAMBANOVA_API_KEY: str = os.environ.get("SAMBANOVA_API_KEY", "")
 GROQ_API_KEY_2: str = os.environ.get("GROQ_API_KEY_2", "")
 NVIDIA_API_KEY: str = os.environ.get("NVIDIA_API_KEY", "")      # NVIDIA NIM (build.nvidia.com)
 OPENROUTER_API_KEY: str = os.environ.get("OPENROUTER_API_KEY", "")  # OpenRouter — free-model overflow router (last resort)

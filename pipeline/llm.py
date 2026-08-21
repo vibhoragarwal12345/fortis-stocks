@@ -70,6 +70,8 @@ from config import (  # noqa: E402
     GROQ_API_KEY_2,
     NVIDIA_API_KEY,
     OPENROUTER_API_KEY,
+    MISTRAL_API_KEY,
+    SAMBANOVA_API_KEY,
 )
 
 log = logging.getLogger(__name__)
@@ -125,6 +127,27 @@ def _providers() -> list[_Provider]:
         _Provider("groq_2", "openai", GROQ_API_KEY_2,
                   "openai/gpt-oss-120b", "https://api.groq.com/openai/v1",
                   tier=0, rpd=1000, tpd=100_000),
+        # ── Cerebras replacements (both OPTIONAL; dropped when the key is
+        # unset, so this is inert until a key is added) ────────────────────
+        # Cerebras went HTTP 402 "Payment required" on BOTH keys in Aug 2026 --
+        # a billing wall, not a daily cap, so it does not reset. That removed
+        # ~2M of the ~2.2M designed daily tokens and starved dossier
+        # generation, which froze the dashboard for six days.
+        #
+        # Mistral's free "Experiment" tier is the biggest like-for-like
+        # replacement available without a card: ~1B tokens/MONTH (~33M/day)
+        # versus the 1M/day Cerebras gave. Endpoint verified OpenAI-shaped
+        # (POST /v1/chat/completions returns 401 without a key, not 404).
+        # tpd is set conservatively below the headline figure because the free
+        # tier's RPM ceiling, not the token pool, is the real constraint.
+        _Provider("mistral", "openai", MISTRAL_API_KEY,
+                  "mistral-large-latest", "https://api.mistral.ai/v1",
+                  tier=0, rpd=2000, tpd=1_000_000),
+        # SambaNova Cloud -- free via email signup, Llama/Qwen. Second string:
+        # smaller and less documented than Mistral, so speed=1 tries it last.
+        _Provider("sambanova", "openai", SAMBANOVA_API_KEY,
+                  "Meta-Llama-3.3-70B-Instruct", "https://api.sambanova.ai/v1",
+                  tier=0, speed=1, rpd=1000, tpd=500_000),
         _Provider("nvidia", "openai", NVIDIA_API_KEY,
                   "meta/llama-3.3-70b-instruct", "https://integrate.api.nvidia.com/v1",
                   tier=0, rpd=500, speed=1),
