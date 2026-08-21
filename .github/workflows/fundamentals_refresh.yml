@@ -1,0 +1,53 @@
+name: Fundamentals cache · daily refresh
+
+# Warms the `fundamentals` table (migration 057) that the v2 factor ranker
+# (layer2_factor_rank) reads to gate + score the scan. Refreshes a ~470-ticker
+# slice per run (missing first, then stalest), so the full ~3,300 universe is
+# covered on a ~weekly cycle while staying inside the Finnhub free tier.
+#
+# Runs as a SEPARATE, NON-CRITICAL workflow on purpose: the live scan reads the
+# cache as a plain SELECT and the ranker falls back to the legacy technical
+# score if the cache is cold, so a refresh failure degrades selection quality
+# but NEVER breaks the scan.
+#
+# Trigger: a native daily schedule at 09:00 UTC (well before the 12:00 UTC
+# pre-market scan). Native cron is fine here -- unlike the market scan this job
+# is idempotent, non-time-critical, and does not double-fire against pg_cron.
+# workflow_dispatch stays for manual / cold-start warms.
+
+on:
+  schedule:
+    - cron: "0 9 * * 1-5"     # 09:00 UTC, Mon-Fri
+  workflow_dispatch:
+    inputs:
+      budget:
+        description: "Max tickers to fetch this run (0 = whole universe)"
+        required: false
+        default: "470"
+
+concurrency:
+  group: fundamentals-refresh
+  cancel-in-progress: false
+
+env:
+  NEXT_PUBLIC_SUPABASE_URL:  ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  FINNHUB_API_KEY:           ${{ secrets.FINNHUB_API_KEY }}
+
+jobs:
+  refresh:
+    name: "Refresh fundamentals cache"
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-pipeline
+
+      - name: Refresh fundamentals (missing + stalest first)
+        run: |
+          BUDGET="${{ github.event.inputs.budget }}"
+          python -m pipeline.data.fundamentals_cache refresh --budget "${BUDGET:-470}"
+
+      - name: Cache coverage status
+        if: always()
+        run: python -m pipeline.data.fundamentals_cache status
