@@ -646,9 +646,17 @@ def run(run_type: str = "midday") -> None:
 
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from config import SUPABASE_SERVICE_KEY, SUPABASE_URL
-    from supabase import create_client
-    from supabase.lib.client_options import ClientOptions
+    from supabase import ClientOptions, create_client
 
+    # NB: import ClientOptions from `supabase`, NOT from
+    # `supabase.lib.client_options`. Both exist in supabase 2.30.1 and both
+    # report the same __module__, but they are DIFFERENT classes -- the latter
+    # has no `.storage`, so create_client raises
+    #   AttributeError: 'ClientOptions' object has no attribute 'storage'
+    # That broke every harvest on 2026-08-20 and left the rollup stale for a
+    # day. It passed locally because the local venv resolved the re-exported
+    # class; only CI hit the other one.
+    #
     # Explicit per-request deadline. _write_scores issues one HTTP PATCH per
     # row through a thread pool, and neither postgrest-py nor httpx applies a
     # default timeout, so a single hung request stalls the whole agent
